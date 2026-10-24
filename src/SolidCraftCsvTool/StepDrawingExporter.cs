@@ -137,6 +137,14 @@ public static class StepDrawingExporter
 
 internal static class DxfProjectionReader
 {
+    sealed class EndpointNode(Point2 point)
+    {
+        public Point2 Point { get; } = point;
+        public List<int> Edges { get; } = [];
+    }
+    readonly record struct EndpointKey(long X, long Y);
+    readonly record struct ProjectionEdge(int A, int B, string Layer);
+
     public static Projection2 Read(string path, string name)
     {
         if (!File.Exists(path)) throw new IOException("SolidCraft 未输出投影视图：" + path);
@@ -212,7 +220,54 @@ internal static class DxfProjectionReader
 
         var all = lines.SelectMany(l => new[] { l.A, l.B }).Concat(polylines.SelectMany(p => p.Points)).ToArray();
         if (all.Length == 0) throw new InvalidDataException($"{name} 投影视图没有可绘制的实体，请检查 STEP 文件。");
-        return new(name, lines, polylines, new(all.Min(p => p.X), all.Min(p => p.Y), all.Max(p => p.X), all.Max(p => p.Y)));
+        var joined = JoinConnectedLines(lines);
+        polylines.AddRange(joined.Polylines);
+        return new(name, joined.Lines, polylines, new(all.Min(p => p.X), all.Min(p => p.Y), all.Max(p => p.X), all.Max(p => p.Y)));
+    }
+
+    static (List<Line2> Lines, List<Polyline2> Polylines) JoinConnectedLines(IReadOnlyList<Line2> source)
+    {
+        const double snap = 0.001;
+        var isolated = new List<Line2>(); var chains = new List<Polyline2>();
+        foreach (var layerGroup in source.GroupBy(line => line.Layer, StringComparer.OrdinalIgnoreCase))
+        {
+            var nodes = new List<EndpointNode>(); var nodeIds = new Dictionary<EndpointKey, int>(); var edges = new List<ProjectionEdge>();
+            int Node(Point2 point)
+            {
+                var key = new EndpointKey((long)Math.Round(point.X / snap), (long)Math.Round(point.Y / snap));
+                if (nodeIds.TryGetValue(key, out int id)) return id;
+                id = nodes.Count; nodes.Add(new(point)); nodeIds.Add(key, id); return id;
+            }
+            foreach (Line2 line in layerGroup)
+            {
+                int a = Node(line.A), b = Node(line.B);
+                if (a == b) { isolated.Add(line); continue; }
+                int edge = edges.Count; edges.Add(new(a, b, line.Layer)); nodes[a].Edges.Add(edge); nodes[b].Edges.Add(edge);
+            }
+            var visited = new bool[edges.Count];
+            void Walk(int startNode, int firstEdge)
+            {
+                var points = new List<Point2> { nodes[startNode].Point }; int current = startNode, edgeId = firstEdge; bool closed = false;
+                while (!visited[edgeId])
+                {
+                    visited[edgeId] = true; ProjectionEdge edge = edges[edgeId]; int next = edge.A == current ? edge.B : edge.A;
+                    points.Add(nodes[next].Point);
+                    if (next == startNode) { closed = true; break; }
+                    if (nodes[next].Edges.Count != 2) break;
+                    int nextEdge = nodes[next].Edges[0] == edgeId ? nodes[next].Edges[1] : nodes[next].Edges[0];
+                    if (visited[nextEdge]) break;
+                    current = next; edgeId = nextEdge;
+                }
+                if (closed && points.Count > 2 && Distance(points[0], points[^1]) <= snap * 1.5) points.RemoveAt(points.Count - 1);
+                if (points.Count == 2) isolated.Add(new(points[0], points[1], layerGroup.Key));
+                else if (points.Count > 2) chains.Add(new(points, closed, layerGroup.Key));
+            }
+            for (int node = 0; node < nodes.Count; node++)
+                if (nodes[node].Edges.Count != 2)
+                    foreach (int edge in nodes[node].Edges) if (!visited[edge]) Walk(node, edge);
+            for (int edge = 0; edge < edges.Count; edge++) if (!visited[edge]) Walk(edges[edge].A, edge);
+        }
+        return (isolated, chains);
     }
 
     static double? Number(List<(int Code, string Value)> pairs, int code)
@@ -221,6 +276,7 @@ internal static class DxfProjectionReader
         return value == null ? null : Parse(value);
     }
     static double Parse(string value) => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double result) && double.IsFinite(result) ? result : throw new InvalidDataException("DXF 中含有无效坐标。");
+    static double Distance(Point2 a, Point2 b) { double dx = a.X - b.X, dy = a.Y - b.Y; return Math.Sqrt(dx * dx + dy * dy); }
 
     static IReadOnlyList<Point2> ExpandBulges(IReadOnlyList<Point2> vertices, IReadOnlyList<double> bulges, bool closed)
     {
