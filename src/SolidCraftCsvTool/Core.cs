@@ -100,13 +100,6 @@ public static class ModelRules
         throw new InvalidDataException("SolidCraft 返回的 STEP 实例编号格式未知，无法安全移动组合零件。");
     }
 
-    public static void RequirePackedBounds(Bounds actual, int expectedBodies, double expectedMaxX)
-    {
-        const double tolerance = 0.02;
-        if (actual.Bodies != expectedBodies || Math.Abs(actual.Min[0]) > tolerance || Math.Abs(actual.Max[0] - expectedMaxX) > tolerance)
-            throw new InvalidDataException($"组合 STEP 摆放校验失败：实际 X 范围 {actual.Min[0]:0.###}…{actual.Max[0]:0.###} mm，预期 0…{expectedMaxX:0.###} mm；实体 {actual.Bodies}/{expectedBodies}。已停止导出。");
-    }
-
     public static void RequireClearInterference(JsonElement result, int expectedBodies)
     {
         if (!result.TryGetProperty("interferences", out var overlaps) || overlaps.ValueKind != JsonValueKind.Array ||

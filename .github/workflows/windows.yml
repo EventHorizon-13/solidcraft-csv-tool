@@ -29,7 +29,7 @@ jobs:
           @"
           Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
-          本次使用 SolidCraft 实例移动命令设置世界坐标偏移，并在导出前验证组合包围盒和实体相交。
+          本次使用 SolidCraft 实例移动命令设置世界坐标偏移，并在导出前检查实体数量和相交。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8

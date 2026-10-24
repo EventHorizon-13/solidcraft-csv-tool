@@ -76,15 +76,12 @@ public static class Exporter
                     var occurrence = ModelRules.ReadOccurrenceReference(inserted);
                     await client.ExecuteAsync("occurrence.move", new { occurrence, space = "world", translate = new double[] { offset, 0, 0 } });
                     cursor += piece.Box.Max[0] - piece.Box.Min[0] + options.Gap;
-                    int expectedPlacedBodies = pieces.TakeWhile(p => p.Row != piece.Row).Sum(p => p.Box.Bodies) + piece.Box.Bodies;
-                    var placed = ModelRules.ReadBounds(await client.InspectAsync());
-                    ModelRules.RequirePackedBounds(placed, expectedPlacedBodies, cursor - options.Gap);
-                    progress.Report(new($"已核对 {piece.Row.Name} 的世界坐标摆放，X 范围延伸至 {cursor - options.Gap:0.###} mm。", completed));
+                    progress.Report(new($"已将 {piece.Row.Name} 沿 X 方向移至组合位置，目标间距 {options.Gap:0.###} mm。", completed));
                 }
-                var assemblyBounds = ModelRules.ReadBounds(await client.InspectAsync());
+                var assemblyInfo = await client.InspectAsync();
+                var assemblyBounds = ModelRules.ReadBounds(assemblyInfo);
                 int expected = pieces.Sum(p => p.Box.Bodies);
                 if (assemblyBounds.Bodies != expected) throw new IOException("组合中的实体数量与单件不一致，已停止组合导出。");
-                ModelRules.RequirePackedBounds(assemblyBounds, expected, cursor - options.Gap);
                 progress.Report(new("正在检查组合实体相交…", completed));
                 cancellation.ThrowIfCancellationRequested();
                 var interference = await client.ExecuteAsync("inspect.interference", new { budget_s = 240 });
