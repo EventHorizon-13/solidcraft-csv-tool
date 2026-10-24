@@ -179,6 +179,8 @@ internal sealed record DetectedArc(double StartX, double EndX, double CenterX, d
 
 internal static class DxfFeatureDetector
 {
+    static double Distance(double dx, double dy) => Math.Sqrt(dx * dx + dy * dy);
+
     public static StepFeatureSet Analyze(Projection2 front, Projection2 top)
     {
         var arcs = DetectRepeatedArcs(front);
@@ -206,7 +208,7 @@ internal static class DxfFeatureDetector
             for (int i = 1; i < poly.Points.Count - 1; i++)
             {
                 Point2 a = poly.Points[i - 1], b = poly.Points[i], c = poly.Points[i + 1];
-                double l1 = Math.Hypot(b.X - a.X, b.Y - a.Y), l2 = Math.Hypot(c.X - b.X, c.Y - b.Y);
+                double l1 = Distance(b.X - a.X, b.Y - a.Y), l2 = Distance(c.X - b.X, c.Y - b.Y);
                 if (l1 < 2 || l2 < 2) continue;
                 double dot = ((b.X - a.X) * (c.X - b.X) + (b.Y - a.Y) * (c.Y - b.Y)) / (l1 * l2);
                 double turn = Math.Acos(Math.Clamp(dot, -1, 1)) * 180 / Math.PI;
@@ -233,7 +235,7 @@ internal static class DxfFeatureDetector
             {
                 Point2 a = poly.Points[i - 1], b = poly.Points[i];
                 double dx = Math.Abs(b.X - a.X), dy = Math.Abs(b.Y - a.Y);
-                if (dx < 2 || dy < 2 || Math.Hypot(dx, dy) < 5) continue;
+                if (dx < 2 || dy < 2 || Distance(dx, dy) < 5) continue;
                 bool nearCorner = (Math.Min(Math.Abs(a.X - view.Bounds.MinX), Math.Abs(view.Bounds.MaxX - a.X)) < view.Bounds.Width * 0.18 ||
                                    Math.Min(Math.Abs(b.X - view.Bounds.MinX), Math.Abs(view.Bounds.MaxX - b.X)) < view.Bounds.Width * 0.18) &&
                                   (Math.Min(Math.Abs(a.Y - view.Bounds.MinY), Math.Abs(view.Bounds.MaxY - a.Y)) < view.Bounds.Height * 0.18 ||
@@ -306,7 +308,7 @@ internal static class MachiningPdf
 
     static void DrawPage(PdfDocument pdf, StepDrawingPage item, int pageNumber, int pageCount)
     {
-        PdfPage page = pdf.AddPage(); page.Size = PageSize.A4; page.Orientation = PageOrientation.Landscape;
+        PdfPage page = pdf.AddPage(); page.Width = XUnit.FromPoint(841.89); page.Height = XUnit.FromPoint(595.28);
         using XGraphics g = XGraphics.FromPdfPage(page);
         const double w = 841.89, h = 595.28, margin = 17;
         var black = new XPen(Outline, 0.65); var thin = new XPen(Outline, 0.4); var dimPen = new XPen(Dimension, 0.55); var dimBrush = new XSolidBrush(DimensionText);
