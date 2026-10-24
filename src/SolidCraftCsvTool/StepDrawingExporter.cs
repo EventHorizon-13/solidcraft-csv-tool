@@ -118,7 +118,7 @@ public static class StepDrawingExporter
     static string SafeFileName(string value)
     {
         var invalid = Path.GetInvalidFileNameChars().ToHashSet();
-        string safe = new(value.Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '_' : ch).ToArray()).Trim(' ', '.');
+        string safe = new string(value.Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '_' : ch).ToArray()).Trim(' ', '.');
         return safe.Length == 0 ? "STEP" : safe;
     }
 
@@ -312,11 +312,11 @@ internal static class DxfFeatureDetector
 }
 internal static class MachiningDxf
 {
-    sealed class Writer(string path)
+    sealed class Writer(string path) : IDisposable
     {
         readonly StreamWriter output = new(path, false, Encoding.ASCII);
         public void Pair(int code, string value) { output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
-        public void Finish() => output.Dispose();
+        public void Dispose() => output.Dispose();
         public void Line(Point2 a, Point2 b, string layer = "DIM")
         {
             if (Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) < 0.00001) return;
@@ -398,7 +398,6 @@ internal static class MachiningDxf
             writer.Text("尺寸取自 STEP 投影几何；请按原图复核半孔、台阶及装配方向。", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
             Footer(writer, page.Name, front.Max.X + 100, top.Min.Y - 60);
             writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
-            writer.Finish();
         }
     }
 
