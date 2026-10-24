@@ -23,13 +23,15 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item README.md dist/app/README.md
+          Copy-Item THIRD_PARTY_NOTICES.md dist/app/THIRD_PARTY_NOTICES.md
           Compress-Archive -Path dist/app/* -DestinationPath dist/SolidCraftCsvTool-win-x64.zip
           $hash = (Get-FileHash dist/SolidCraftCsvTool-win-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  SolidCraftCsvTool-win-x64.zip" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
           @"
           Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
-          本次使用 SolidCraft 实例移动命令设置世界坐标偏移，并在导出前检查实体数量和相交。
+          新增 STEP 批量加工图工作流：读取 STEP、从 SolidCraft 导出正交三视图、测量外形并标注识别出的重复弧槽尺寸，合成为多页 PDF。
+          加工图工作流尚未连接用户的 SolidCraft 桌面端做实机复核；复杂端部、半槽、斜边尺寸需要人工核对。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8

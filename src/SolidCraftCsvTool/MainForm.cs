@@ -55,6 +55,7 @@ public sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("删除选中", DeleteSelected));
         toolbar.Controls.Add(MakeButton("检查参数", () => { var rows = ModelRules.Validate(GetRows()); SetStatus($"{rows.Count} 行参数检查通过"); }));
         toolbar.Controls.Add(MakeButton("启动 SolidCraft…", LaunchSolidCraft));
+        toolbar.Controls.Add(MakeButton("STEP 批量出图 PDF", () => { _ = RunStepDrawing(); }));
         layout.Controls.Add(toolbar, 0, 2);
 
         grid.Dock = DockStyle.Fill; grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false;
@@ -205,6 +206,28 @@ public sealed class MainForm : Form
         }
         catch (OperationCanceledException) { SetStatus("已停止，已导出的文件保留。"); Log("已按请求停止。"); }
         catch (Exception ex) { Log("导出中止：" + ex.Message); ShowError(ex.Message); SetStatus("导出中止"); }
+        finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
+    }
+
+    async Task RunStepDrawing()
+    {
+        using OpenFileDialog input = new() { Filter = "STEP 三维文件 (*.step;*.stp)|*.step;*.stp", Multiselect = true, Title = "选择要批量生成加工图的 STEP 文件" };
+        if (input.ShowDialog(this) != DialogResult.OK) return;
+        using SaveFileDialog outputFile = new() { Filter = "PDF 加工图 (*.pdf)|*.pdf", DefaultExt = "pdf", AddExtension = true, FileName = "辊密封_加工图.pdf", Title = "保存多页加工图 PDF" };
+        if (outputFile.ShowDialog(this) != DialogResult.OK) return;
+        try
+        {
+            string[] files = input.FileNames.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase).ToArray();
+            var target = Path.GetFullPath(outputFile.FileName);
+            if (File.Exists(target)) throw new IOException("目标 PDF 已存在，请选择新文件名；当前入口不会覆盖原图纸。");
+            cancellation = new(); SetRunning(true); progressBar.Maximum = files.Length; progressBar.Value = 0;
+            Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
+            await Task.Run(() => StepDrawingExporter.RunAsync(files, target, (int)port.Value, progress, cancellation.Token));
+            SetStatus($"加工图完成：{files.Length} 个 STEP"); Log("多页 PDF：" + target);
+            MessageBox.Show(this, $"已生成 {files.Length} 页加工图。\n{target}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (OperationCanceledException) { SetStatus("已停止；未完成的 PDF 不会发布。"); Log("STEP 批量出图已停止。"); }
+        catch (Exception ex) { Log("STEP 出图中止：" + ex.Message); ShowError(ex.Message); SetStatus("STEP 出图中止"); }
         finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
     }
 
