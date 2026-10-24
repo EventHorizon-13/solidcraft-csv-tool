@@ -314,7 +314,7 @@ internal static class MachiningDxf
 {
     sealed class Writer(string path) : IDisposable
     {
-        readonly StreamWriter output = new(path, false, Encoding.ASCII);
+        readonly StreamWriter output = new(path, false, DxfEncoding());
         public void Pair(int code, string value) { output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
         public void Dispose() => output.Dispose();
         public void Line(Point2 a, Point2 b, string layer = "DIM")
@@ -325,8 +325,8 @@ internal static class MachiningDxf
         public void Polyline(IReadOnlyList<Point2> points, bool closed, string layer)
         {
             if (points.Count < 2) return;
-            Pair(0, "LWPOLYLINE"); Pair(8, layer); Pair(90, points.Count.ToString(CultureInfo.InvariantCulture)); Pair(70, closed ? "1" : "0");
-            foreach (Point2 p in points) { Pair(10, F(p.X)); Pair(20, F(p.Y)); }
+            for (int i = 1; i < points.Count; i++) Line(points[i - 1], points[i], layer);
+            if (closed) Line(points[^1], points[0], layer);
         }
         public void Text(string value, Point2 at, double height, string layer = "TEXT", double rotation = 0)
         {
@@ -358,10 +358,10 @@ internal static class MachiningDxf
             var end = new Map(page.End, page.Front.Bounds.Width + 100 - page.End.Bounds.MinX, -page.End.Bounds.MinY);
             DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
             writer.Text(page.Name, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
-            writer.Text("三视图加工尺寸    单位：mm", new(front.Min.X, front.Max.Y + 62), 3.2, "TITLE");
-            writer.Text("主视图", new(front.Min.X, front.Max.Y + 8), 3.0, "TITLE");
-            writer.Text("俯视图", new(top.Min.X, top.Max.Y + 8), 3.0, "TITLE");
-            writer.Text("端视图", new(end.Min.X, end.Max.Y + 8), 3.0, "TITLE");
+            writer.Text("3 VIEW MACHINING DRAWING    UNIT: mm", new(front.Min.X, front.Max.Y + 62), 3.2, "TITLE");
+            writer.Text("FRONT", new(front.Min.X, front.Max.Y + 8), 3.0, "TITLE");
+            writer.Text("TOP", new(top.Min.X, top.Max.Y + 8), 3.0, "TITLE");
+            writer.Text("END", new(end.Min.X, end.Max.Y + 8), 3.0, "TITLE");
 
             // 外形尺寸：总长、总高、总宽及端视图复核尺寸。
             Horizontal(writer, front.Min.X, front.Max.X, front.Min.Y, front.Min.Y - 22, Fmt(page.Front.Bounds.Width));
@@ -395,7 +395,7 @@ internal static class MachiningDxf
                 string slopes = string.Join("；", page.Features.PlanSlants.Select(s => $"斜边 {Fmt(s.Dx)}×{Fmt(s.Dy)}"));
                 writer.Text(slopes, new(front.Min.X, top.Min.Y - 48), 3.0, "TITLE");
             }
-            writer.Text("尺寸取自 STEP 投影几何；请按原图复核半孔、台阶及装配方向。", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
+            writer.Text("STEP PROJECTION DIMENSIONS - REVIEW HALF HOLES AND END STEPS", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
             Footer(writer, page.Name, front.Max.X + 100, top.Min.Y - 60);
             writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
         }
@@ -403,8 +403,8 @@ internal static class MachiningDxf
 
     static void Header(Writer w)
     {
-        w.Pair(0, "SECTION"); w.Pair(2, "HEADER"); w.Pair(9, "$ACADVER"); w.Pair(1, "AC1015");
-        w.Pair(9, "$INSUNITS"); w.Pair(70, "4"); w.Pair(9, "$MEASUREMENT"); w.Pair(70, "1"); w.Pair(9, "$DWGCODEPAGE"); w.Pair(3, "ANSI_1252");
+        w.Pair(0, "SECTION"); w.Pair(2, "HEADER"); w.Pair(9, "$ACADVER"); w.Pair(1, "AC1009");
+        w.Pair(9, "$DWGCODEPAGE"); w.Pair(3, "ANSI_936");
         w.Pair(0, "ENDSEC");
         w.Pair(0, "SECTION"); w.Pair(2, "TABLES");
         w.Pair(0, "TABLE"); w.Pair(2, "LTYPE"); w.Pair(70, "2");
@@ -417,6 +417,13 @@ internal static class MachiningDxf
         for (int i = 0; i < layers.Length; i++) { w.Pair(0, "LAYER"); w.Pair(2, layers[i]); w.Pair(70, "0"); w.Pair(62, colors[i].ToString(CultureInfo.InvariantCulture)); w.Pair(6, layers[i] == "HIDDEN" ? "DASHED" : "CONTINUOUS"); }
         w.Pair(0, "ENDTAB");
         w.Pair(0, "TABLE"); w.Pair(2, "STYLE"); w.Pair(70, "1"); w.Pair(0, "STYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0"); w.Pair(40, "0"); w.Pair(41, "1"); w.Pair(50, "0"); w.Pair(71, "0"); w.Pair(42, "2.5"); w.Pair(3, "txt"); w.Pair(4, ""); w.Pair(0, "ENDTAB");
+        w.Pair(0, "ENDSEC");
+        w.Pair(0, "SECTION"); w.Pair(2, "BLOCKS");
+        foreach (string block in new[] { "$MODEL_SPACE", "$PAPER_SPACE" })
+        {
+            w.Pair(0, "BLOCK"); w.Pair(8, "0"); w.Pair(2, block); w.Pair(70, "0"); w.Pair(10, "0"); w.Pair(20, "0"); w.Pair(30, "0"); w.Pair(3, block); w.Pair(1, "");
+            w.Pair(0, "ENDBLK"); w.Pair(8, "0");
+        }
         w.Pair(0, "ENDSEC"); w.Pair(0, "SECTION"); w.Pair(2, "ENTITIES");
     }
 
@@ -482,23 +489,17 @@ internal static class MachiningDxf
     static void Footer(Writer w, string name, double x, double y)
     {
         w.Line(new(x, y + 7), new(x + 90, y + 7), "TITLE");
-        w.Text("图名：" + name, new(x + 2, y + 2), 2.8, "TITLE");
-        w.Text("单位：mm   来源：STEP", new(x + 2, y - 4), 2.8, "TITLE");
+        w.Text("PART: " + name, new(x + 2, y + 2), 2.8, "TITLE");
+        w.Text("UNITS: mm   SOURCE: STEP", new(x + 2, y - 4), 2.8, "TITLE");
     }
 
     static bool IsHidden(string layer) => layer.Contains("HIDDEN", StringComparison.OrdinalIgnoreCase);
     static string F(double value) => value.ToString("0.#####", CultureInfo.InvariantCulture);
     static string Fmt(double value) => Math.Abs(value - Math.Round(value)) < 0.005 ? Math.Round(value).ToString("0", CultureInfo.InvariantCulture) : value.ToString("0.##", CultureInfo.InvariantCulture);
-    static string Escape(string value)
+    static string Escape(string value) => value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal);
+    static Encoding DxfEncoding()
     {
-        var result = new StringBuilder(value.Length);
-        foreach (char ch in value)
-        {
-            if (ch == '\\') result.Append("\\\\");
-            else if (ch == '\r' || ch == '\n') result.Append(' ');
-            else if (ch > 127) result.Append("\\U+").Append(((int)ch).ToString("X4", CultureInfo.InvariantCulture));
-            else result.Append(ch);
-        }
-        return result.ToString();
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return Encoding.GetEncoding(936, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
     }
 }
