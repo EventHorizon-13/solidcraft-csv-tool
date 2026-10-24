@@ -31,8 +31,7 @@ jobs:
           Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
           STEP 加工图按文件名排序，纵向排入一个汇总 DXF，每张图标注序号和文件名。
-          输出正交三视图，并标注外形、弧槽直径与位置链、轮廓折点尺寸链、半孔及端部台阶尺寸。
-          DXF 尺寸基于 STEP 投影几何提取；复杂端部和半孔仍建议对照恒瑞已完成图纸复核。
+          输出正交三视图，合并到一个 DXF 并标注序号和 STEP 文件名；此版不含尺寸标注。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8
