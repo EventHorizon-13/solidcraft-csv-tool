@@ -18,7 +18,7 @@ Windows 10/11 x64 桌面程序，使用 C# / WinForms 原生窗口与表格控�
 
 ## STEP 批量加工图
 
-“STEP 批量出图 PDF”直接以已存在的 STEP 实体为输入，不读取 CSV 来绘制轮廓。SolidCraft 对每个 STEP 做正交三视图投影；程序按投影边界标外形长宽高，尝试从主视轮廓识别重复弧槽的直径和中心距，再按横向图框合成多页 PDF。PDF 是自动制图初稿：弧槽和半槽的自动识别尺寸需要按原模型复核；未识别的特征会在图页提示。复杂倒角、子头/母槽尺寸当前不自动推断，不会伪造标注。
+“STEP 批量出图 PDF”直接以已存在的 STEP 实体为输入，不读取 CSV 来绘制轮廓。SolidCraft 对每个 STEP 做正交三视图投影；程序按投影边界标外形长宽高，尝试从主视轮廓识别重复弧槽的直径和中心距，再按横向图框合成多页 PDF。PDF 是自动制图初稿：弧槽和半槽的自动识别尺寸需要按原模型复核；未识别的特征会在图页提示。复杂倒角、子头/母槽尺寸当前不自动推断，不会伪造标注。程序包附带 Noto Sans SC，出图不依赖 Windows 是否安装微软雅黑。
 
 “停止”会等当前 SolidCraft 命令完成，再停止后续操作。长任务通过控制协议查询原请求结果，不会自动重发修改或导出命令。生成期间请勿手动切换 SolidCraft 标签或修改模型。
 
@@ -42,13 +42,13 @@ CSV、模板和最终输出可放 NAS；SolidCraft 读写的中间文件位于 `
 
 ## 从源码构建
 
-开发环境需要 Windows 与 .NET 10 SDK。最终使用者不需要 SDK 或运行时。
+开发环境需要 Windows、.NET 10 SDK、Python 3.12，以及可访问 GitHub 的网络，用于准备随程序发布的中文字体。最终使用者不需要安装 Python、SDK 或 .NET 运行时。
 
 ```powershell
 .\build.ps1
 ```
 
-输出位于 `dist/app/SolidCraftCsvTool.exe`。项目不依赖 Python 或第三方 NuGet 包。GitHub Actions 在 Windows 构建机发布自包含程序包与 SHA256 校验文件。
+输出位于 `dist/app/SolidCraftCsvTool.exe`。程序使用 PDFsharp-GDI 生成 PDF，GitHub Actions 在 Windows 构建机发布自包含程序包、中文字体和 SHA256 校验文件。
 
 构建不连接 SolidCraft 桌面端，也不生成 CAD 模型。真实导入、摆放和组合导出仍以 Windows 桌面端实际运行为准。
 

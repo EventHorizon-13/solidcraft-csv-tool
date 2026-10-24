@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using PdfSharp.Drawing;
+using PdfSharp.Fonts;
 using PdfSharp.Pdf;
 
 namespace SolidCraftCsvTool;
@@ -292,9 +293,15 @@ internal static class MachiningPdf
     static readonly XColor Outline = XColor.FromArgb(25, 31, 38);
     static readonly XColor Dimension = XColor.FromArgb(0, 188, 196);
     static readonly XColor DimensionText = XColor.FromArgb(0, 170, 38);
-    static readonly XFont Text = new("Microsoft YaHei", 8, XFontStyleEx.Regular);
-    static readonly XFont Small = new("Microsoft YaHei", 6.5, XFontStyleEx.Regular);
-    static readonly XFont Title = new("Microsoft YaHei", 17, XFontStyleEx.Regular);
+    static readonly XFont Text = CreateFont(8);
+    static readonly XFont Small = CreateFont(6.5);
+    static readonly XFont Title = CreateFont(17);
+
+    static XFont CreateFont(double size)
+    {
+        GlobalFontSettings.FontResolver ??= new BundledChineseFontResolver();
+        return new XFont("SolidCraft CJK", size, XFontStyleEx.Regular);
+    }
 
     public static void Write(string path, IReadOnlyList<StepDrawingPage> pages)
     {
@@ -466,4 +473,23 @@ internal static class MachiningPdf
         public double Y(double y) => top + (Projection.Bounds.MaxY - y) * scale;
         public XPoint Point(Point2 p) => new(X(p.X), Y(p.Y));
     }
+}
+
+internal sealed class BundledChineseFontResolver : IFontResolver
+{
+    const string Family = "SolidCraft CJK";
+    const string Face = "NotoSansSC-Regular";
+    static readonly Lazy<byte[]> FontData = new(() =>
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "Fonts", "NotoSansSC.ttf");
+        if (!File.Exists(path)) throw new FileNotFoundException("程序字体文件缺失，请重新解压完整软件包。", path);
+        return File.ReadAllBytes(path);
+    });
+
+    public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic) =>
+        familyName.Equals(Family, StringComparison.OrdinalIgnoreCase)
+            ? new FontResolverInfo(Face, mustSimulateBold: false, mustSimulateItalic: false)
+            : null;
+
+    public byte[]? GetFont(string faceName) => faceName == Face ? FontData.Value : null;
 }
