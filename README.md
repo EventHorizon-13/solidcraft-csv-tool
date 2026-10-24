@@ -1,45 +1,50 @@
 # SolidCraft 参数与批量导出
 
-Windows 桌面小工具：在表格中录入或修改辊密封参数，导入/导出 CSV，并让运行中的 SolidCraft 桌面版生成每行的原生 `.solidcraft` 与单件 `.step`。可选生成一个组合 STEP，程序按实体包围盒沿 X 方向留间距排布，并在导出前调用 SolidCraft 的精确实体相交检查；只要发现相交、检查超时或有实体未检查，就停止组合 STEP 导出。
+Windows 10/11 x64 桌面程序，使用 C# / WinForms 原生窗口与表格控件。发布包自带 .NET 运行时，双击运行，无需安装 Python 或 .NET。
 
-## 运行环境
+[下载 Windows 版本](https://github.com/EventHorizon-13/solidcraft-csv-tool/releases/latest/download/SolidCraftCsvTool-win-x64.zip) · [所有发行版](https://github.com/EventHorizon-13/solidcraft-csv-tool/releases)
 
-- Windows 10/11
-- Python 3.10+（含 Tkinter）
-- SolidCraft Windows 桌面版
-- V13 参数化辊密封模板
+解压 ZIP 后运行 `SolidCraftCsvTool.exe`。需要电脑上已安装 SolidCraft Windows 桌面版，并准备 V13 参数化辊密封模板。模板由使用者自行选择，程序不包含私人模型文件。
 
-先保存桌面中打开的设计，再用控制端口启动 SolidCraft：
+## 使用
 
-```powershell
-solidcraft --control 7878
-```
+1. 保存 SolidCraft 中当前打开的设计。点程序里的“启动 SolidCraft…”选择桌面版 `solidcraft.exe`，程序会加上控制参数启动；也可自行用 `solidcraft.exe --control 7878` 启动。
+2. 选择 V13 `.solidcraft` 模板与输出文件夹。
+3. 在参数表里直接输入，或导入 CSV。子头、母槽、左右半孔、左右斜边分别使用复选框。
+4. 按需勾选“另导出组合 STEP”，设置实体间距，点“生成并导出”。
 
-也可在快捷方式“目标”末尾添加 `--control 7878`。程序只连 `127.0.0.1`，并从 `%LOCALAPPDATA%\SolidCraft\control\7878.token` 读取本次启动的令牌。
+每行输出 `编号_辊密封.solidcraft` 与同名 `.step`。组合输出为 `辊密封_组合.step`，各型号按实体包围盒沿 X 方向留间距放置，再用 SolidCraft 精确检查相交。相交、实体数量不一致、检查未完成或返回信息不足时，中止组合 STEP 导出；已完成的单件会保留。默认不覆盖同名文件。
 
-启动程序：
+“停止”会等当前 SolidCraft 命令完成，再停止后续操作。长任务通过控制协议查询原请求结果，不会自动重发修改或导出命令。生成期间请勿手动切换 SolidCraft 标签或修改模型。
 
-```powershell
-py .\main.py
-```
+## CSV
 
-选 CSV、V13 `.solidcraft` 模板和输出目录后点“连接 SolidCraft 并生成”。模板和 STEP 会先暂存在本机 `%LOCALAPPDATA%\SolidCraft\csv-tool`，所以 CSV、模板及最终输出目录都可以位于 NAS；通过 SolidCraft 文件命令访问的路径保持在本地盘。
-
-## 参数表
-
-CSV 表头为：
+兼容原来的 CSV 表头，界面把“左半圆 / 右半圆”显示为“左半孔 / 右半孔”：
 
 ```text
 编号,孔数,孔径,孔距,高度,宽度,子头,母槽,左半圆,右半圆,左斜边,右斜边,斜边Y,斜边Z
 ```
 
-开关使用 0/1；小数孔数必须为 `x.5` 且恰好指定左或右半圆。程序兼容 UTF-8、带 BOM 的 UTF-8、UTF-16 和 GBK/GB18030；导出默认 UTF-8 BOM，便于 Excel 打开。
+开关在 CSV 里为 `0/1`。孔数为 `x.5` 时必须选一侧半孔；整数孔数必须两侧都不选，或两侧都选。半孔由 V13 模板的整排孔位平移与端面剪切实现，例如 4.5 孔切削 5 个孔位、5 孔双半孔切削 6 个孔位。尺寸单位 mm。
 
-## 导出行为
+支持 UTF-8、UTF-8 BOM、UTF-16、GBK / GB18030，导出为 Excel 可直接识别的 UTF-8 BOM。`examples/参数示例.csv` 是通用示例，未包含用户的生产表格。
 
-- 每行生成 `编号_辊密封.solidcraft` 和同名单件 `.step`。
-- 勾选组合 STEP 后，所有单件 STEP 作为独立实体装入一个新设计。按每个零件的实体包围盒计算 X 偏移，零件之间保留设定的间距。
-- 组合导出前调用 `inspect.interference`。相交对、未检查实体、超时或被截断时，不生成组合 STEP；单件输出仍保留。
-- 输出默认不覆盖同名文件；只有显式勾选“覆盖已有输出”才会替换。
+## 本机文件
 
-本工具通过 SolidCraft 桌面控制通道调用 `doc.open`、`parameters.change`、`file.save_as`、`file.export`、`file.insert_step` 和 `inspect.interference`。参见 SolidCraft 官方[控制协议](https://docs.solidcraft.io/dev/control-protocol.html)与[命令参考](https://docs.solidcraft.io/reference/commands.html)。
+CSV、模板和最终输出可放 NAS；SolidCraft 读写的中间文件位于 `%LOCALAPPDATA%\SolidCraft\csv-tool\run-*`。成功后清理本次中间文件，失败或停止时保留并在运行记录中显示路径。界面日志仅保留约 500 行，不持续写日志文件。模板路径、输出目录、SolidCraft 程序路径与端口保存在同目录的 `settings.json`。
+
+控制连接仅访问 `127.0.0.1`。默认读取 `%LOCALAPPDATA%\SolidCraft\control\端口.token`；也支持 `SOLIDCRAFT_CONTROL_DIR`。令牌只在连接首请求发送，不写入日志。
+
+## 从源码构建
+
+开发环境需要 Windows 与 .NET 10 SDK。最终使用者不需要 SDK 或运行时。
+
+```powershell
+.\build.ps1
+```
+
+输出位于 `dist/app/SolidCraftCsvTool.exe`。项目不依赖 Python 或第三方 NuGet 包。GitHub Actions 在 Windows 构建机执行 CSV / 半孔规则 / 包围盒 / 相交结果 / 控制通道回归检查、GUI 启动检查及自包含发布，成功后自动生成 GitHub Release 与 SHA256 校验文件。
+
+检查不生成 CAD 模型。自动检查不能代替真实 SolidCraft Windows 桌面端的建模、导出与设备尺寸验收。
+
+本工具使用 SolidCraft 官方[控制协议](https://docs.solidcraft.io/dev/control-protocol.html)与[命令参考](https://docs.solidcraft.io/reference/commands.html)。旧 Python 实现可在 Git 历史中查看，当前入口为 C# Windows 应用。

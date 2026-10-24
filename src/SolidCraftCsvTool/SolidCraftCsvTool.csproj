@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyName>SolidCraftCsvTool</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>SolidCraft 参数与批量导出</Product>
+    <Description>Windows CSV parameter editor and SolidCraft desktop exporter</Description>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+</Project>
