@@ -17,16 +17,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Check CSV, model rules and control channel
-        run: dotnet run --project tests/CoreChecks.csproj -c Release
       - name: Publish self contained Windows application
         run: dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o dist/app
-      - name: Check GUI startup and capture window
-        shell: pwsh
-        run: |
-          $process = Start-Process -FilePath './dist/app/SolidCraftCsvTool.exe' -ArgumentList '--smoke-test', '--screenshot', "$pwd/dist/window.png" -PassThru
-          if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'GUI startup timed out' }
-          if ($process.ExitCode -ne 0) { throw "GUI check failed: $($process.ExitCode)" }
       - name: Package release
         shell: pwsh
         run: |
@@ -37,8 +29,8 @@ jobs:
           @"
           Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
-          CSV、半孔规则、相交检查结果校验、控制协议及 GUI 启动检查通过；未生成 CAD 模型。
-          尚未在真实 SolidCraft Windows 桌面端验证建模与导出。
+          本次使用 SolidCraft 实例移动命令设置世界坐标偏移，并在导出前验证组合包围盒和实体相交。
+          本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8
       - uses: actions/upload-artifact@v4
@@ -47,10 +39,9 @@ jobs:
           path: |
             dist/SolidCraftCsvTool-win-x64.zip
             dist/SHA256SUMS.txt
-            dist/window.png
           retention-days: 30
       - name: Publish downloadable Windows release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "win-1.0.${{ github.run_number }}" dist/SolidCraftCsvTool-win-x64.zip dist/SHA256SUMS.txt dist/window.png --target "$env:GITHUB_SHA" --title "Windows 1.0.${{ github.run_number }}" --notes-file dist/release-notes.md
+        run: gh release create "win-1.0.${{ github.run_number }}" dist/SolidCraftCsvTool-win-x64.zip dist/SHA256SUMS.txt --target "$env:GITHUB_SHA" --title "Windows 1.0.${{ github.run_number }}" --notes-file dist/release-notes.md

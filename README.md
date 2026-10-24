@@ -13,7 +13,7 @@ Windows 10/11 x64 桌面程序，使用 C# / WinForms 原生窗口与表格控�
 3. 在参数表里直接输入，或导入 CSV。子头、母槽、左右半孔、左右斜边分别使用复选框。
 4. 按需勾选“另导出组合 STEP”，设置实体间距，点“生成并导出”。
 
-每行输出 `编号_辊密封.solidcraft` 与同名 `.step`。组合输出为 `辊密封_组合.step`，各型号按实体包围盒沿 X 方向留间距放置，再用 SolidCraft 精确检查相交。相交、实体数量不一致、检查未完成或返回信息不足时，中止组合 STEP 导出；已完成的单件会保留。默认不覆盖同名文件。
+每行输出 `编号_辊密封.solidcraft` 与同名 `.step`。组合输出为 `辊密封_组合.step`。各 STEP 先插入新设计，再通过 SolidCraft 的实例移动命令沿 X 方向留间距排开；每放入一件都会核对世界坐标包围盒，最后再精确检查相交。相交、偏移未生效、实体数量不一致、检查未完成或返回信息不足时，中止组合 STEP 导出，并报告已知相交对；已完成的单件会保留。默认不覆盖同名文件。
 
 “停止”会等当前 SolidCraft 命令完成，再停止后续操作。长任务通过控制协议查询原请求结果，不会自动重发修改或导出命令。生成期间请勿手动切换 SolidCraft 标签或修改模型。
 
@@ -43,8 +43,8 @@ CSV、模板和最终输出可放 NAS；SolidCraft 读写的中间文件位于 `
 .\build.ps1
 ```
 
-输出位于 `dist/app/SolidCraftCsvTool.exe`。项目不依赖 Python 或第三方 NuGet 包。GitHub Actions 在 Windows 构建机执行 CSV / 半孔规则 / 包围盒 / 相交结果 / 控制通道回归检查、GUI 启动检查及自包含发布，成功后自动生成 GitHub Release 与 SHA256 校验文件。
+输出位于 `dist/app/SolidCraftCsvTool.exe`。项目不依赖 Python 或第三方 NuGet 包。GitHub Actions 在 Windows 构建机发布自包含程序包与 SHA256 校验文件。
 
-检查不生成 CAD 模型。自动检查不能代替真实 SolidCraft Windows 桌面端的建模、导出与设备尺寸验收。
+构建不连接 SolidCraft 桌面端，也不生成 CAD 模型。真实导入、摆放和组合导出仍以 Windows 桌面端实际运行为准。
 
 本工具使用 SolidCraft 官方[控制协议](https://docs.solidcraft.io/dev/control-protocol.html)与[命令参考](https://docs.solidcraft.io/reference/commands.html)。旧 Python 实现可在 Git 历史中查看，当前入口为 C# Windows 应用。

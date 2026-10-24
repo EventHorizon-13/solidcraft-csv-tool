@@ -89,6 +89,24 @@ public static class ModelRules
 
     public static double TranslationX(Bounds bounds, double cursor) => cursor - bounds.Min[0];
 
+    public static JsonElement ReadOccurrenceReference(JsonElement insertion)
+    {
+        if (!insertion.TryGetProperty("occurrence", out var occurrence))
+            throw new InvalidDataException("SolidCraft 没有返回 STEP 实例编号，无法安全排布组合 STEP。");
+        if (occurrence.ValueKind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.Array)
+            return occurrence.Clone();
+        if (occurrence.ValueKind == JsonValueKind.Object && occurrence.TryGetProperty("id", out var id) && (id.ValueKind is JsonValueKind.String or JsonValueKind.Number))
+            return id.Clone();
+        throw new InvalidDataException("SolidCraft 返回的 STEP 实例编号格式未知，无法安全移动组合零件。");
+    }
+
+    public static void RequirePackedBounds(Bounds actual, int expectedBodies, double expectedMaxX)
+    {
+        const double tolerance = 0.02;
+        if (actual.Bodies != expectedBodies || Math.Abs(actual.Min[0]) > tolerance || Math.Abs(actual.Max[0] - expectedMaxX) > tolerance)
+            throw new InvalidDataException($"组合 STEP 摆放校验失败：实际 X 范围 {actual.Min[0]:0.###}…{actual.Max[0]:0.###} mm，预期 0…{expectedMaxX:0.###} mm；实体 {actual.Bodies}/{expectedBodies}。已停止导出。");
+    }
+
     public static void RequireClearInterference(JsonElement result, int expectedBodies)
     {
         if (!result.TryGetProperty("interferences", out var overlaps) || overlaps.ValueKind != JsonValueKind.Array ||
@@ -99,7 +117,16 @@ public static class ModelRules
         if (countValue != 0 || overlaps.GetArrayLength() != 0 || uncheckedPairs.GetArrayLength() != 0 || checkedValue != expectedBodies ||
             IsTrue(result, "truncated") || IsTrue(result, "budget_exceeded") ||
             (result.TryGetProperty("pairs_not_checked", out var p) && (!p.TryGetInt32(out int pending) || pending != 0)))
-            throw new InvalidDataException($"组合 STEP 未导出：相交 {Math.Max(countValue, overlaps.GetArrayLength())} 对，未检查 {uncheckedPairs.GetArrayLength()} 项，已检查实体 {checkedValue}/{expectedBodies}。");
+        {
+            var details = overlaps.EnumerateArray().Take(3).Select(pair =>
+            {
+                string a = pair.TryGetProperty("a", out var left) ? left.ToString() : "?";
+                string b = pair.TryGetProperty("b", out var right) ? right.ToString() : "?";
+                string volume = pair.TryGetProperty("volume_mm3", out var v) ? $", 相交体积 {v} mm³" : "";
+                return $"{a} ↔ {b}{volume}";
+            });
+            throw new InvalidDataException($"组合 STEP 未导出：相交 {Math.Max(countValue, overlaps.GetArrayLength())} 对，未检查 {uncheckedPairs.GetArrayLength()} 项，已检查实体 {checkedValue}/{expectedBodies}。{string.Join("；", details)}");
+        }
     }
 
     static bool IsTrue(JsonElement obj, string name) => obj.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.False && value.ValueKind != JsonValueKind.Null;
