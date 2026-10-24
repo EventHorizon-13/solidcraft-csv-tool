@@ -55,7 +55,7 @@ public sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("删除选中", DeleteSelected));
         toolbar.Controls.Add(MakeButton("检查参数", () => { var rows = ModelRules.Validate(GetRows()); SetStatus($"{rows.Count} 行参数检查通过"); }));
         toolbar.Controls.Add(MakeButton("启动 SolidCraft…", LaunchSolidCraft));
-        toolbar.Controls.Add(MakeButton("STEP 批量出图 DXF", () => { _ = RunStepDrawing(); }));
+        toolbar.Controls.Add(MakeButton("STEP 合并出图 DXF", () => { _ = RunStepDrawing(); }));
         layout.Controls.Add(toolbar, 0, 2);
 
         grid.Dock = DockStyle.Fill; grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false;
@@ -222,8 +222,8 @@ public sealed class MainForm : Form
             cancellation = new(); SetRunning(true); progressBar.Maximum = files.Length; progressBar.Value = 0;
             Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
             await Task.Run(() => StepDrawingExporter.RunAsync(files, target, (int)port.Value, progress, cancellation.Token));
-            SetStatus($"加工图完成：{files.Length} 个 DXF"); Log("DXF 输出文件夹：" + target);
-            MessageBox.Show(this, $"已生成 {files.Length} 个带尺寸 DXF。\n{target}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            SetStatus($"加工图完成：1 个 DXF，含 {files.Length} 张图"); Log("汇总 DXF 输出文件夹：" + target);
+            MessageBox.Show(this, $"已生成 1 个汇总 DXF，内含 {files.Length} 张带尺寸加工图，按 STEP 文件名排序并标注序号。\n\n{Path.Combine(target, "STEP加工图_汇总.dxf")}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (OperationCanceledException) { SetStatus("已停止；已完成的 DXF 保留。"); Log("STEP 批量出图已停止。"); }
         catch (Exception ex) { string details = DescribeException(ex); Log("STEP 出图中止：" + details); ShowError(details); SetStatus("STEP 出图中止"); }
