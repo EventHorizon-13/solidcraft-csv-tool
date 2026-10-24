@@ -211,8 +211,8 @@ internal static class DxfProjectionReader
                 if (cx.HasValue && cy.HasValue && radius.HasValue && radius.Value > 0)
                 {
                     bool circle = type.Equals("CIRCLE", StringComparison.OrdinalIgnoreCase);
-                    double start = circle ? 0 : Number(entity, 50) ?? 0, end = circle ? 360 : Number(entity, 51) ?? 360;
-                    var points = SampleArc(new(cx.Value, cy.Value), radius.Value, start, end, circle);
+                    double arcStart = circle ? 0 : Number(entity, 50) ?? 0, arcEnd = circle ? 360 : Number(entity, 51) ?? 360;
+                    var points = SampleArc(new(cx.Value, cy.Value), radius.Value, arcStart, arcEnd, circle);
                     if (points.Count >= 3) polylines.Add(new(points, circle, layer));
                 }
             }
