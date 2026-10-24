@@ -1,8 +1,5 @@
 using System.Globalization;
 using System.Text;
-using PdfSharp.Drawing;
-using PdfSharp.Fonts;
-using PdfSharp.Pdf;
 
 namespace SolidCraftCsvTool;
 
@@ -17,13 +14,13 @@ internal sealed record Box2(double MinX, double MinY, double MaxX, double MaxY)
 internal sealed record Projection2(string Name, IReadOnlyList<Line2> Lines, IReadOnlyList<Polyline2> Polylines, Box2 Bounds);
 internal sealed record ObliqueProjection(double Dx, double Dy);
 internal sealed record StepFeatureSet(IReadOnlyList<DetectedArc> Arcs, double? Pitch, double? Diameter,
-    IReadOnlyList<double> FrontBreaks, IReadOnlyList<double> PlanBreakX, IReadOnlyList<double> PlanBreakY,
+    IReadOnlyList<double> FrontBreaks, IReadOnlyList<double> FrontBreakY, IReadOnlyList<double> PlanBreakX, IReadOnlyList<double> PlanBreakY,
     IReadOnlyList<ObliqueProjection> PlanSlants, string Note);
 internal sealed record StepDrawingPage(string Name, Projection2 Front, Projection2 Top, Projection2 End, StepFeatureSet Features);
 
 public static class StepDrawingExporter
 {
-    public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outputPdf, int port,
+    public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outputFolder, int port,
         IProgress<ExportProgress> progress, CancellationToken cancellation)
     {
         if (inputFiles.Count == 0) throw new InvalidDataException("请选择至少一个 STEP 文件。");
@@ -31,11 +28,19 @@ public static class StepDrawingExporter
             if (!File.Exists(path) || !new[] { ".step", ".stp" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
                 throw new InvalidDataException("输入列表中包含不存在或格式不支持的文件：" + path);
 
+        inputFiles = inputFiles.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase).ToArray();
+        string destination = Path.GetFullPath(outputFolder);
+        Directory.CreateDirectory(destination);
+        string[] outputNames = inputFiles.Select((path, index) => $"{index + 1:D3}_{SafeFileName(Path.GetFileNameWithoutExtension(path))}_加工图.dxf").ToArray();
+        if (outputNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != outputNames.Length)
+            throw new IOException("输入文件名生成了重复的输出文件名，请先重命名 STEP 文件。");
+        string collision = outputNames.FirstOrDefault(name => File.Exists(Path.Combine(destination, name))) ?? "";
+        if (collision.Length > 0) throw new IOException("目标文件已存在，未覆盖任何文件：" + Path.Combine(destination, collision));
+
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "step-drawings-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
-        string stagedPdf = Path.Combine(work, "加工图.pdf");
         var pages = new List<StepDrawingPage>(inputFiles.Count);
-        bool published = false;
+        var staged = new List<string>(inputFiles.Count);
         try
         {
             using var client = await ControlClient.ConnectAsync(port);
@@ -66,7 +71,7 @@ public static class StepDrawingExporter
 
                     await client.RequestAsync("ui.documents", new { action = "close", force = true });
                     currentStepOpen = false;
-                    progress.Report(new($"已读取 {Path.GetFileName(step)}，三视图与可识别特征尺寸已提取。", i + 1));
+                    progress.Report(new($"已读取 {Path.GetFileName(step)}，三视图与几何特征已提取。", i + 1));
                 }
             }
             finally
@@ -82,22 +87,39 @@ public static class StepDrawingExporter
             }
 
             cancellation.ThrowIfCancellationRequested();
-            progress.Report(new("正在排版带尺寸的多页 PDF…", inputFiles.Count));
-            MachiningPdf.Write(stagedPdf, pages);
+            for (int i = 0; i < pages.Count; i++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                string path = Path.Combine(work, outputNames[i]);
+                progress.Report(new($"正在生成尺寸标注 {i + 1}/{pages.Count}：{outputNames[i]}", i));
+                MachiningDxf.Write(path, pages[i]);
+                staged.Add(path);
+            }
             cancellation.ThrowIfCancellationRequested();
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPdf))!);
-            if (File.Exists(outputPdf)) throw new IOException("PDF 目标文件已存在，未覆盖原文件。");
-            File.Move(stagedPdf, outputPdf);
-            published = true;
-            progress.Report(new($"加工图 PDF 已生成：{pages.Count} 页。", inputFiles.Count));
+            for (int i = 0; i < staged.Count; i++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                string target = Path.Combine(destination, outputNames[i]);
+                if (File.Exists(target)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + target);
+                File.Move(staged[i], target);
+                progress.Report(new($"已保存 {i + 1}/{staged.Count}：{outputNames[i]}", i + 1));
+            }
+            progress.Report(new($"加工图 DXF 已生成：{pages.Count} 个文件。", inputFiles.Count));
         }
         finally
         {
-            if (published || Directory.Exists(work))
+            if (Directory.Exists(work))
             {
                 try { Directory.Delete(work, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
         }
+    }
+
+    static string SafeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+        string safe = new(value.Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '_' : ch).ToArray()).Trim(' ', '.');
+        return safe.Length == 0 ? "STEP" : safe;
     }
 
     static async Task<Projection2> ExportProjection(ControlClient client, string work, string file, string view, CancellationToken cancellation)
@@ -190,13 +212,14 @@ internal static class DxfFeatureDetector
         var pitches = centers.Zip(centers.Skip(1), (a, b) => b - a).Where(x => diameter.HasValue && x > diameter.Value * 0.6 && x < diameter.Value * 4).ToArray();
         double? pitch = pitches.Length > 0 ? Median(pitches) : null;
         var frontBreaks = SharpBreaks(front, axisX: true);
+        var frontBreakY = SharpBreaks(front, axisX: false);
         var planBreakX = SharpBreaks(top, axisX: true);
         var planBreakY = SharpBreaks(top, axisX: false);
         var slants = ObliqueEdges(top);
         string arcText = arcs.Count > 0 ? $"识别到 {arcs.Count} 处弧槽；Ø{diameter:0.##}" + (pitch.HasValue ? $"；中心距 {pitch.Value:0.##} mm" : "") : "未识别到重复弧槽";
         string slantText = slants.Count > 0 ? $"；斜边投影 {string.Join("、", slants.Select(s => $"{s.Dx:0.##}×{s.Dy:0.##}"))} mm" : "";
-        string note = $"{arcText}{slantText}。STEP 轮廓尺寸初标，请复核半槽和端部特征。";
-        return new(arcs, pitch, diameter, frontBreaks, planBreakX, planBreakY, slants, note);
+        string note = $"{arcText}{slantText}。尺寸由 STEP 投影几何提取。";
+        return new(arcs, pitch, diameter, frontBreaks, frontBreakY, planBreakX, planBreakY, slants, note);
     }
 
     static IReadOnlyList<double> SharpBreaks(Projection2 view, bool axisX)
@@ -287,209 +310,196 @@ internal static class DxfFeatureDetector
         return values.Length == 0 ? 0 : values.Length % 2 == 1 ? values[values.Length / 2] : (values[values.Length / 2 - 1] + values[values.Length / 2]) / 2;
     }
 }
-
-internal static class MachiningPdf
+internal static class MachiningDxf
 {
-    static readonly XColor Outline = XColor.FromArgb(25, 31, 38);
-    static readonly XColor Dimension = XColor.FromArgb(0, 188, 196);
-    static readonly XColor DimensionText = XColor.FromArgb(0, 170, 38);
-    static readonly XFont Text = CreateFont(8);
-    static readonly XFont Small = CreateFont(6.5);
-    static readonly XFont Title = CreateFont(17);
-
-    static XFont CreateFont(double size)
+    sealed class Writer(string path)
     {
-        GlobalFontSettings.FontResolver ??= new BundledChineseFontResolver();
-        return new XFont("SolidCraft CJK", size, XFontStyleEx.Regular);
-    }
-
-    public static void Write(string path, IReadOnlyList<StepDrawingPage> pages)
-    {
-        if (pages.Count == 0) throw new InvalidDataException("没有可写入 PDF 的 STEP 图页。");
-        using PdfDocument pdf = new();
-        pdf.Info.Title = "辊密封加工图";
-        pdf.Info.Subject = "由 STEP 实体投影自动生成；尺寸以 STEP 几何测量值为准";
-        for (int i = 0; i < pages.Count; i++) DrawPage(pdf, pages[i], i + 1, pages.Count);
-        pdf.Save(path);
-    }
-
-    static void DrawPage(PdfDocument pdf, StepDrawingPage item, int pageNumber, int pageCount)
-    {
-        PdfPage page = pdf.AddPage(); page.Width = XUnit.FromPoint(841.89); page.Height = XUnit.FromPoint(595.28);
-        using XGraphics g = XGraphics.FromPdfPage(page);
-        const double w = 841.89, h = 595.28, margin = 17;
-        var black = new XPen(Outline, 0.65); var thin = new XPen(Outline, 0.4); var dimPen = new XPen(Dimension, 0.55); var dimBrush = new XSolidBrush(DimensionText);
-        g.DrawRectangle(black, margin, margin, w - 2 * margin, h - 2 * margin);
-        g.DrawString("辊密封加工图", Title, new XSolidBrush(Outline), new XPoint(margin + 14, margin + 22));
-        g.DrawString("STEP 实体投影 · 尺寸单位 mm", Small, XBrushes.DimGray, new XPoint(margin + 15, margin + 37));
-
-        double scale = Math.Min(430 / Math.Max(item.Front.Bounds.Width, item.Top.Bounds.Width),
-            Math.Min(145 / Math.Max(item.Front.Bounds.Height, 1), Math.Min(145 / Math.Max(item.Top.Bounds.Height, 1), 295 / Math.Max(item.Front.Bounds.Height + item.Top.Bounds.Height, 1))));
-        scale = Math.Min(scale, 118 / Math.Max(item.End.Bounds.Width, 1));
-        double left = 92, frontTop = 98;
-        var front = new ViewMap(item.Front, left, frontTop, scale);
-        DrawView(g, front, thin);
-        g.DrawString("主视图", Small, XBrushes.DimGray, new XPoint(left, frontTop - 8));
-        DrawHorizontalDimension(g, front.X(item.Front.Bounds.MinX), front.X(item.Front.Bounds.MaxX), front.Y(item.Front.Bounds.MinY), front.Y(item.Front.Bounds.MinY) + 23, Format(item.Front.Bounds.Width), dimPen, dimBrush);
-        DrawVerticalDimension(g, front.X(item.Front.Bounds.MinX), front.X(item.Front.Bounds.MinX) - 27, front.Y(item.Front.Bounds.MinY), front.Y(item.Front.Bounds.MaxY), Format(item.Front.Bounds.Height), dimPen, dimBrush);
-
-        double topTop = frontTop + item.Front.Bounds.Height * scale + 66;
-        var top = new ViewMap(item.Top, left, topTop, scale);
-        DrawView(g, top, thin);
-        g.DrawString("俯视图", Small, XBrushes.DimGray, new XPoint(left, topTop - 8));
-        DrawVerticalDimension(g, top.X(item.Top.Bounds.MaxX), top.X(item.Top.Bounds.MaxX) + 26, top.Y(item.Top.Bounds.MinY), top.Y(item.Top.Bounds.MaxY), Format(item.Top.Bounds.Height), dimPen, dimBrush);
-        DrawChain(g, top, item.Features.PlanBreakX, axisX: true, top.Y(item.Top.Bounds.MinY) + 30, dimPen, dimBrush);
-        DrawChain(g, top, item.Features.PlanBreakY, axisX: false, top.X(item.Top.Bounds.MaxX) + 47, dimPen, dimBrush);
-
-        double endX = 655, endTop = frontTop;
-        var end = new ViewMap(item.End, endX, endTop, scale);
-        DrawView(g, end, thin);
-        g.DrawString("端视图", Small, XBrushes.DimGray, new XPoint(endX, endTop - 8));
-        DrawHorizontalDimension(g, end.X(item.End.Bounds.MinX), end.X(item.End.Bounds.MaxX), end.Y(item.End.Bounds.MinY), end.Y(item.End.Bounds.MinY) + 22, Format(item.End.Bounds.Width), dimPen, dimBrush);
-
-        string feature = item.Features.Note;
-        g.DrawString(feature, Text, XBrushes.Black, new XRect(640, 263, 178, 72), XStringFormats.TopLeft);
-        g.DrawString("主视/俯视/端视来自输入 STEP；外形尺寸取投影边界。端部台阶链尺寸取轮廓折点。", Small,
-            XBrushes.DimGray, new XRect(640, 339, 178, 42), XStringFormats.TopLeft);
-        DrawFeatureDimensions(g, front, item.Features, dimPen, dimBrush);
-
-        DrawTitleBlock(g, item.Name, pageNumber, pageCount, DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), black, thin);
-    }
-
-    static void DrawView(XGraphics g, ViewMap map, XPen pen)
-    {
-        foreach (var line in map.Projection.Lines)
-            g.DrawLine(IsHidden(line.Layer) ? new XPen(Outline, 0.35) { DashStyle = XDashStyle.Dash } : pen, map.Point(line.A), map.Point(line.B));
-        foreach (var poly in map.Projection.Polylines)
+        readonly StreamWriter output = new(path, false, Encoding.ASCII);
+        public void Pair(int code, string value) { output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
+        public void Finish() => output.Dispose();
+        public void Line(Point2 a, Point2 b, string layer = "DIM")
         {
-            for (int i = 1; i < poly.Points.Count; i++) g.DrawLine(IsHidden(poly.Layer) ? new XPen(Outline, 0.35) { DashStyle = XDashStyle.Dash } : pen, map.Point(poly.Points[i - 1]), map.Point(poly.Points[i]));
-            if (poly.Closed) g.DrawLine(pen, map.Point(poly.Points[^1]), map.Point(poly.Points[0]));
+            if (Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) < 0.00001) return;
+            Pair(0, "LINE"); Pair(8, layer); Pair(10, F(a.X)); Pair(20, F(a.Y)); Pair(30, "0"); Pair(11, F(b.X)); Pair(21, F(b.Y)); Pair(31, "0");
+        }
+        public void Polyline(IReadOnlyList<Point2> points, bool closed, string layer)
+        {
+            if (points.Count < 2) return;
+            Pair(0, "LWPOLYLINE"); Pair(8, layer); Pair(90, points.Count.ToString(CultureInfo.InvariantCulture)); Pair(70, closed ? "1" : "0");
+            foreach (Point2 p in points) { Pair(10, F(p.X)); Pair(20, F(p.Y)); }
+        }
+        public void Text(string value, Point2 at, double height, string layer = "TEXT", double rotation = 0)
+        {
+            Pair(0, "TEXT"); Pair(8, layer); Pair(10, F(at.X)); Pair(20, F(at.Y)); Pair(30, "0"); Pair(40, F(height)); Pair(1, Escape(value)); Pair(7, "STANDARD");
+            Pair(50, F(rotation));
+            Pair(72, "1"); Pair(73, "2"); Pair(11, F(at.X)); Pair(21, F(at.Y)); Pair(31, "0");
+        }
+        public void Raw(string value) => output.Write(value);
+    }
+
+    sealed record Map(Projection2 Projection, double Dx, double Dy)
+    {
+        public Point2 P(Point2 p) => new(p.X + Dx, p.Y + Dy);
+        public Point2 At(double x, double y) => new(x + Dx, y + Dy);
+        public Point2 Min => At(Projection.Bounds.MinX, Projection.Bounds.MinY);
+        public Point2 Max => At(Projection.Bounds.MaxX, Projection.Bounds.MaxY);
+        public double Width => Projection.Bounds.Width;
+        public double Height => Projection.Bounds.Height;
+    }
+
+    public static void Write(string path, StepDrawingPage page)
+    {
+        using (var writer = new Writer(path))
+        {
+            Header(writer);
+            var front = new Map(page.Front, -page.Front.Bounds.MinX, -page.Front.Bounds.MinY);
+            double topY = -(page.Front.Bounds.Height + page.Top.Bounds.Height + 76);
+            var top = new Map(page.Top, -page.Top.Bounds.MinX, topY - page.Top.Bounds.MinY);
+            var end = new Map(page.End, page.Front.Bounds.Width + 100 - page.End.Bounds.MinX, -page.End.Bounds.MinY);
+            DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
+            writer.Text(page.Name, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
+            writer.Text("三视图加工尺寸    单位：mm", new(front.Min.X, front.Max.Y + 62), 3.2, "TITLE");
+            writer.Text("主视图", new(front.Min.X, front.Max.Y + 8), 3.0, "TITLE");
+            writer.Text("俯视图", new(top.Min.X, top.Max.Y + 8), 3.0, "TITLE");
+            writer.Text("端视图", new(end.Min.X, end.Max.Y + 8), 3.0, "TITLE");
+
+            // 外形尺寸：总长、总高、总宽及端视图复核尺寸。
+            Horizontal(writer, front.Min.X, front.Max.X, front.Min.Y, front.Min.Y - 22, Fmt(page.Front.Bounds.Width));
+            Vertical(writer, front.Min.X, front.Min.X - 20, front.Min.Y, front.Max.Y, Fmt(page.Front.Bounds.Height));
+            Horizontal(writer, end.Min.X, end.Max.X, end.Min.Y, end.Min.Y - 20, Fmt(page.End.Bounds.Width));
+            Vertical(writer, end.Min.X, end.Min.X - 18, end.Min.Y, end.Max.Y, Fmt(page.End.Bounds.Height));
+            Vertical(writer, top.Max.X, top.Max.X + 23, top.Min.Y, top.Max.Y, Fmt(page.Top.Bounds.Height));
+
+            // 槽径、槽中心位置链；这对应成品图中的 Ø 标注与 60/120 等位置链。
+            if (page.Features.Arcs.Count > 0 && page.Features.Diameter is double diameter)
+            {
+                var arcs = page.Features.Arcs.OrderBy(a => a.CenterX).ToArray();
+                var first = arcs[0];
+                Point2 target = front.At(first.CenterX, first.BaselineY - first.Depth);
+                Point2 label = front.At(first.CenterX + Math.Max(diameter * 0.68, 28), front.Projection.Bounds.MaxY + 48);
+                writer.Line(target, new(label.X, label.Y - 2), "DIM"); Arrow(writer, target, new(label.X, label.Y - 2), 2.4);
+                writer.Text("%%c" + Fmt(diameter), label, 3.6, "TEXT");
+                var marks = new[] { page.Front.Bounds.MinX }.Concat(arcs.Select(a => a.CenterX)).Append(page.Front.Bounds.MaxX).Distinct().Order().ToArray();
+                DrawHorizontalChain(writer, front, marks, front.Max.Y + 18);
+            }
+            if (page.Features.FrontBreaks.Count > 0)
+                DrawHorizontalChain(writer, front, IncludeEnds(page.Features.FrontBreaks.Concat(page.Features.Arcs.Select(a => a.CenterX)).ToArray(), page.Front.Bounds.MinX, page.Front.Bounds.MaxX), front.Max.Y + 34);
+
+            // 轮廓折点尺寸链：覆盖条纹/槽距、左右半孔位置、端部台阶分段。
+            DrawHorizontalChain(writer, top, IncludeEnds(page.Features.PlanBreakX, page.Top.Bounds.MinX, page.Top.Bounds.MaxX), top.Min.Y - 20);
+            DrawVerticalChain(writer, top, IncludeEnds(page.Features.PlanBreakY, page.Top.Bounds.MinY, page.Top.Bounds.MaxY), top.Max.X + 39);
+            DrawVerticalChain(writer, front, IncludeEnds(page.Features.FrontBreakY, page.Front.Bounds.MinY, page.Front.Bounds.MaxY), front.Max.X + 24);
+
+            if (page.Features.PlanSlants.Count > 0)
+            {
+                string slopes = string.Join("；", page.Features.PlanSlants.Select(s => $"斜边 {Fmt(s.Dx)}×{Fmt(s.Dy)}"));
+                writer.Text(slopes, new(front.Min.X, top.Min.Y - 48), 3.0, "TITLE");
+            }
+            writer.Text("尺寸取自 STEP 投影几何；请按原图复核半孔、台阶及装配方向。", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
+            Footer(writer, page.Name, front.Max.X + 100, top.Min.Y - 60);
+            writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
+            writer.Finish();
         }
     }
 
-    static void DrawHorizontalDimension(XGraphics g, double x1, double x2, double featureY, double dimY, string label, XPen pen, XBrush brush)
+    static void Header(Writer w)
+    {
+        w.Pair(0, "SECTION"); w.Pair(2, "HEADER"); w.Pair(9, "$ACADVER"); w.Pair(1, "AC1015");
+        w.Pair(9, "$INSUNITS"); w.Pair(70, "4"); w.Pair(9, "$MEASUREMENT"); w.Pair(70, "1"); w.Pair(9, "$DWGCODEPAGE"); w.Pair(3, "ANSI_1252");
+        w.Pair(0, "ENDSEC");
+        w.Pair(0, "SECTION"); w.Pair(2, "TABLES");
+        w.Pair(0, "TABLE"); w.Pair(2, "LTYPE"); w.Pair(70, "2");
+        w.Pair(0, "LTYPE"); w.Pair(2, "CONTINUOUS"); w.Pair(70, "0"); w.Pair(3, "Solid line"); w.Pair(72, "65"); w.Pair(73, "0"); w.Pair(40, "0");
+        w.Pair(0, "LTYPE"); w.Pair(2, "DASHED"); w.Pair(70, "0"); w.Pair(3, "Dashed __ __ __"); w.Pair(72, "65"); w.Pair(73, "2"); w.Pair(40, "6"); w.Pair(49, "4"); w.Pair(49, "-2");
+        w.Pair(0, "ENDTAB");
+        string[] layers = ["VISIBLE", "HIDDEN", "DIM", "TEXT", "TITLE"];
+        short[] colors = [7, 8, 4, 3, 7];
+        w.Pair(0, "TABLE"); w.Pair(2, "LAYER"); w.Pair(70, layers.Length.ToString(CultureInfo.InvariantCulture));
+        for (int i = 0; i < layers.Length; i++) { w.Pair(0, "LAYER"); w.Pair(2, layers[i]); w.Pair(70, "0"); w.Pair(62, colors[i].ToString(CultureInfo.InvariantCulture)); w.Pair(6, layers[i] == "HIDDEN" ? "DASHED" : "CONTINUOUS"); }
+        w.Pair(0, "ENDTAB");
+        w.Pair(0, "TABLE"); w.Pair(2, "STYLE"); w.Pair(70, "1"); w.Pair(0, "STYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0"); w.Pair(40, "0"); w.Pair(41, "1"); w.Pair(50, "0"); w.Pair(71, "0"); w.Pair(42, "2.5"); w.Pair(3, "txt"); w.Pair(4, ""); w.Pair(0, "ENDTAB");
+        w.Pair(0, "ENDSEC"); w.Pair(0, "SECTION"); w.Pair(2, "ENTITIES");
+    }
+
+    static void DrawView(Writer w, Map map)
+    {
+        foreach (Line2 line in map.Projection.Lines) w.Line(map.P(line.A), map.P(line.B), IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE");
+        foreach (Polyline2 poly in map.Projection.Polylines)
+        {
+            var points = poly.Points.Select(map.P).ToArray();
+            w.Polyline(points, poly.Closed, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE");
+        }
+    }
+
+    static void Horizontal(Writer w, double x1, double x2, double featureY, double dimY, string label)
     {
         if (x2 < x1) (x1, x2) = (x2, x1);
-        g.DrawLine(pen, x1, featureY, x1, dimY + Math.Sign(dimY - featureY) * 3);
-        g.DrawLine(pen, x2, featureY, x2, dimY + Math.Sign(dimY - featureY) * 3);
-        double mid = (x1 + x2) / 2, textW = Math.Max(24, g.MeasureString(label, Small).Width + 7);
-        if (x2 - x1 > textW + 16) { g.DrawLine(pen, x1, dimY, mid - textW / 2, dimY); g.DrawLine(pen, mid + textW / 2, dimY, x2, dimY); }
-        else g.DrawLine(pen, x1, dimY, x2, dimY);
-        Arrow(g, x1, dimY, 1, 0, pen); Arrow(g, x2, dimY, -1, 0, pen);
-        g.DrawString(label, Small, brush, new XRect(mid - textW / 2, dimY - 8, textW, 14), XStringFormats.Center);
+        w.Line(new(x1, featureY), new(x1, dimY - Math.Sign(dimY - featureY) * 2), "DIM");
+        w.Line(new(x2, featureY), new(x2, dimY - Math.Sign(dimY - featureY) * 2), "DIM");
+        w.Line(new(x1, dimY), new(x2, dimY), "DIM");
+        Arrow(w, new(x1, dimY), new(x2, dimY), 2.0); Arrow(w, new(x2, dimY), new(x1, dimY), 2.0);
+        w.Text(label, new((x1 + x2) / 2, dimY + 2.2), 3.2);
     }
 
-    static void DrawVerticalDimension(XGraphics g, double featureX, double dimX, double y1, double y2, string label, XPen pen, XBrush brush)
+    static void Vertical(Writer w, double featureX, double dimX, double y1, double y2, string label)
     {
         if (y2 < y1) (y1, y2) = (y2, y1);
-        g.DrawLine(pen, featureX, y1, dimX + Math.Sign(dimX - featureX) * 3, y1);
-        g.DrawLine(pen, featureX, y2, dimX + Math.Sign(dimX - featureX) * 3, y2);
-        g.DrawLine(pen, dimX, y1, dimX, y2); Arrow(g, dimX, y1, 0, 1, pen); Arrow(g, dimX, y2, 0, -1, pen);
-        XGraphicsState state = g.Save(); g.TranslateTransform(dimX - 7, (y1 + y2) / 2); g.RotateTransform(-90);
-        g.DrawString(label, Small, brush, new XRect(-27, -6, 54, 12), XStringFormats.Center); g.Restore(state);
+        w.Line(new(featureX, y1), new(dimX + Math.Sign(dimX - featureX) * 2, y1), "DIM");
+        w.Line(new(featureX, y2), new(dimX + Math.Sign(dimX - featureX) * 2, y2), "DIM");
+        w.Line(new(dimX, y1), new(dimX, y2), "DIM");
+        Arrow(w, new(dimX, y1), new(dimX, y2), 2.0); Arrow(w, new(dimX, y2), new(dimX, y1), 2.0);
+        w.Text(label, new(dimX - 2.2, (y1 + y2) / 2), 3.2, rotation: 90);
     }
 
-    static void DrawFeatureDimensions(XGraphics g, ViewMap front, StepFeatureSet features, XPen pen, XBrush brush)
+    static void DrawHorizontalChain(Writer w, Map map, double[] marks, double y)
     {
-        if (features.Arcs.Count == 0 || !features.Diameter.HasValue) return;
-        var arcs = features.Arcs.OrderBy(a => a.CenterX).ToArray();
-        var first = arcs[0];
-        double targetX = front.X(first.CenterX), targetY = front.Y(first.BaselineY - first.Depth);
-        double labelX = Math.Min(600, front.X(front.Projection.Bounds.MaxX) + 58), labelY = front.Y(front.Projection.Bounds.MaxY) + 16;
-        g.DrawLine(pen, targetX, targetY, labelX, labelY + 5);
-        Arrow(g, targetX, targetY, Math.Sign(targetX - labelX), Math.Sign(targetY - (labelY + 5)), pen);
-        g.DrawString($"Ø{Format(features.Diameter.Value)}", Small, brush, new XPoint(labelX, labelY));
-        if (arcs.Length >= 2)
+        for (int i = 1; i < marks.Length; i++)
         {
-            double baseline = arcs.Average(a => a.BaselineY);
-            double edgeLeft = front.X(front.Projection.Bounds.MinX), edgeRight = front.X(front.Projection.Bounds.MaxX);
-            double dimY = Math.Max(68, front.Y(baseline) - 28);
-            var marks = new[] { edgeLeft }.Concat(arcs.Select(a => front.X(a.CenterX))).Append(edgeRight).Distinct().Order().ToArray();
-            for (int i = 1; i < marks.Length; i++)
-                DrawHorizontalDimension(g, marks[i - 1], marks[i], front.Y(baseline), dimY, Format(Math.Abs(marks[i] - marks[i - 1]) / front.Scale), pen, brush);
-        }
-        DrawChain(g, front, features.FrontBreaks, axisX: true, front.Y(front.Projection.Bounds.MinY) + 43, pen, brush);
-    }
-
-    static void DrawChain(XGraphics g, ViewMap map, IReadOnlyList<double> internalMarks, bool axisX, double dimensionLine, XPen pen, XBrush brush)
-    {
-        if (internalMarks.Count == 0) return;
-        double min = axisX ? map.Projection.Bounds.MinX : map.Projection.Bounds.MinY;
-        double max = axisX ? map.Projection.Bounds.MaxX : map.Projection.Bounds.MaxY;
-        var marks = new[] { min }.Concat(internalMarks).Append(max).Distinct().Order().ToArray();
-        if (axisX)
-        {
-            double featureY = map.Y(min);
-            for (int i = 1; i < marks.Length; i++)
-                DrawHorizontalDimension(g, map.X(marks[i - 1]), map.X(marks[i]), featureY, dimensionLine, Format(marks[i] - marks[i - 1]), pen, brush);
-        }
-        else
-        {
-            double featureX = map.X(max);
-            for (int i = 1; i < marks.Length; i++)
-                DrawVerticalDimension(g, featureX, dimensionLine, map.Y(marks[i - 1]), map.Y(marks[i]), Format(marks[i] - marks[i - 1]), pen, brush);
+            double a = map.Dx + marks[i - 1], b = map.Dx + marks[i];
+            if (b - a > 0.2) Horizontal(w, a, b, map.Max.Y, y, Fmt(marks[i] - marks[i - 1]));
         }
     }
 
-    static void Arrow(XGraphics g, double x, double y, double dx, double dy, XPen pen)
+    static void DrawVerticalChain(Writer w, Map map, double[] marks, double x)
     {
-        const double len = 4, wing = 1.6;
-        double px = -dy, py = dx;
-        g.DrawLine(pen, x, y, x - dx * len + px * wing, y - dy * len + py * wing);
-        g.DrawLine(pen, x, y, x - dx * len - px * wing, y - dy * len - py * wing);
+        for (int i = 1; i < marks.Length; i++)
+        {
+            double a = map.Dy + marks[i - 1], b = map.Dy + marks[i];
+            if (b - a > 0.2) Vertical(w, map.Max.X, x, a, b, Fmt(marks[i] - marks[i - 1]));
+        }
     }
 
-    static void DrawTitleBlock(XGraphics g, string name, int pageNumber, int total, string pagesafeDate, XPen border, XPen thin)
+    static double[] IncludeEnds(IReadOnlyList<double> inner, double min, double max) => new[] { min }.Concat(inner.Where(v => v > min + 0.05 && v < max - 0.05)).Append(max).Order().Aggregate(new List<double>(), (list, v) => { if (list.Count == 0 || v - list[^1] > 0.15) list.Add(v); return list; }).ToArray();
+
+    static void Arrow(Writer w, Point2 tip, Point2 toward, double size)
     {
-        const double x = 466, y = 493, w = 358, h = 78;
-        g.DrawRectangle(border, x, y, w, h);
-        double[] cuts = [x + 70, x + 144, x + 218, x + 278];
-        g.DrawLine(thin, x, y + 24, x + w, y + 24); g.DrawLine(thin, x, y + 49, x + w, y + 49);
-        foreach (double cut in cuts) { g.DrawLine(thin, cut, y, cut, y + 49); }
-        g.DrawLine(thin, x + 218, y + 62, x + w, y + 62);
-        g.DrawString("图名", Small, XBrushes.Black, new XRect(x + 6, y + 6, 56, 14), XStringFormats.CenterLeft);
-        g.DrawString(name, Text, XBrushes.Black, new XRect(x + 74, y + 1, w - 80, 22), XStringFormats.CenterLeft);
-        g.DrawString("单位", Small, XBrushes.Black, new XRect(x + 6, y + 29, 56, 14), XStringFormats.CenterLeft);
-        g.DrawString("mm", Text, XBrushes.Black, new XRect(x + 74, y + 25, 63, 22), XStringFormats.Center);
-        g.DrawString("页数", Small, XBrushes.Black, new XRect(x + 150, y + 29, 56, 14), XStringFormats.CenterLeft);
-        g.DrawString($"{pageNumber} / {total}", Text, XBrushes.Black, new XRect(x + 222, y + 25, 52, 22), XStringFormats.Center);
-        g.DrawString("来源", Small, XBrushes.Black, new XRect(x + 286, y + 29, 56, 14), XStringFormats.CenterLeft);
-        g.DrawString("STEP", Text, XBrushes.Black, new XRect(x + 6, y + 53, 60, 17), XStringFormats.CenterLeft);
-        g.DrawString("恒瑞 · 自动出图", Small, XBrushes.Black, new XRect(x + 76, y + 51, 130, 18), XStringFormats.CenterLeft);
-        g.DrawString("日期", Small, XBrushes.Black, new XRect(x + 222, y + 51, 48, 18), XStringFormats.CenterLeft);
-        g.DrawString(pagesafeDate, Small, XBrushes.Black, new XRect(x + 280, y + 51, 74, 18), XStringFormats.Center);
-        g.DrawString("尺寸以 STEP 实体测量值为准；未识别的复杂特征请复核原始模型。", Small, XBrushes.DimGray,
-            new XRect(26, 539, 424, 24), XStringFormats.CenterLeft);
+        double dx = toward.X - tip.X, dy = toward.Y - tip.Y, length = Math.Sqrt(dx * dx + dy * dy);
+        if (length < 0.0001) return;
+        dx /= length; dy /= length; double px = -dy, py = dx, wing = size * 0.42;
+        w.Line(tip, new(tip.X + dx * size + px * wing, tip.Y + dy * size + py * wing), "DIM");
+        w.Line(tip, new(tip.X + dx * size - px * wing, tip.Y + dy * size - py * wing), "DIM");
+    }
+
+    static void Footer(Writer w, string name, double x, double y)
+    {
+        w.Line(new(x, y + 7), new(x + 90, y + 7), "TITLE");
+        w.Text("图名：" + name, new(x + 2, y + 2), 2.8, "TITLE");
+        w.Text("单位：mm   来源：STEP", new(x + 2, y - 4), 2.8, "TITLE");
     }
 
     static bool IsHidden(string layer) => layer.Contains("HIDDEN", StringComparison.OrdinalIgnoreCase);
-    static string Format(double value) => Math.Abs(value - Math.Round(value)) < 0.005 ? Math.Round(value).ToString("0", CultureInfo.InvariantCulture) : value.ToString("0.##", CultureInfo.InvariantCulture);
-
-    sealed class ViewMap(Projection2 projection, double left, double top, double scale)
+    static string F(double value) => value.ToString("0.#####", CultureInfo.InvariantCulture);
+    static string Fmt(double value) => Math.Abs(value - Math.Round(value)) < 0.005 ? Math.Round(value).ToString("0", CultureInfo.InvariantCulture) : value.ToString("0.##", CultureInfo.InvariantCulture);
+    static string Escape(string value)
     {
-        public Projection2 Projection { get; } = projection;
-        public double Scale { get; } = scale;
-        public double X(double x) => left + (x - Projection.Bounds.MinX) * scale;
-        public double Y(double y) => top + (Projection.Bounds.MaxY - y) * scale;
-        public XPoint Point(Point2 p) => new(X(p.X), Y(p.Y));
+        var result = new StringBuilder(value.Length);
+        foreach (char ch in value)
+        {
+            if (ch == '\\') result.Append("\\\\");
+            else if (ch == '\r' || ch == '\n') result.Append(' ');
+            else if (ch > 127) result.Append("\\U+").Append(((int)ch).ToString("X4", CultureInfo.InvariantCulture));
+            else result.Append(ch);
+        }
+        return result.ToString();
     }
-}
-
-internal sealed class BundledChineseFontResolver : IFontResolver
-{
-    const string Family = "SolidCraft CJK";
-    const string Face = "NotoSansSC-Regular";
-    static readonly Lazy<byte[]> FontData = new(() =>
-    {
-        string path = Path.Combine(AppContext.BaseDirectory, "Fonts", "NotoSansSC.ttf");
-        if (!File.Exists(path)) throw new FileNotFoundException("程序字体文件缺失，请重新解压完整软件包。", path);
-        return File.ReadAllBytes(path);
-    });
-
-    public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic) =>
-        familyName.Equals(Family, StringComparison.OrdinalIgnoreCase)
-            ? new FontResolverInfo(Face, mustSimulateBold: false, mustSimulateItalic: false)
-            : null;
-
-    public byte[]? GetFont(string faceName) => faceName == Face ? FontData.Value : null;
 }

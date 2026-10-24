@@ -14,14 +14,6 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Prepare bundled Simplified Chinese font
-        shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check fonttools==4.62.0
-          & "$env:GITHUB_WORKSPACE/tools/prepare-font.ps1"
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -32,18 +24,15 @@ jobs:
         run: |
           Copy-Item README.md dist/app/README.md
           Copy-Item THIRD_PARTY_NOTICES.md dist/app/THIRD_PARTY_NOTICES.md
-          New-Item -ItemType Directory -Path dist/app/Fonts -Force | Out-Null
-          Copy-Item src/SolidCraftCsvTool/Assets/NotoSansSC.ttf dist/app/Fonts/NotoSansSC.ttf
-          Copy-Item src/SolidCraftCsvTool/Assets/OFL.txt dist/app/Fonts/OFL.txt
           Compress-Archive -Path dist/app/* -DestinationPath dist/SolidCraftCsvTool-win-x64.zip
           $hash = (Get-FileHash dist/SolidCraftCsvTool-win-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  SolidCraftCsvTool-win-x64.zip" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
           @"
           Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
-          新增 STEP 批量加工图工作流：读取 STEP、从 SolidCraft 导出正交三视图、测量外形并标注识别出的重复弧槽尺寸，合成为多页 PDF。
-          随软件包附带 Noto Sans SC 字体，PDF 不再依赖 Windows 已安装微软雅黑。
-          加工图工作流尚未连接用户的 SolidCraft 桌面端做实机复核；复杂端部、半槽、斜边尺寸需要人工核对。
+          STEP 批量加工图按文件名排序，逐件生成编号 DXF，放入同一输出文件夹。
+          输出正交三视图，并标注外形、弧槽直径与位置链、轮廓折点尺寸链、半孔及端部台阶尺寸。
+          DXF 尺寸基于 STEP 投影几何提取；复杂端部和半孔仍建议对照恒瑞已完成图纸复核。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8
