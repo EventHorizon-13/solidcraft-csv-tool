@@ -170,17 +170,42 @@ internal static class DxfProjectionReader
             }
             else if (type.Equals("LWPOLYLINE", StringComparison.OrdinalIgnoreCase))
             {
-                var vertices = new List<Point2>(); double? x = null;
+                var vertices = new List<Point2>(); var bulges = new List<double>(); double? x = null, y = null; double bulge = 0;
                 foreach (var item in entity)
                 {
-                    if (item.Code == 10) { if (x.HasValue) throw new InvalidDataException("DXF 顶点缺少 Y 坐标。"); x = Parse(item.Value); }
-                    else if (item.Code == 20 && x.HasValue) { vertices.Add(new(x.Value, Parse(item.Value))); x = null; }
+                    if (item.Code == 10)
+                    {
+                        if (x.HasValue)
+                        {
+                            if (!y.HasValue) throw new InvalidDataException("DXF 顶点缺少 Y 坐标。");
+                            vertices.Add(new(x.Value, y.Value)); bulges.Add(bulge);
+                        }
+                        x = Parse(item.Value); y = null; bulge = 0;
+                    }
+                    else if (item.Code == 20 && x.HasValue) y = Parse(item.Value);
+                    else if (item.Code == 42 && x.HasValue) bulge = Parse(item.Value);
                 }
-                if (x.HasValue) throw new InvalidDataException("DXF 顶点 Y 坐标缺失。");
+                if (x.HasValue)
+                {
+                    if (!y.HasValue) throw new InvalidDataException("DXF 顶点 Y 坐标缺失。");
+                    vertices.Add(new(x.Value, y.Value)); bulges.Add(bulge);
+                }
                 if (vertices.Count >= 2)
                 {
                     bool closed = (int.TryParse(entity.FirstOrDefault(p => p.Code == 70).Value, out int flag) && (flag & 1) != 0);
-                    polylines.Add(new(vertices, closed, layer));
+                    var expanded = ExpandBulges(vertices, bulges, closed);
+                    polylines.Add(new(expanded, closed, layer));
+                }
+            }
+            else if (type.Equals("ARC", StringComparison.OrdinalIgnoreCase) || type.Equals("CIRCLE", StringComparison.OrdinalIgnoreCase))
+            {
+                double? cx = Number(entity, 10), cy = Number(entity, 20), radius = Number(entity, 40);
+                if (cx.HasValue && cy.HasValue && radius.HasValue && radius.Value > 0)
+                {
+                    bool circle = type.Equals("CIRCLE", StringComparison.OrdinalIgnoreCase);
+                    double start = circle ? 0 : Number(entity, 50) ?? 0, end = circle ? 360 : Number(entity, 51) ?? 360;
+                    var points = SampleArc(new(cx.Value, cy.Value), radius.Value, start, end, circle);
+                    if (points.Count >= 3) polylines.Add(new(points, circle, layer));
                 }
             }
         }
@@ -196,6 +221,49 @@ internal static class DxfProjectionReader
         return value == null ? null : Parse(value);
     }
     static double Parse(string value) => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double result) && double.IsFinite(result) ? result : throw new InvalidDataException("DXF 中含有无效坐标。");
+
+    static IReadOnlyList<Point2> ExpandBulges(IReadOnlyList<Point2> vertices, IReadOnlyList<double> bulges, bool closed)
+    {
+        var result = new List<Point2>();
+        int segmentCount = closed ? vertices.Count : vertices.Count - 1;
+        for (int i = 0; i < segmentCount; i++)
+        {
+            Point2 a = vertices[i], b = vertices[(i + 1) % vertices.Count];
+            if (result.Count == 0) result.Add(a);
+            double bulge = i < bulges.Count ? bulges[i] : 0;
+            if (Math.Abs(bulge) < 1e-8) { result.Add(b); continue; }
+            double dx = b.X - a.X, dy = b.Y - a.Y, chord = Math.Sqrt(dx * dx + dy * dy);
+            double theta = 4 * Math.Atan(bulge), radius = chord * (1 + bulge * bulge) / (4 * Math.Abs(bulge));
+            double offset = chord * (1 - bulge * bulge) / (4 * bulge);
+            Point2 center = new((a.X + b.X) / 2 - dy / chord * offset, (a.Y + b.Y) / 2 + dx / chord * offset);
+            double start = Math.Atan2(a.Y - center.Y, a.X - center.X), maxAngle = 2 * Math.Acos(Math.Clamp(1 - 0.005 / radius, -1, 1));
+            int steps = Math.Clamp((int)Math.Ceiling(Math.Abs(theta) / Math.Max(maxAngle, 0.001)), 3, 720);
+            for (int step = 1; step <= steps; step++)
+            {
+                double angle = start + theta * step / steps;
+                result.Add(new(center.X + radius * Math.Cos(angle), center.Y + radius * Math.Sin(angle)));
+            }
+        }
+        if (!closed && segmentCount == 0) result.AddRange(vertices);
+        return result;
+    }
+
+    static IReadOnlyList<Point2> SampleArc(Point2 center, double radius, double startDegrees, double endDegrees, bool closed)
+    {
+        double sweep = endDegrees - startDegrees;
+        if (closed) sweep = 360;
+        else { while (sweep <= 0) sweep += 360; }
+        double maxAngle = 2 * Math.Acos(Math.Clamp(1 - 0.005 / radius, -1, 1));
+        int steps = Math.Clamp((int)Math.Ceiling(sweep * Math.PI / 180 / Math.Max(maxAngle, 0.001)), 4, 720);
+        int count = closed ? steps : steps + 1;
+        var points = new List<Point2>(count);
+        for (int i = 0; i < count; i++)
+        {
+            double angle = (startDegrees + sweep * i / steps) * Math.PI / 180;
+            points.Add(new(center.X + radius * Math.Cos(angle), center.Y + radius * Math.Sin(angle)));
+        }
+        return points;
+    }
 }
 
 internal sealed record DetectedArc(double StartX, double EndX, double CenterX, double Diameter, double Depth, double BaselineY);
@@ -322,6 +390,10 @@ internal static class MachiningDxf
             if (Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) < 0.00001) return;
             Pair(0, "LINE"); Pair(8, layer); Pair(10, F(a.X)); Pair(20, F(a.Y)); Pair(30, "0"); Pair(11, F(b.X)); Pair(21, F(b.Y)); Pair(31, "0");
         }
+        public void Arc(Point2 center, double radius, double startDegrees, double endDegrees, string layer)
+        {
+            Pair(0, "ARC"); Pair(8, layer); Pair(10, F(center.X)); Pair(20, F(center.Y)); Pair(30, "0"); Pair(40, F(radius)); Pair(50, F(startDegrees)); Pair(51, F(endDegrees));
+        }
         public void Polyline(IReadOnlyList<Point2> points, bool closed, string layer)
         {
             if (points.Count < 2) return;
@@ -432,10 +504,74 @@ internal static class MachiningDxf
         foreach (Line2 line in map.Projection.Lines) w.Line(map.P(line.A), map.P(line.B), IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE");
         foreach (Polyline2 poly in map.Projection.Polylines)
         {
-            var points = poly.Points.Select(map.P).ToArray();
-            w.Polyline(points, poly.Closed, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE");
+            var points = poly.Points.Select(map.P).ToList();
+            if (poly.Closed && points.Count > 2) points.Add(points[0]);
+            DrawCurvePolyline(w, points, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE");
         }
     }
+
+    static void DrawCurvePolyline(Writer w, IReadOnlyList<Point2> points, string layer)
+    {
+        int i = 0;
+        while (i < points.Count - 1)
+        {
+            if (i + 2 < points.Count && TryFitArc(points, i, out int end, out Point2 center, out double radius, out bool counterClockwise))
+            {
+                double a = Angle(center, points[i]), b = Angle(center, points[end]);
+                if (counterClockwise) w.Arc(center, radius, a, b, layer);
+                else w.Arc(center, radius, b, a, layer);
+                i = end;
+            }
+            else
+            {
+                w.Line(points[i], points[i + 1], layer);
+                i++;
+            }
+        }
+    }
+
+    static bool TryFitArc(IReadOnlyList<Point2> points, int start, out int end, out Point2 center, out double radius, out bool counterClockwise)
+    {
+        end = start; center = new(0, 0); radius = 0; counterClockwise = true;
+        Point2 a = points[start], b = points[start + 1], c = points[start + 2];
+        double determinant = 2 * (a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y));
+        double scale = Math.Max(1, Math.Max(Math.Abs(a.X) + Math.Abs(a.Y), Math.Max(Math.Abs(b.X) + Math.Abs(b.Y), Math.Abs(c.X) + Math.Abs(c.Y))));
+        if (Math.Abs(determinant) < scale * scale * 1e-9) return false;
+        double aa = a.X * a.X + a.Y * a.Y, bb = b.X * b.X + b.Y * b.Y, cc = c.X * c.X + c.Y * c.Y;
+        center = new((aa * (b.Y - c.Y) + bb * (c.Y - a.Y) + cc * (a.Y - b.Y)) / determinant,
+            (aa * (c.X - b.X) + bb * (a.X - c.X) + cc * (b.X - a.X)) / determinant);
+        radius = Distance(center, a);
+        if (!double.IsFinite(radius) || radius < 1 || radius > 100000) return false;
+        double cross = Cross(a, b, c);
+        if (Math.Abs(cross) < 1e-8) return false;
+        counterClockwise = cross > 0;
+        double tolerance = Math.Clamp(radius * 0.00015, 0.012, 0.035);
+        double firstTurn = SignedAngle(a, b, center), secondTurn = SignedAngle(b, c, center);
+        if ((counterClockwise && (firstTurn <= 0 || secondTurn <= 0)) || (!counterClockwise && (firstTurn >= 0 || secondTurn >= 0))) return false;
+        double sweep = firstTurn + secondTurn;
+        end = start + 2;
+        for (int k = start + 3; k < points.Count; k++)
+        {
+            if (Math.Abs(Distance(center, points[k]) - radius) > tolerance) break;
+            double step = SignedAngle(points[k - 1], points[k], center);
+            if ((counterClockwise && step <= 0) || (!counterClockwise && step >= 0) || Math.Abs(step) > 30) break;
+            if (Math.Abs(sweep + step) > 170) break;
+            sweep += step;
+            end = k;
+        }
+        if (Math.Abs(sweep) < 8 || end - start < 4) { end = start; return false; }
+        return true;
+    }
+
+    static double Distance(Point2 a, Point2 b)
+    {
+        double dx = a.X - b.X, dy = a.Y - b.Y;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    static double Cross(Point2 a, Point2 b, Point2 c) => (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X);
+    static double SignedAngle(Point2 a, Point2 b, Point2 center) => Math.Atan2((a.X - center.X) * (b.Y - center.Y) - (a.Y - center.Y) * (b.X - center.X), (a.X - center.X) * (b.X - center.X) + (a.Y - center.Y) * (b.Y - center.Y)) * 180 / Math.PI;
+    static double Angle(Point2 center, Point2 p) { double degrees = Math.Atan2(p.Y - center.Y, p.X - center.X) * 180 / Math.PI; return degrees < 0 ? degrees + 360 : degrees; }
 
     static void Horizontal(Writer w, double x1, double x2, double featureY, double dimY, string label)
     {
