@@ -31,16 +31,13 @@ public static class StepDrawingExporter
         inputFiles = inputFiles.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase).ToArray();
         string destination = Path.GetFullPath(outputFolder);
         Directory.CreateDirectory(destination);
-        string[] outputNames = inputFiles.Select((path, index) => $"{index + 1:D3}_{SafeFileName(Path.GetFileNameWithoutExtension(path))}_加工图.dxf").ToArray();
-        if (outputNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != outputNames.Length)
-            throw new IOException("输入文件名生成了重复的输出文件名，请先重命名 STEP 文件。");
-        string collision = outputNames.FirstOrDefault(name => File.Exists(Path.Combine(destination, name))) ?? "";
-        if (collision.Length > 0) throw new IOException("目标文件已存在，未覆盖任何文件：" + Path.Combine(destination, collision));
+        const string outputName = "STEP加工图_汇总.dxf";
+        string outputPath = Path.Combine(destination, outputName);
+        if (File.Exists(outputPath)) throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
 
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "step-drawings-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         var pages = new List<StepDrawingPage>(inputFiles.Count);
-        var staged = new List<string>(inputFiles.Count);
         try
         {
             using var client = await ControlClient.ConnectAsync(port);
@@ -87,24 +84,14 @@ public static class StepDrawingExporter
             }
 
             cancellation.ThrowIfCancellationRequested();
-            for (int i = 0; i < pages.Count; i++)
-            {
-                cancellation.ThrowIfCancellationRequested();
-                string path = Path.Combine(work, outputNames[i]);
-                progress.Report(new($"正在生成尺寸标注 {i + 1}/{pages.Count}：{outputNames[i]}", i));
-                MachiningDxf.Write(path, pages[i]);
-                staged.Add(path);
-            }
             cancellation.ThrowIfCancellationRequested();
-            for (int i = 0; i < staged.Count; i++)
-            {
-                cancellation.ThrowIfCancellationRequested();
-                string target = Path.Combine(destination, outputNames[i]);
-                if (File.Exists(target)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + target);
-                File.Move(staged[i], target);
-                progress.Report(new($"已保存 {i + 1}/{staged.Count}：{outputNames[i]}", i + 1));
-            }
-            progress.Report(new($"加工图 DXF 已生成：{pages.Count} 个文件。", inputFiles.Count));
+            string staged = Path.Combine(work, outputName);
+            progress.Report(new($"正在将 {pages.Count} 张加工图排版到一个 DXF…", pages.Count - 1));
+            MachiningDxf.WriteCombined(staged, pages);
+            cancellation.ThrowIfCancellationRequested();
+            if (File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
+            File.Move(staged, outputPath);
+            progress.Report(new($"已保存汇总 DXF：{outputName}（含 {pages.Count} 张加工图）", inputFiles.Count));
         }
         finally
         {
@@ -113,13 +100,6 @@ public static class StepDrawingExporter
                 try { Directory.Delete(work, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
         }
-    }
-
-    static string SafeFileName(string value)
-    {
-        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
-        string safe = new string(value.Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '_' : ch).ToArray()).Trim(' ', '.');
-        return safe.Length == 0 ? "STEP" : safe;
     }
 
     static async Task<Projection2> ExportProjection(ControlClient client, string work, string file, string view, CancellationToken cancellation)
@@ -439,15 +419,19 @@ internal static class MachiningDxf
     sealed class Writer(string path) : IDisposable
     {
         readonly StreamWriter output = new(path, false, DxfEncoding());
+        double offsetX, offsetY;
+        public void SetOffset(double x, double y) { offsetX = x; offsetY = y; }
         public void Pair(int code, string value) { output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
         public void Dispose() => output.Dispose();
         public void Line(Point2 a, Point2 b, string layer = "DIM")
         {
+            a = new(a.X + offsetX, a.Y + offsetY); b = new(b.X + offsetX, b.Y + offsetY);
             if (Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) < 0.00001) return;
             Pair(0, "LINE"); Pair(8, layer); Pair(10, F(a.X)); Pair(20, F(a.Y)); Pair(30, "0"); Pair(11, F(b.X)); Pair(21, F(b.Y)); Pair(31, "0");
         }
         public void Arc(Point2 center, double radius, double startDegrees, double endDegrees, string layer)
         {
+            center = new(center.X + offsetX, center.Y + offsetY);
             Pair(0, "ARC"); Pair(8, layer); Pair(10, F(center.X)); Pair(20, F(center.Y)); Pair(30, "0"); Pair(40, F(radius)); Pair(50, F(startDegrees)); Pair(51, F(endDegrees));
         }
         public void Polyline(IReadOnlyList<Point2> points, bool closed, string layer)
@@ -458,6 +442,7 @@ internal static class MachiningDxf
         }
         public void Text(string value, Point2 at, double height, string layer = "TEXT", double rotation = 0)
         {
+            at = new(at.X + offsetX, at.Y + offsetY);
             Pair(0, "TEXT"); Pair(8, layer); Pair(10, F(at.X)); Pair(20, F(at.Y)); Pair(30, "0"); Pair(40, F(height)); Pair(1, Escape(value)); Pair(7, "STANDARD");
             Pair(50, F(rotation));
             Pair(72, "1"); Pair(73, "2"); Pair(11, F(at.X)); Pair(21, F(at.Y)); Pair(31, "0");
@@ -480,53 +465,76 @@ internal static class MachiningDxf
         using (var writer = new Writer(path))
         {
             Header(writer);
-            var front = new Map(page.Front, -page.Front.Bounds.MinX, -page.Front.Bounds.MinY);
-            double topY = -(page.Front.Bounds.Height + page.Top.Bounds.Height + 76);
-            var top = new Map(page.Top, -page.Top.Bounds.MinX, topY - page.Top.Bounds.MinY);
-            var end = new Map(page.End, page.Front.Bounds.Width + 100 - page.End.Bounds.MinX, -page.End.Bounds.MinY);
-            DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
-            writer.Text(page.Name, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
-            writer.Text("3 VIEW MACHINING DRAWING    UNIT: mm", new(front.Min.X, front.Max.Y + 62), 3.2, "TITLE");
-            writer.Text("FRONT", new(front.Min.X, front.Max.Y + 8), 3.0, "TITLE");
-            writer.Text("TOP", new(top.Min.X, top.Max.Y + 8), 3.0, "TITLE");
-            writer.Text("END", new(end.Min.X, end.Max.Y + 8), 3.0, "TITLE");
-
-            // 外形尺寸：总长、总高、总宽及端视图复核尺寸。
-            Horizontal(writer, front.Min.X, front.Max.X, front.Min.Y, front.Min.Y - 22, Fmt(page.Front.Bounds.Width));
-            Vertical(writer, front.Min.X, front.Min.X - 20, front.Min.Y, front.Max.Y, Fmt(page.Front.Bounds.Height));
-            Horizontal(writer, end.Min.X, end.Max.X, end.Min.Y, end.Min.Y - 20, Fmt(page.End.Bounds.Width));
-            Vertical(writer, end.Min.X, end.Min.X - 18, end.Min.Y, end.Max.Y, Fmt(page.End.Bounds.Height));
-            Vertical(writer, top.Max.X, top.Max.X + 23, top.Min.Y, top.Max.Y, Fmt(page.Top.Bounds.Height));
-
-            // 槽径、槽中心位置链；这对应成品图中的 Ø 标注与 60/120 等位置链。
-            if (page.Features.Arcs.Count > 0 && page.Features.Diameter is double diameter)
-            {
-                var arcs = page.Features.Arcs.OrderBy(a => a.CenterX).ToArray();
-                var first = arcs[0];
-                Point2 target = front.At(first.CenterX, first.BaselineY - first.Depth);
-                Point2 label = front.At(first.CenterX + Math.Max(diameter * 0.68, 28), front.Projection.Bounds.MaxY + 48);
-                writer.Line(target, new(label.X, label.Y - 2), "DIM"); Arrow(writer, target, new(label.X, label.Y - 2), 2.4);
-                writer.Text("%%c" + Fmt(diameter), label, 3.6, "TEXT");
-                var marks = new[] { page.Front.Bounds.MinX }.Concat(arcs.Select(a => a.CenterX)).Append(page.Front.Bounds.MaxX).Distinct().Order().ToArray();
-                DrawHorizontalChain(writer, front, marks, front.Max.Y + 18);
-            }
-            if (page.Features.FrontBreaks.Count > 0)
-                DrawHorizontalChain(writer, front, IncludeEnds(page.Features.FrontBreaks.Concat(page.Features.Arcs.Select(a => a.CenterX)).ToArray(), page.Front.Bounds.MinX, page.Front.Bounds.MaxX), front.Max.Y + 34);
-
-            // 轮廓折点尺寸链：覆盖条纹/槽距、左右半孔位置、端部台阶分段。
-            DrawHorizontalChain(writer, top, IncludeEnds(page.Features.PlanBreakX, page.Top.Bounds.MinX, page.Top.Bounds.MaxX), top.Min.Y - 20);
-            DrawVerticalChain(writer, top, IncludeEnds(page.Features.PlanBreakY, page.Top.Bounds.MinY, page.Top.Bounds.MaxY), top.Max.X + 39);
-            DrawVerticalChain(writer, front, IncludeEnds(page.Features.FrontBreakY, page.Front.Bounds.MinY, page.Front.Bounds.MaxY), front.Max.X + 24);
-
-            if (page.Features.PlanSlants.Count > 0)
-            {
-                string slopes = string.Join("；", page.Features.PlanSlants.Select(s => $"斜边 {Fmt(s.Dx)}×{Fmt(s.Dy)}"));
-                writer.Text(slopes, new(front.Min.X, top.Min.Y - 48), 3.0, "TITLE");
-            }
-            writer.Text("STEP PROJECTION DIMENSIONS - REVIEW HALF HOLES AND END STEPS", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
-            Footer(writer, page.Name, front.Max.X + 100, top.Min.Y - 60);
+            DrawPage(writer, page, null);
             writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
         }
+    }
+
+    public static void WriteCombined(string path, IReadOnlyList<StepDrawingPage> pages)
+    {
+        if (pages.Count == 0) throw new InvalidDataException("没有可写入汇总图的 STEP 加工图。");
+        using var writer = new Writer(path);
+        Header(writer);
+        double cursorY = 0;
+        for (int i = 0; i < pages.Count; i++)
+        {
+            StepDrawingPage page = pages[i];
+            writer.SetOffset(0, cursorY);
+            DrawPage(writer, page, i + 1);
+            // 每张图的内容范围约为前视图高度 + 俯视图高度 + 尺寸/标题留白，逐张向下排布。
+            cursorY -= page.Front.Bounds.Height + page.Top.Bounds.Height + 280;
+        }
+        writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
+    }
+
+    static void DrawPage(Writer writer, StepDrawingPage page, int? sequence)
+    {
+        var front = new Map(page.Front, -page.Front.Bounds.MinX, -page.Front.Bounds.MinY);
+        double topY = -(page.Front.Bounds.Height + page.Top.Bounds.Height + 76);
+        var top = new Map(page.Top, -page.Top.Bounds.MinX, topY - page.Top.Bounds.MinY);
+        var end = new Map(page.End, page.Front.Bounds.Width + 100 - page.End.Bounds.MinX, -page.End.Bounds.MinY);
+        DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
+        string title = sequence is int number ? $"序号 {number:D3}    {page.Name}" : page.Name;
+        writer.Text(title, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
+        writer.Text("3 VIEW MACHINING DRAWING    UNIT: mm", new(front.Min.X, front.Max.Y + 62), 3.2, "TITLE");
+        writer.Text("FRONT", new(front.Min.X, front.Max.Y + 8), 3.0, "TITLE");
+        writer.Text("TOP", new(top.Min.X, top.Max.Y + 8), 3.0, "TITLE");
+        writer.Text("END", new(end.Min.X, end.Max.Y + 8), 3.0, "TITLE");
+
+            // 外形尺寸：总长、总高、总宽及端视图复核尺寸。
+        Horizontal(writer, front.Min.X, front.Max.X, front.Min.Y, front.Min.Y - 22, Fmt(page.Front.Bounds.Width));
+        Vertical(writer, front.Min.X, front.Min.X - 20, front.Min.Y, front.Max.Y, Fmt(page.Front.Bounds.Height));
+        Horizontal(writer, end.Min.X, end.Max.X, end.Min.Y, end.Min.Y - 20, Fmt(page.End.Bounds.Width));
+        Vertical(writer, end.Min.X, end.Min.X - 18, end.Min.Y, end.Max.Y, Fmt(page.End.Bounds.Height));
+        Vertical(writer, top.Max.X, top.Max.X + 23, top.Min.Y, top.Max.Y, Fmt(page.Top.Bounds.Height));
+
+        // 槽径、槽中心位置链；这对应成品图中的 Ø 标注与 60/120 等位置链。
+        if (page.Features.Arcs.Count > 0 && page.Features.Diameter is double diameter)
+        {
+            var arcs = page.Features.Arcs.OrderBy(a => a.CenterX).ToArray();
+            var first = arcs[0];
+            Point2 target = front.At(first.CenterX, first.BaselineY - first.Depth);
+            Point2 label = front.At(first.CenterX + Math.Max(diameter * 0.68, 28), front.Projection.Bounds.MaxY + 48);
+            writer.Line(target, new(label.X, label.Y - 2), "DIM"); Arrow(writer, target, new(label.X, label.Y - 2), 2.4);
+            writer.Text("%%c" + Fmt(diameter), label, 3.6, "TEXT");
+            var marks = new[] { page.Front.Bounds.MinX }.Concat(arcs.Select(a => a.CenterX)).Append(page.Front.Bounds.MaxX).Distinct().Order().ToArray();
+            DrawHorizontalChain(writer, front, marks, front.Max.Y + 18);
+        }
+        if (page.Features.FrontBreaks.Count > 0)
+            DrawHorizontalChain(writer, front, IncludeEnds(page.Features.FrontBreaks.Concat(page.Features.Arcs.Select(a => a.CenterX)).ToArray(), page.Front.Bounds.MinX, page.Front.Bounds.MaxX), front.Max.Y + 34);
+
+        // 轮廓折点尺寸链：覆盖条纹/槽距、左右半孔位置、端部台阶分段。
+        DrawHorizontalChain(writer, top, IncludeEnds(page.Features.PlanBreakX, page.Top.Bounds.MinX, page.Top.Bounds.MaxX), top.Min.Y - 20);
+        DrawVerticalChain(writer, top, IncludeEnds(page.Features.PlanBreakY, page.Top.Bounds.MinY, page.Top.Bounds.MaxY), top.Max.X + 39);
+        DrawVerticalChain(writer, front, IncludeEnds(page.Features.FrontBreakY, page.Front.Bounds.MinY, page.Front.Bounds.MaxY), front.Max.X + 24);
+
+        if (page.Features.PlanSlants.Count > 0)
+        {
+            string slopes = string.Join("；", page.Features.PlanSlants.Select(s => $"斜边 {Fmt(s.Dx)}×{Fmt(s.Dy)}"));
+            writer.Text(slopes, new(front.Min.X, top.Min.Y - 48), 3.0, "TITLE");
+        }
+        writer.Text("STEP PROJECTION DIMENSIONS - REVIEW HALF HOLES AND END STEPS", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
+        Footer(writer, page.Name, front.Max.X + 100, top.Min.Y - 60);
     }
 
     static void Header(Writer w)
