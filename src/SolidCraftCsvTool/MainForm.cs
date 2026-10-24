@@ -205,7 +205,7 @@ public sealed class MainForm : Form
             MessageBox.Show(this, $"已导出 {rows.Count} 个型号。\n{options.Output}", "导出完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (OperationCanceledException) { SetStatus("已停止，已导出的文件保留。"); Log("已按请求停止。"); }
-        catch (Exception ex) { Log("导出中止：" + ex.Message); ShowError(ex.Message); SetStatus("导出中止"); }
+        catch (Exception ex) { string details = DescribeException(ex); Log("导出中止：" + details); ShowError(details); SetStatus("导出中止"); }
         finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
     }
 
@@ -227,13 +227,23 @@ public sealed class MainForm : Form
             MessageBox.Show(this, $"已生成 {files.Length} 页加工图。\n{target}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (OperationCanceledException) { SetStatus("已停止；未完成的 PDF 不会发布。"); Log("STEP 批量出图已停止。"); }
-        catch (Exception ex) { Log("STEP 出图中止：" + ex.Message); ShowError(ex.Message); SetStatus("STEP 出图中止"); }
+        catch (Exception ex) { string details = DescribeException(ex); Log("STEP 出图中止：" + details); ShowError(details); SetStatus("STEP 出图中止"); }
         finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
     }
 
     void SetRunning(bool running) { foreach (var control in editControls) control.Enabled = !running; run.Enabled = !running; stop.Enabled = running; grid.ReadOnly = running; if (!running) gap.Enabled = combined.Checked; }
     void SetStatus(string text) => status.Text = text;
     void ShowError(string text) => MessageBox.Show(this, text, "请检查", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    static string DescribeException(Exception exception)
+    {
+        var messages = new List<string>();
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            string item = $"{current.GetType().Name}: {current.Message}";
+            if (messages.Count == 0 || !messages[^1].Equals(item, StringComparison.Ordinal)) messages.Add(item);
+        }
+        return string.Join("\n原因：", messages);
+    }
     void Log(string text) { log.AppendText($"{DateTime.Now:HH:mm:ss}  {text}{Environment.NewLine}"); if (log.Lines.Length > 500) log.Lines = log.Lines.TakeLast(400).ToArray(); log.SelectionStart = log.TextLength; log.ScrollToCaret(); }
 
     void LoadSettings()
