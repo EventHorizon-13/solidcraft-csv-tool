@@ -481,8 +481,8 @@ internal static class MachiningDxf
             StepDrawingPage page = pages[i];
             writer.SetOffset(0, cursorY);
             DrawPage(writer, page, i + 1);
-            // 每张图的内容范围约为前视图高度 + 俯视图高度 + 尺寸/标题留白，逐张向下排布。
-            cursorY -= page.Front.Bounds.Height + page.Top.Bounds.Height + 280;
+            // 只保留零件轮廓、序号与文件名；每张图之间留足间距。
+            cursorY -= page.Front.Bounds.Height * 2 + page.Top.Bounds.Height + 230;
         }
         writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
     }
@@ -496,45 +496,6 @@ internal static class MachiningDxf
         DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
         string title = sequence is int number ? $"序号 {number:D3}    {page.Name}" : page.Name;
         writer.Text(title, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
-        writer.Text("3 VIEW MACHINING DRAWING    UNIT: mm", new(front.Min.X, front.Max.Y + 62), 3.2, "TITLE");
-        writer.Text("FRONT", new(front.Min.X, front.Max.Y + 8), 3.0, "TITLE");
-        writer.Text("TOP", new(top.Min.X, top.Max.Y + 8), 3.0, "TITLE");
-        writer.Text("END", new(end.Min.X, end.Max.Y + 8), 3.0, "TITLE");
-
-            // 外形尺寸：总长、总高、总宽及端视图复核尺寸。
-        Horizontal(writer, front.Min.X, front.Max.X, front.Min.Y, front.Min.Y - 22, Fmt(page.Front.Bounds.Width));
-        Vertical(writer, front.Min.X, front.Min.X - 20, front.Min.Y, front.Max.Y, Fmt(page.Front.Bounds.Height));
-        Horizontal(writer, end.Min.X, end.Max.X, end.Min.Y, end.Min.Y - 20, Fmt(page.End.Bounds.Width));
-        Vertical(writer, end.Min.X, end.Min.X - 18, end.Min.Y, end.Max.Y, Fmt(page.End.Bounds.Height));
-        Vertical(writer, top.Max.X, top.Max.X + 23, top.Min.Y, top.Max.Y, Fmt(page.Top.Bounds.Height));
-
-        // 槽径、槽中心位置链；这对应成品图中的 Ø 标注与 60/120 等位置链。
-        if (page.Features.Arcs.Count > 0 && page.Features.Diameter is double diameter)
-        {
-            var arcs = page.Features.Arcs.OrderBy(a => a.CenterX).ToArray();
-            var first = arcs[0];
-            Point2 target = front.At(first.CenterX, first.BaselineY - first.Depth);
-            Point2 label = front.At(first.CenterX + Math.Max(diameter * 0.68, 28), front.Projection.Bounds.MaxY + 48);
-            writer.Line(target, new(label.X, label.Y - 2), "DIM"); Arrow(writer, target, new(label.X, label.Y - 2), 2.4);
-            writer.Text("%%c" + Fmt(diameter), label, 3.6, "TEXT");
-            var marks = new[] { page.Front.Bounds.MinX }.Concat(arcs.Select(a => a.CenterX)).Append(page.Front.Bounds.MaxX).Distinct().Order().ToArray();
-            DrawHorizontalChain(writer, front, marks, front.Max.Y + 18);
-        }
-        if (page.Features.FrontBreaks.Count > 0)
-            DrawHorizontalChain(writer, front, IncludeEnds(page.Features.FrontBreaks.Concat(page.Features.Arcs.Select(a => a.CenterX)).ToArray(), page.Front.Bounds.MinX, page.Front.Bounds.MaxX), front.Max.Y + 34);
-
-        // 轮廓折点尺寸链：覆盖条纹/槽距、左右半孔位置、端部台阶分段。
-        DrawHorizontalChain(writer, top, IncludeEnds(page.Features.PlanBreakX, page.Top.Bounds.MinX, page.Top.Bounds.MaxX), top.Min.Y - 20);
-        DrawVerticalChain(writer, top, IncludeEnds(page.Features.PlanBreakY, page.Top.Bounds.MinY, page.Top.Bounds.MaxY), top.Max.X + 39);
-        DrawVerticalChain(writer, front, IncludeEnds(page.Features.FrontBreakY, page.Front.Bounds.MinY, page.Front.Bounds.MaxY), front.Max.X + 24);
-
-        if (page.Features.PlanSlants.Count > 0)
-        {
-            string slopes = string.Join("；", page.Features.PlanSlants.Select(s => $"斜边 {Fmt(s.Dx)}×{Fmt(s.Dy)}"));
-            writer.Text(slopes, new(front.Min.X, top.Min.Y - 48), 3.0, "TITLE");
-        }
-        writer.Text("STEP PROJECTION DIMENSIONS - REVIEW HALF HOLES AND END STEPS", new(front.Min.X, top.Min.Y - 60), 2.8, "TITLE");
-        Footer(writer, page.Name, front.Max.X + 100, top.Min.Y - 60);
     }
 
     static void Header(Writer w)
