@@ -525,11 +525,11 @@ internal static class MachiningDxf
         w.Pair(0, "LTYPE"); w.Pair(2, "DASHED"); w.Pair(70, "0"); w.Pair(3, "Dashed __ __ __"); w.Pair(72, "65"); w.Pair(73, "2"); w.Pair(40, "6"); w.Pair(49, "4"); w.Pair(49, "-2");
         w.Pair(0, "ENDTAB");
         string[] layers = ["VISIBLE", "HIDDEN", "DIM", "TEXT", "TITLE"];
-        short[] colors = [7, 8, 4, 3, 7];
+        short[] colors = [7, 7, 4, 3, 7];
         w.Pair(0, "TABLE"); w.Pair(2, "LAYER"); w.Pair(70, layers.Length.ToString(CultureInfo.InvariantCulture));
         for (int i = 0; i < layers.Length; i++) { w.Pair(0, "LAYER"); w.Pair(2, layers[i]); w.Pair(70, "0"); w.Pair(62, colors[i].ToString(CultureInfo.InvariantCulture)); w.Pair(6, layers[i] == "HIDDEN" ? "DASHED" : "CONTINUOUS"); }
         w.Pair(0, "ENDTAB");
-        w.Pair(0, "TABLE"); w.Pair(2, "STYLE"); w.Pair(70, "1"); w.Pair(0, "STYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0"); w.Pair(40, "0"); w.Pair(41, "1"); w.Pair(50, "0"); w.Pair(71, "0"); w.Pair(42, "2.5"); w.Pair(3, "txt"); w.Pair(4, ""); w.Pair(0, "ENDTAB");
+        w.Pair(0, "TABLE"); w.Pair(2, "STYLE"); w.Pair(70, "1"); w.Pair(0, "STYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0"); w.Pair(40, "0"); w.Pair(41, "1"); w.Pair(50, "0"); w.Pair(71, "0"); w.Pair(42, "2.5"); w.Pair(3, "txt.shx"); w.Pair(4, "gbcbig.shx"); w.Pair(0, "ENDTAB");
         w.Pair(0, "ENDSEC");
         w.Pair(0, "SECTION"); w.Pair(2, "BLOCKS");
         foreach (string block in new[] { "$MODEL_SPACE", "$PAPER_SPACE" })
