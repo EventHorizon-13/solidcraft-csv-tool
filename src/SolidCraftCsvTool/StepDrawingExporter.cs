@@ -543,23 +543,28 @@ internal static class MachiningDxf
     static void DrawView(Writer w, Map map)
     {
         var fittedArcs = new List<ArcPath>();
+        var linework = new List<Line2>(map.Projection.Lines.Count);
         foreach (Polyline2 poly in map.Projection.Polylines)
         {
             var points = poly.Points.Select(map.P).ToList();
             if (poly.Closed && points.Count > 2) points.Add(points[0]);
-            fittedArcs.AddRange(DrawCurvePolyline(w, points, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE"));
+            var converted = DrawCurvePolyline(w, points, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE");
+            fittedArcs.AddRange(converted.Arcs);
+            linework.AddRange(converted.Lines);
         }
         foreach (Line2 line in map.Projection.Lines)
         {
             string renderedLayer = IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE";
-            Line2 positioned = new(map.P(line.A), map.P(line.B), renderedLayer);
-            if (!IsCoveredByArc(positioned, fittedArcs)) w.Line(positioned.A, positioned.B, renderedLayer);
+            linework.Add(new(map.P(line.A), map.P(line.B), renderedLayer));
         }
+        foreach (Line2 line in linework)
+            if (!IsCoveredByArc(line, fittedArcs)) w.Line(line.A, line.B, line.Layer);
     }
 
-    static List<ArcPath> DrawCurvePolyline(Writer w, IReadOnlyList<Point2> points, string layer)
+    static (List<ArcPath> Arcs, List<Line2> Lines) DrawCurvePolyline(Writer w, IReadOnlyList<Point2> points, string layer)
     {
         var fitted = new List<ArcPath>();
+        var lines = new List<Line2>();
         int i = 0;
         while (i < points.Count - 1)
         {
@@ -575,11 +580,11 @@ internal static class MachiningDxf
             }
             else
             {
-                w.Line(points[i], points[i + 1], layer);
+                lines.Add(new(points[i], points[i + 1], layer));
                 i++;
             }
         }
-        return fitted;
+        return (fitted, lines);
     }
 
     static bool IsCoveredByArc(Line2 line, IReadOnlyList<ArcPath> arcs)
@@ -600,6 +605,7 @@ internal static class MachiningDxf
 
             double angleMargin = Math.Max(1.5, Math.Asin(Math.Clamp(length / (2 * arc.Radius), 0, 1)) * 180 / Math.PI + 0.5);
             bool covered = true;
+            bool extendsPastArcEndpoint = false;
             foreach (Point2 point in samples)
             {
                 double radialError = Math.Abs(Distance(point, arc.Center) - arc.Radius);
@@ -607,10 +613,12 @@ internal static class MachiningDxf
                 double relative = (angle - arc.StartDegrees + 360) % 360;
                 double beforeStart = (arc.StartDegrees - angle + 360) % 360;
                 double afterEnd = (angle - arc.StartDegrees - arc.SweepDegrees + 720) % 360;
-                bool angleOnArc = relative <= arc.SweepDegrees + angleMargin || beforeStart <= angleMargin || afterEnd <= angleMargin;
-                if (radialError > radialTolerance || !angleOnArc) { covered = false; break; }
+                bool insideArc = relative <= arc.SweepDegrees;
+                bool nearArc = insideArc || beforeStart <= angleMargin || afterEnd <= angleMargin;
+                if (!insideArc && (beforeStart <= angleMargin || afterEnd <= angleMargin)) extendsPastArcEndpoint = true;
+                if (radialError > radialTolerance || !nearArc) { covered = false; break; }
             }
-            if (covered) return true;
+            if (covered && (sameLayer || (hiddenEdgeCoveredByVisibleArc && extendsPastArcEndpoint))) return true;
         }
         return false;
     }
