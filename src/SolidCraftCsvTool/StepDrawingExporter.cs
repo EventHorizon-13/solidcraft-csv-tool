@@ -200,9 +200,24 @@ internal static class DxfProjectionReader
 
         var all = lines.SelectMany(l => new[] { l.A, l.B }).Concat(polylines.SelectMany(p => p.Points)).ToArray();
         if (all.Length == 0) throw new InvalidDataException($"{name} 投影视图没有可绘制的实体，请检查 STEP 文件。");
-        var joined = JoinConnectedLines(lines);
+        var joined = JoinConnectedLines(DeduplicateLines(lines));
         polylines.AddRange(joined.Polylines);
         return new(name, joined.Lines, polylines, new(all.Min(p => p.X), all.Min(p => p.Y), all.Max(p => p.X), all.Max(p => p.Y)));
+    }
+
+    static List<Line2> DeduplicateLines(IReadOnlyList<Line2> source)
+    {
+        const double snap = 0.001;
+        var result = new List<Line2>(source.Count);
+        var seen = new HashSet<(EndpointKey A, EndpointKey B, string Layer)>();
+        EndpointKey Key(Point2 p) => new((long)Math.Round(p.X / snap), (long)Math.Round(p.Y / snap));
+        foreach (Line2 line in source)
+        {
+            EndpointKey a = Key(line.A), b = Key(line.B);
+            if (a.X > b.X || (a.X == b.X && a.Y > b.Y)) (a, b) = (b, a);
+            if (seen.Add((a, b, line.Layer.ToUpperInvariant()))) result.Add(line);
+        }
+        return result;
     }
 
     static (List<Line2> Lines, List<Polyline2> Polylines) JoinConnectedLines(IReadOnlyList<Line2> source)
@@ -459,6 +474,7 @@ internal static class MachiningDxf
         public double Width => Projection.Bounds.Width;
         public double Height => Projection.Bounds.Height;
     }
+    sealed record ArcPath(Point2 Center, double Radius, double StartDegrees, double SweepDegrees, string Layer);
 
     public static void Write(string path, StepDrawingPage page)
     {
@@ -526,17 +542,24 @@ internal static class MachiningDxf
 
     static void DrawView(Writer w, Map map)
     {
-        foreach (Line2 line in map.Projection.Lines) w.Line(map.P(line.A), map.P(line.B), IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE");
+        var fittedArcs = new List<ArcPath>();
         foreach (Polyline2 poly in map.Projection.Polylines)
         {
             var points = poly.Points.Select(map.P).ToList();
             if (poly.Closed && points.Count > 2) points.Add(points[0]);
-            DrawCurvePolyline(w, points, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE");
+            fittedArcs.AddRange(DrawCurvePolyline(w, points, IsHidden(poly.Layer) ? "HIDDEN" : "VISIBLE"));
+        }
+        foreach (Line2 line in map.Projection.Lines)
+        {
+            string renderedLayer = IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE";
+            Line2 positioned = new(map.P(line.A), map.P(line.B), renderedLayer);
+            if (!IsCoveredByArc(positioned, fittedArcs)) w.Line(positioned.A, positioned.B, renderedLayer);
         }
     }
 
-    static void DrawCurvePolyline(Writer w, IReadOnlyList<Point2> points, string layer)
+    static List<ArcPath> DrawCurvePolyline(Writer w, IReadOnlyList<Point2> points, string layer)
     {
+        var fitted = new List<ArcPath>();
         int i = 0;
         while (i < points.Count - 1)
         {
@@ -545,6 +568,9 @@ internal static class MachiningDxf
                 double a = Angle(center, points[i]), b = Angle(center, points[end]);
                 if (counterClockwise) w.Arc(center, radius, a, b, layer);
                 else w.Arc(center, radius, b, a, layer);
+                double start = counterClockwise ? a : b, finish = counterClockwise ? b : a;
+                double sweep = (finish - start + 360) % 360;
+                fitted.Add(new(center, radius, start, sweep, layer));
                 i = end;
             }
             else
@@ -553,6 +579,38 @@ internal static class MachiningDxf
                 i++;
             }
         }
+        return fitted;
+    }
+
+    static bool IsCoveredByArc(Line2 line, IReadOnlyList<ArcPath> arcs)
+    {
+        const double radialTolerance = 0.025;
+        double dx = line.B.X - line.A.X, dy = line.B.Y - line.A.Y;
+        double length = Math.Sqrt(dx * dx + dy * dy);
+        Point2[] samples = [line.A, new((line.A.X + line.B.X) / 2, (line.A.Y + line.B.Y) / 2), line.B];
+        foreach (ArcPath arc in arcs)
+        {
+            if (!string.Equals(line.Layer, arc.Layer, StringComparison.OrdinalIgnoreCase)) continue;
+            double minX = Math.Min(line.A.X, line.B.X), maxX = Math.Max(line.A.X, line.B.X);
+            double minY = Math.Min(line.A.Y, line.B.Y), maxY = Math.Max(line.A.Y, line.B.Y);
+            if (maxX < arc.Center.X - arc.Radius - radialTolerance || minX > arc.Center.X + arc.Radius + radialTolerance ||
+                maxY < arc.Center.Y - arc.Radius - radialTolerance || minY > arc.Center.Y + arc.Radius + radialTolerance) continue;
+
+            double angleMargin = Math.Max(0.5, Math.Asin(Math.Clamp(length / (2 * arc.Radius), 0, 1)) * 180 / Math.PI + 0.5);
+            bool covered = true;
+            foreach (Point2 point in samples)
+            {
+                double radialError = Math.Abs(Distance(point, arc.Center) - arc.Radius);
+                double angle = Angle(arc.Center, point);
+                double relative = (angle - arc.StartDegrees + 360) % 360;
+                double beforeStart = (arc.StartDegrees - angle + 360) % 360;
+                double afterEnd = (angle - arc.StartDegrees - arc.SweepDegrees + 720) % 360;
+                bool angleOnArc = relative <= arc.SweepDegrees + angleMargin || beforeStart <= angleMargin || afterEnd <= angleMargin;
+                if (radialError > radialTolerance || !angleOnArc) { covered = false; break; }
+            }
+            if (covered) return true;
+        }
+        return false;
     }
 
     static bool TryFitArc(IReadOnlyList<Point2> points, int start, out int end, out Point2 center, out double radius, out bool counterClockwise)
