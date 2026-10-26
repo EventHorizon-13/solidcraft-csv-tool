@@ -557,9 +557,155 @@ internal static class MachiningDxf
             string renderedLayer = IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE";
             linework.Add(new(map.P(line.A), map.P(line.B), renderedLayer));
         }
-        foreach (Line2 line in linework)
+        var reconstructed = ReconstructHiddenArcs(linework, fittedArcs);
+        foreach (ArcPath arc in reconstructed.Arcs)
+        {
+            w.Arc(arc.Center, arc.Radius, arc.StartDegrees, arc.StartDegrees + arc.SweepDegrees, arc.Layer);
+            fittedArcs.Add(arc);
+        }
+        for (int i = 0; i < linework.Count; i++)
+        {
+            if (reconstructed.ConsumedLines.Contains(i)) continue;
+            Line2 line = linework[i];
             if (!IsCoveredByArc(line, fittedArcs)) w.Line(line.A, line.B, line.Layer);
+        }
     }
+
+    static (List<ArcPath> Arcs, HashSet<int> ConsumedLines) ReconstructHiddenArcs(
+        IReadOnlyList<Line2> lines, IReadOnlyList<ArcPath> referenceArcs)
+    {
+        // SolidCraft exports some hidden circular edges as many short LINE entities.
+        // Use the fitted visible arc as a geometric guide, fit a circle to the hidden
+        // fragments, and emit one HIDDEN ARC for each well-supported arc span.
+        var reconstructed = new List<ArcPath>();
+        var consumed = new HashSet<int>();
+        foreach (ArcPath reference in referenceArcs
+                     .Where(arc => arc.Layer == "VISIBLE" && arc.Radius >= 1 && arc.SweepDegrees >= 6)
+                     .OrderByDescending(arc => arc.SweepDegrees))
+        {
+            var candidates = new List<int>();
+            var fitPoints = new List<Point2>();
+            var relativeAngles = new List<double>();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (consumed.Contains(i)) continue;
+                Line2 line = lines[i];
+                if (line.Layer != "HIDDEN") continue;
+                double length = Distance(line.A, line.B);
+                if (length < 0.0001 || length > 3.0) continue;
+
+                Point2 midpoint = new((line.A.X + line.B.X) / 2, (line.A.Y + line.B.Y) / 2);
+                double relative = RelativeAngle(Angle(reference.Center, midpoint), reference.StartDegrees);
+                if (relative > reference.SweepDegrees + 0.25) continue;
+                if (Math.Abs(Distance(midpoint, reference.Center) - reference.Radius) > 1.5 ||
+                    Math.Abs(Distance(line.A, reference.Center) - reference.Radius) > 1.5 ||
+                    Math.Abs(Distance(line.B, reference.Center) - reference.Radius) > 1.5) continue;
+
+                candidates.Add(i);
+                fitPoints.Add(line.A);
+                fitPoints.Add(line.B);
+                relativeAngles.Add(relative);
+            }
+
+            if (candidates.Count < 8) continue;
+            double coveredSpan = relativeAngles.Max() - relativeAngles.Min();
+            if (coveredSpan < Math.Max(5.0, reference.SweepDegrees * 0.55) ||
+                coveredSpan > reference.SweepDegrees + 5.0) continue;
+
+            Point2 center;
+            double radius;
+            if (reference.SweepDegrees >= 20)
+            {
+                if (!TryFitCircle(fitPoints, reference.Center, out center, out radius)) continue;
+            }
+            else
+            {
+                // A very short arc does not provide enough angular spread for a
+                // stable center fit. Keep the reference center and fit its radius.
+                center = reference.Center;
+                radius = fitPoints.Average(point => Distance(point, center));
+            }
+            if (Distance(center, reference.Center) > 1.5 || Math.Abs(radius - reference.Radius) > 1.5) continue;
+
+            var inliers = fitPoints.Where(point => Math.Abs(Distance(point, center) - radius) <= 0.05).ToList();
+            if (inliers.Count < fitPoints.Count * 0.9 || inliers.Count < 16 ||
+                inliers.Average(point => Math.Pow(Distance(point, center) - radius, 2)) > 0.0004) continue;
+            if (reference.SweepDegrees >= 20 && !TryFitCircle(inliers, reference.Center, out center, out radius)) continue;
+            if (Distance(center, reference.Center) > 1.5 || Math.Abs(radius - reference.Radius) > 1.5) continue;
+            if (inliers.Any(point => Math.Abs(Distance(point, center) - radius) > 0.05)) continue;
+
+            reconstructed.Add(new(center, radius, reference.StartDegrees, reference.SweepDegrees, "HIDDEN"));
+            foreach (int index in candidates)
+            {
+                Line2 line = lines[index];
+                Point2 midpoint = new((line.A.X + line.B.X) / 2, (line.A.Y + line.B.Y) / 2);
+                double relative = RelativeAngle(Angle(reference.Center, midpoint), reference.StartDegrees);
+                if (relative <= reference.SweepDegrees + 0.25 &&
+                    Math.Abs(Distance(midpoint, center) - radius) <= 0.05 &&
+                    Math.Abs(Distance(line.A, center) - radius) <= 0.05 &&
+                    Math.Abs(Distance(line.B, center) - radius) <= 0.05)
+                    consumed.Add(index);
+            }
+        }
+        return (reconstructed, consumed);
+    }
+
+    static bool TryFitCircle(IReadOnlyList<Point2> points, Point2 origin, out Point2 center, out double radius)
+    {
+        center = origin;
+        radius = 0;
+        if (points.Count < 3) return false;
+        double xx = 0, xy = 0, x = 0, yy = 0, y = 0, n = points.Count;
+        double xq = 0, yq = 0, q = 0;
+        foreach (Point2 point in points)
+        {
+            double px = point.X - origin.X, py = point.Y - origin.Y;
+            double squared = px * px + py * py;
+            xx += px * px; xy += px * py; x += px;
+            yy += py * py; y += py;
+            xq -= px * squared; yq -= py * squared; q -= squared;
+        }
+        double[,] matrix = { { xx, xy, x }, { xy, yy, y }, { x, y, n } };
+        double[] rhs = [xq, yq, q];
+        if (!Solve3x3(matrix, rhs, out double[] solution)) return false;
+        double offsetX = -solution[0] / 2, offsetY = -solution[1] / 2;
+        double radiusSquared = offsetX * offsetX + offsetY * offsetY - solution[2];
+        if (!double.IsFinite(radiusSquared) || radiusSquared <= 0) return false;
+        center = new(origin.X + offsetX, origin.Y + offsetY);
+        radius = Math.Sqrt(radiusSquared);
+        return double.IsFinite(radius) && radius >= 1 && radius <= 100000;
+    }
+
+    static bool Solve3x3(double[,] matrix, double[] rhs, out double[] solution)
+    {
+        solution = new double[3];
+        for (int column = 0; column < 3; column++)
+        {
+            int pivot = column;
+            for (int row = column + 1; row < 3; row++)
+                if (Math.Abs(matrix[row, column]) > Math.Abs(matrix[pivot, column])) pivot = row;
+            if (Math.Abs(matrix[pivot, column]) < 1e-12) return false;
+            if (pivot != column)
+            {
+                for (int j = column; j < 3; j++) (matrix[column, j], matrix[pivot, j]) = (matrix[pivot, j], matrix[column, j]);
+                (rhs[column], rhs[pivot]) = (rhs[pivot], rhs[column]);
+            }
+            double divisor = matrix[column, column];
+            for (int j = column; j < 3; j++) matrix[column, j] /= divisor;
+            rhs[column] /= divisor;
+            for (int row = 0; row < 3; row++)
+            {
+                if (row == column) continue;
+                double factor = matrix[row, column];
+                for (int j = column; j < 3; j++) matrix[row, j] -= factor * matrix[column, j];
+                rhs[row] -= factor * rhs[column];
+            }
+        }
+        Array.Copy(rhs, solution, 3);
+        return solution.All(double.IsFinite);
+    }
+
+    static double RelativeAngle(double angle, double start) => (angle - start + 360) % 360;
 
     static (List<ArcPath> Arcs, List<Line2> Lines) DrawCurvePolyline(Writer w, IReadOnlyList<Point2> points, string layer)
     {
