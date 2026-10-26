@@ -80,4 +80,5 @@ try
     finally { listener.Stop(); }
 }
 finally { Directory.Delete(temp, true); }
+checks += DimensionChecks.Run(args.Length > 0 ? args[0] : null);
 Console.WriteLine($"PASS: {checks} checks; no CAD models generated.");

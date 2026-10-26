@@ -17,8 +17,32 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Set release identity
+        shell: pwsh
+        run: |
+          "BUILD_VERSION=1.0.${{ github.run_number }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd')
+          "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Check dimensions, build identity and core behavior
+        shell: pwsh
+        run: |
+          dotnet run --project tests/CoreChecks.csproj -c Release "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -- dist/checks
+          if ($LASTEXITCODE -ne 0) { throw 'Checks failed' }
       - name: Publish self contained Windows application
-        run: dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o dist/app
+        run: dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/app
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Audit native DXF with an independent reader
+        run: |
+          python -m pip install ezdxf
+          python tools/check-dimensions.py dist/checks/annotated-sample.dxf
+      - name: Smoke check Windows window
+        shell: pwsh
+        run: |
+          $process = Start-Process dist/app/SolidCraftCsvTool.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png" -PassThru
+          if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Windows smoke check timed out' }
+          if ($process.ExitCode -ne 0) { throw 'Windows smoke check failed' }
       - name: Package release
         shell: pwsh
         run: |
@@ -28,10 +52,13 @@ jobs:
           $hash = (Get-FileHash dist/SolidCraftCsvTool-win-x64.zip -Algorithm SHA256).Hash.ToLower()
           "$hash  SolidCraftCsvTool-win-x64.zip" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
           @"
+          标准辊密封批量生成 $env:BUILD_VERSION，编译日期 $env:BUILD_DATE。
           Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
           STEP 加工图按文件名排序，纵向排入一个汇总 DXF，每张图标注序号和文件名。
-          输出正交三视图，合并到一个 DXF 并标注序号和 STEP 文件名；此版不含尺寸标注。
+          按参考图样增加总长、宽、高、圆槽中心距、槽口、端部及台阶分段尺寸；尺寸线青色、文字绿色。
+          输出可编辑的 CAD DIMENSION 尺寸对象，单位 mm；尺寸由 STEP 投影几何提取，加工前请核对。
+          标题栏显示产品名称、发行版本与编译日期，沿用隐藏圆弧拟合修复。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8
@@ -47,3 +74,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "win-1.0.${{ github.run_number }}" dist/SolidCraftCsvTool-win-x64.zip dist/SHA256SUMS.txt --target "$env:GITHUB_SHA" --title "Windows 1.0.${{ github.run_number }}" --notes-file dist/release-notes.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dimension-checks
+          path: dist/checks/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -429,15 +429,48 @@ internal static class DxfFeatureDetector
         return values.Length == 0 ? 0 : values.Length % 2 == 1 ? values[values.Length / 2] : (values[values.Length / 2 - 1] + values[values.Length / 2]) / 2;
     }
 }
-internal static class MachiningDxf
+internal static partial class MachiningDxf
 {
     sealed class Writer(string path) : IDisposable
     {
-        readonly StreamWriter output = new(path, false, DxfEncoding());
+        readonly StringWriter document = new(CultureInfo.InvariantCulture);
+        TextWriter output = null!;
+        readonly StringBuilder dimensionBlocks = new();
+        int blockInsertion = -1, dimensionCount;
         double offsetX, offsetY;
         public void SetOffset(double x, double y) { offsetX = x; offsetY = y; }
-        public void Pair(int code, string value) { output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
-        public void Dispose() => output.Dispose();
+        public void Pair(int code, string value) { output ??= document; output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
+        public void MarkBlockInsertion() => blockInsertion = document.GetStringBuilder().Length;
+        public void Dispose()
+        {
+            using var file = new StreamWriter(path, false, DxfEncoding());
+            string text = document.ToString();
+            if (blockInsertion < 0) { file.Write(text); return; }
+            file.Write(text.AsSpan(0, blockInsertion));
+            file.Write(dimensionBlocks.ToString());
+            file.Write(text.AsSpan(blockInsertion));
+            document.Dispose();
+        }
+        public void LinearDimension(Point2 a, Point2 b, Point2 line, Point2 text, double rotation, Action drawGraphics)
+        {
+            string name = "*D" + (++dimensionCount).ToString(CultureInfo.InvariantCulture);
+            using var block = new StringWriter(CultureInfo.InvariantCulture);
+            TextWriter previous = output ?? document;
+            output = block;
+            try
+            {
+                Pair(0, "BLOCK"); Pair(8, "DIM"); Pair(2, name); Pair(70, "1");
+                Pair(10, "0"); Pair(20, "0"); Pair(30, "0"); Pair(3, name); Pair(1, "");
+                drawGraphics();
+                Pair(0, "ENDBLK"); Pair(8, "DIM");
+            }
+            finally { output = previous; }
+            dimensionBlocks.Append(block.ToString());
+            Pair(0, "DIMENSION"); Pair(8, "DIM"); Pair(2, name); Pair(3, "STANDARD"); Pair(70, "32"); Pair(1, "<>"); Pair(50, F(rotation));
+            void Point(int code, Point2 p) { Pair(code, F(p.X + offsetX)); Pair(code + 10, F(p.Y + offsetY)); Pair(code + 20, "0"); }
+            Point(10, line); Point(11, text); Point(13, a); Point(14, b);
+            Pair(42, F(Math.Abs(rotation == 0 ? b.X - a.X : b.Y - a.Y)));
+        }
         public void Line(Point2 a, Point2 b, string layer = "DIM")
         {
             a = new(a.X + offsetX, a.Y + offsetY); b = new(b.X + offsetX, b.Y + offsetY);
@@ -462,7 +495,7 @@ internal static class MachiningDxf
             Pair(50, F(rotation));
             Pair(72, "1"); Pair(73, "2"); Pair(11, F(at.X)); Pair(21, F(at.Y)); Pair(31, "0");
         }
-        public void Raw(string value) => output.Write(value);
+        public void Raw(string value) { output ??= document; output.Write(value); }
     }
 
     sealed record Map(Projection2 Projection, double Dx, double Dy)
@@ -497,8 +530,8 @@ internal static class MachiningDxf
             StepDrawingPage page = pages[i];
             writer.SetOffset(0, cursorY);
             DrawPage(writer, page, i + 1);
-            // 只保留零件轮廓、序号与文件名；每张图之间留足间距。
-            cursorY -= page.Front.Bounds.Height * 2 + page.Top.Bounds.Height + 230;
+            // Include dimension rows and title clearance between adjacent drawings.
+            cursorY -= page.Front.Bounds.Height + page.Top.Bounds.Height + 232;
         }
         writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
     }
@@ -506,10 +539,11 @@ internal static class MachiningDxf
     static void DrawPage(Writer writer, StepDrawingPage page, int? sequence)
     {
         var front = new Map(page.Front, -page.Front.Bounds.MinX, -page.Front.Bounds.MinY);
-        double topY = -(page.Front.Bounds.Height + page.Top.Bounds.Height + 76);
+        double topY = -(page.Top.Bounds.Height + 92);
         var top = new Map(page.Top, -page.Top.Bounds.MinX, topY - page.Top.Bounds.MinY);
         var end = new Map(page.End, page.Front.Bounds.Width + 100 - page.End.Bounds.MinX, -page.End.Bounds.MinY);
-        DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
+        var frontArcs = DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
+        DrawAnnotations(writer, front, top, end, frontArcs);
         string title = sequence is int number ? $"序号 {number:D3}    {page.Name}" : page.Name;
         writer.Text(title, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
     }
@@ -518,6 +552,7 @@ internal static class MachiningDxf
     {
         w.Pair(0, "SECTION"); w.Pair(2, "HEADER"); w.Pair(9, "$ACADVER"); w.Pair(1, "AC1009");
         w.Pair(9, "$DWGCODEPAGE"); w.Pair(3, "ANSI_936");
+        w.Pair(9, "$INSUNITS"); w.Pair(70, "4");
         w.Pair(0, "ENDSEC");
         w.Pair(0, "SECTION"); w.Pair(2, "TABLES");
         w.Pair(0, "TABLE"); w.Pair(2, "LTYPE"); w.Pair(70, "2");
@@ -530,6 +565,12 @@ internal static class MachiningDxf
         for (int i = 0; i < layers.Length; i++) { w.Pair(0, "LAYER"); w.Pair(2, layers[i]); w.Pair(70, "0"); w.Pair(62, colors[i].ToString(CultureInfo.InvariantCulture)); w.Pair(6, layers[i] == "HIDDEN" ? "DASHED" : "CONTINUOUS"); }
         w.Pair(0, "ENDTAB");
         w.Pair(0, "TABLE"); w.Pair(2, "STYLE"); w.Pair(70, "1"); w.Pair(0, "STYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0"); w.Pair(40, "0"); w.Pair(41, "1"); w.Pair(50, "0"); w.Pair(71, "0"); w.Pair(42, "2.5"); w.Pair(3, "txt.shx"); w.Pair(4, "gbcbig.shx"); w.Pair(0, "ENDTAB");
+        w.Pair(0, "TABLE"); w.Pair(2, "DIMSTYLE"); w.Pair(70, "1");
+        w.Pair(0, "DIMSTYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0");
+        w.Pair(40, "1"); w.Pair(41, "2"); w.Pair(42, "1"); w.Pair(44, "2");
+        w.Pair(77, "1"); w.Pair(78, "8"); w.Pair(140, "3.2"); w.Pair(147, "1");
+        w.Pair(176, "4"); w.Pair(177, "4"); w.Pair(178, "3"); w.Pair(271, "2");
+        w.Pair(0, "ENDTAB");
         w.Pair(0, "ENDSEC");
         w.Pair(0, "SECTION"); w.Pair(2, "BLOCKS");
         foreach (string block in new[] { "$MODEL_SPACE", "$PAPER_SPACE" })
@@ -537,10 +578,11 @@ internal static class MachiningDxf
             w.Pair(0, "BLOCK"); w.Pair(8, "0"); w.Pair(2, block); w.Pair(70, "0"); w.Pair(10, "0"); w.Pair(20, "0"); w.Pair(30, "0"); w.Pair(3, block); w.Pair(1, "");
             w.Pair(0, "ENDBLK"); w.Pair(8, "0");
         }
+        w.MarkBlockInsertion();
         w.Pair(0, "ENDSEC"); w.Pair(0, "SECTION"); w.Pair(2, "ENTITIES");
     }
 
-    static void DrawView(Writer w, Map map)
+    static List<ArcPath> DrawView(Writer w, Map map)
     {
         var fittedArcs = new List<ArcPath>();
         var linework = new List<Line2>(map.Projection.Lines.Count);
@@ -569,6 +611,7 @@ internal static class MachiningDxf
             Line2 line = linework[i];
             if (!IsCoveredByArc(line, fittedArcs)) w.Line(line.A, line.B, line.Layer);
         }
+        return fittedArcs;
     }
 
     static (List<ArcPath> Arcs, HashSet<int> ConsumedLines) ReconstructHiddenArcs(
@@ -815,21 +858,35 @@ internal static class MachiningDxf
     static void Horizontal(Writer w, double x1, double x2, double featureY, double dimY, string label)
     {
         if (x2 < x1) (x1, x2) = (x2, x1);
-        w.Line(new(x1, featureY), new(x1, dimY - Math.Sign(dimY - featureY) * 2), "DIM");
-        w.Line(new(x2, featureY), new(x2, dimY - Math.Sign(dimY - featureY) * 2), "DIM");
-        w.Line(new(x1, dimY), new(x2, dimY), "DIM");
-        Arrow(w, new(x1, dimY), new(x2, dimY), 2.0); Arrow(w, new(x2, dimY), new(x1, dimY), 2.0);
-        w.Text(label, new((x1 + x2) / 2, dimY + 2.2), 3.2);
+        if (x2 - x1 < 0.05) return;
+        double direction = Math.Sign(dimY - featureY);
+        Point2 text = new((x1 + x2) / 2, dimY + 2.8);
+        w.LinearDimension(new(x1, featureY), new(x2, featureY), new(x2, dimY), text, 0, () =>
+        {
+            w.Line(new(x1, featureY + direction), new(x1, dimY + direction * 2), "DIM");
+            w.Line(new(x2, featureY + direction), new(x2, dimY + direction * 2), "DIM");
+            w.Line(new(x1, dimY), new(x2, dimY), "DIM");
+            double size = Math.Min(2, (x2 - x1) / 3);
+            Arrow(w, new(x1, dimY), new(x2, dimY), size); Arrow(w, new(x2, dimY), new(x1, dimY), size);
+            w.Text(label, text, 3.2);
+        });
     }
 
     static void Vertical(Writer w, double featureX, double dimX, double y1, double y2, string label)
     {
         if (y2 < y1) (y1, y2) = (y2, y1);
-        w.Line(new(featureX, y1), new(dimX + Math.Sign(dimX - featureX) * 2, y1), "DIM");
-        w.Line(new(featureX, y2), new(dimX + Math.Sign(dimX - featureX) * 2, y2), "DIM");
-        w.Line(new(dimX, y1), new(dimX, y2), "DIM");
-        Arrow(w, new(dimX, y1), new(dimX, y2), 2.0); Arrow(w, new(dimX, y2), new(dimX, y1), 2.0);
-        w.Text(label, new(dimX - 2.2, (y1 + y2) / 2), 3.2, rotation: 90);
+        if (y2 - y1 < 0.05) return;
+        double direction = Math.Sign(dimX - featureX);
+        Point2 text = new(dimX - 2.8, (y1 + y2) / 2);
+        w.LinearDimension(new(featureX, y1), new(featureX, y2), new(dimX, y2), text, 90, () =>
+        {
+            w.Line(new(featureX + direction, y1), new(dimX + direction * 2, y1), "DIM");
+            w.Line(new(featureX + direction, y2), new(dimX + direction * 2, y2), "DIM");
+            w.Line(new(dimX, y1), new(dimX, y2), "DIM");
+            double size = Math.Min(2, (y2 - y1) / 3);
+            Arrow(w, new(dimX, y1), new(dimX, y2), size); Arrow(w, new(dimX, y2), new(dimX, y1), size);
+            w.Text(label, text, 3.2, rotation: 90);
+        });
     }
 
     static void DrawHorizontalChain(Writer w, Map map, double[] marks, double y)

@@ -23,7 +23,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "SolidCraft 参数与批量导出";
+        Text = AppBuildInfo.WindowTitle;
         Font = new Font("Microsoft YaHei UI", 9F);
         ClientSize = new Size(1360, 810); MinimumSize = new Size(1000, 680);
         StartPosition = FormStartPosition.CenterScreen;
@@ -223,7 +223,7 @@ public sealed class MainForm : Form
             Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
             await Task.Run(() => StepDrawingExporter.RunAsync(files, target, (int)port.Value, progress, cancellation.Token));
             SetStatus($"加工图完成：1 个 DXF，含 {files.Length} 张图"); Log("汇总 DXF 输出文件夹：" + target);
-            MessageBox.Show(this, $"已生成 1 个汇总 DXF，内含 {files.Length} 张加工图（仅投影、序号和文件名），按 STEP 文件名排序。\n\n{Path.Combine(target, "STEP加工图_汇总.dxf")}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, $"已生成 1 个汇总 DXF，内含 {files.Length} 张带尺寸标注的三视图，按 STEP 文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, "STEP加工图_汇总.dxf")}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (OperationCanceledException) { SetStatus("已停止；已完成的 DXF 保留。"); Log("STEP 批量出图已停止。"); }
         catch (Exception ex) { string details = DescribeException(ex); Log("STEP 出图中止：" + details); ShowError(details); SetStatus("STEP 出图中止"); }

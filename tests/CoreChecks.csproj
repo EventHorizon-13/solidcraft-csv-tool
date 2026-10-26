@@ -4,9 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</BuildDate>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../src/SolidCraftCsvTool/Core.cs" Link="Core.cs" />
     <Compile Include="../src/SolidCraftCsvTool/ControlClient.cs" Link="ControlClient.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/Exporter.cs" Link="Exporter.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/StepDrawingExporter.cs" Link="StepDrawingExporter.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/AppBuildInfo.cs" Link="AppBuildInfo.cs" />
+    <AssemblyMetadata Include="BuildDate" Value="$(BuildDate)" />
   </ItemGroup>
 </Project>
