@@ -590,13 +590,15 @@ internal static class MachiningDxf
         Point2[] samples = [line.A, new((line.A.X + line.B.X) / 2, (line.A.Y + line.B.Y) / 2), line.B];
         foreach (ArcPath arc in arcs)
         {
-            if (!string.Equals(line.Layer, arc.Layer, StringComparison.OrdinalIgnoreCase)) continue;
+            bool sameLayer = string.Equals(line.Layer, arc.Layer, StringComparison.OrdinalIgnoreCase);
+            bool hiddenEdgeCoveredByVisibleArc = line.Layer == "HIDDEN" && arc.Layer == "VISIBLE";
+            if (!sameLayer && !hiddenEdgeCoveredByVisibleArc) continue;
             double minX = Math.Min(line.A.X, line.B.X), maxX = Math.Max(line.A.X, line.B.X);
             double minY = Math.Min(line.A.Y, line.B.Y), maxY = Math.Max(line.A.Y, line.B.Y);
             if (maxX < arc.Center.X - arc.Radius - radialTolerance || minX > arc.Center.X + arc.Radius + radialTolerance ||
                 maxY < arc.Center.Y - arc.Radius - radialTolerance || minY > arc.Center.Y + arc.Radius + radialTolerance) continue;
 
-            double angleMargin = Math.Max(0.5, Math.Asin(Math.Clamp(length / (2 * arc.Radius), 0, 1)) * 180 / Math.PI + 0.5);
+            double angleMargin = Math.Max(1.5, Math.Asin(Math.Clamp(length / (2 * arc.Radius), 0, 1)) * 180 / Math.PI + 0.5);
             bool covered = true;
             foreach (Point2 point in samples)
             {
