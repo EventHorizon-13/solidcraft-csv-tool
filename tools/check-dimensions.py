@@ -103,3 +103,10 @@ for dim in dimensions:
         assert not overlap, ('Dimension label overlap',box,other)
     rectangles.append(box)
 print('First-angle layout: framed sheets and dimension-label separation checks passed')
+
+dense=ezdxf.readfile(path.with_name('crowded-sample.dxf'))
+horizontal=[d for d in dense.modelspace().query('DIMENSION') if d.dimtype==0 and abs(d.dxf.angle)<0.001]
+tiny=next(d for d in horizontal if abs(d.get_measurement()-2)<0.001)
+adjacent=next(d for d in horizontal if abs(d.get_measurement()-30)<0.001)
+assert abs(tiny.dxf.text_midpoint.y-adjacent.dxf.text_midpoint.y)>20
+print('Crowded 2 mm dimension exists and uses its own text row')
