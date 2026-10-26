@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</BuildDate>
+    <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss'))</BuildDate>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="netDxf" Version="2023.11.10" />
@@ -17,6 +17,7 @@
     <Compile Include="../src/SolidCraftCsvTool/Dxf2010Compatibility.cs" Link="Dxf2010Compatibility.cs" />
     <Compile Include="../src/SolidCraftCsvTool/DrawingOptions.cs" Link="DrawingOptions.cs" />
     <Compile Include="../src/SolidCraftCsvTool/MachiningDxf.Layout.cs" Link="MachiningDxf.Layout.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/MachiningDxf.Features.cs" Link="MachiningDxf.Features.cs" />
     <AssemblyMetadata Include="BuildDate" Value="$(BuildDate)" />
   </ItemGroup>
 </Project>

@@ -15,27 +15,12 @@ internal static partial class MachiningDxf
         DrawLowerDimensions(w, front);
         Vertical(w, front.Min.X, front.Min.X - w.DimensionRow, front.Min.Y, front.Max.Y, w.FormatDimension(front.Height));
         DrawPerimeterHeight(w, front);
+        DrawHoleDiameters(w, front, arcs);
 
     }
 
-    static void DrawPlanAnnotations(Writer w, Map top)
-    {
-        double[] planMarks = AxisMarks(top.Projection, true);
-        if (planMarks.Length > 2) DrawHorizontalChain(w, top, planMarks, top.Max.Y + w.DimensionRow);
-        DrawLowerDimensions(w, top);
-        Vertical(w, top.Min.X, top.Min.X - w.DimensionRow, top.Min.Y, top.Max.Y, w.FormatDimension(top.Height));
-        DrawPerimeterHeight(w, top);
-
-    }
-
-    static void DrawEndAnnotations(Writer w, Map end)
-    {
-        Horizontal(w, end.Min.X, end.Max.X, end.Max.Y, end.Max.Y + w.DimensionRow, w.FormatDimension(end.Width));
-        double[] endMarks = AxisMarks(end.Projection, true);
-        if (endMarks.Length > 2) DrawHorizontalChainBelow(w, end, endMarks, end.Min.Y - w.DimensionRow);
-        Vertical(w, end.Min.X, end.Min.X - w.DimensionRow, end.Min.Y, end.Max.Y, w.FormatDimension(end.Height));
-        DrawPerimeterHeight(w, end);
-    }
+    static void DrawPlanAnnotations(Writer w,Map top)=>DrawPlanGrooves(w,top);
+    static void DrawEndAnnotations(Writer w,Map end)=>DrawEndSizeAndBevel(w,end);
 
     static void DrawLowerDimensions(Writer w, Map map)
     {

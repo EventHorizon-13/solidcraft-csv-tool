@@ -26,9 +26,18 @@ internal static class TemplateChecks
         var saved=DxfDocument.Load(output)??throw new Exception("Cannot reopen template output");
         Check(saved.Entities.Inserts.Count()==4,"Each drawing needs its own frame and title block");
         Check(saved.Entities.Texts.All(t=>t.Value!="DO_NOT_IMPORT_PART"),"A template's existing part drawings must not be copied");
-        Check(saved.Entities.Inserts.SelectMany(i=>i.Attributes).Any(a=>Convert.ToString(a.Value)=="template-page-2"),"Title attribute must identify the actual part");
+        Check(saved.Entities.Inserts.SelectMany(i=>i.Attributes).Any(a=>Convert.ToString(a.Value)=="辊密封2"),"Title attribute must identify the actual part");
         Check(Math.Abs(saved.DimensionStyles["_5"].TextHeight-.8)<1e-8 && Math.Abs(saved.DimensionStyles["_5"].DimScaleOverall-20)<1e-8,"Imported dimension style must retain its values");
         Check(saved.Entities.Polylines2D.Where(p=>p.Layer.Name=="HIDDEN").All(p=>Math.Abs(p.LinetypeScale-2)<1e-8&&p.LinetypeGeneration),"Hidden line scale and continuity must survive saving");
+        var frameInserts=saved.Entities.Inserts.Where(i=>i.Block.Name=="SYNTHETIC_FRAME").ToArray();
+        Check(saved.Entities.Inserts.SelectMany(i=>i.Attributes).All(a=>frameInserts.Any(f=>a.Position.X>=f.Position.X&&a.Position.X<=f.Position.X+1000*f.Scale.X&&a.Position.Y>=f.Position.Y&&a.Position.Y<=f.Position.Y+700*f.Scale.Y)),"Title attributes must move and scale with their sheet frame");
+        string crowded=Path.Combine(directory,"crowded-sample.dxf");
+        var tightTop=page.Top with{Lines=page.Top.Lines.Append(new Line2(new(32,0),new(32,160),"VISIBLE")).ToArray()};
+        MachiningDxf.Write(crowded,page with{Top=tightTop});
+        var dense=DxfDocument.Load(crowded)??throw new Exception("Cannot read dense annotation fixture");
+        var tiny=dense.Entities.Dimensions.OfType<LinearDimension>().Single(d=>Math.Abs(d.Measurement-2)<.001);
+        var adjacent=dense.Entities.Dimensions.OfType<LinearDimension>().First(d=>Math.Abs(d.Measurement-30)<.001&&Math.Abs(d.Rotation)<.001);
+        Check(Math.Abs(tiny.TextReferencePoint.Y-adjacent.TextReferencePoint.Y)>20,"Crowded dimensions need separate rows");
         bool rejected=false;
         try{MachiningDxf.Write(Path.Combine(directory,"wrong-angle.dxf"),page with{End=page.End with{Name="right"}});}catch(InvalidDataException){rejected=true;}
         Check(rejected,"First-angle drawing must refuse a right-side projection on the right");

@@ -24,7 +24,7 @@ dimensions = list(doc.modelspace().query('DIMENSION'))
 assert len(dimensions) >= 30
 for dim in dimensions:
     labels = [e.dxf.text if e.dxftype()=='TEXT' else e.plain_text() for e in dim.virtual_entities() if e.dxftype() in ('TEXT','MTEXT')]
-    assert len(labels) == 1 and abs(dim.get_measurement() - float(labels[0])) <= 0.00501
+    assert len(labels) == 1 and abs(dim.get_measurement() - float(labels[0].replace('%%c','').replace('%%C','').replace('Ø','').replace('ø','').replace('⌀',''))) <= 0.00501
     assert dim.dxf.handle in doc.entitydb and dim.dxf.owner in doc.entitydb
     assert dim.dxf.dimstyle in doc.dimstyles
     assert dim.dxf.text == '<>'
@@ -61,7 +61,7 @@ def add(entity):
         p = (entity.dxf.align_point if entity.dxf.halign else entity.dxf.insert) if kind=='TEXT' else entity.dxf.insert
         if p.y < -1:
             return
-        angle = entity.dxf.get('rotation',0)
+        angle = entity.get_rotation() if kind=='MTEXT' else entity.dxf.get('rotation',0)
         text = html.escape(entity.dxf.text if kind=='TEXT' else entity.plain_text())
         text_height=entity.dxf.height if kind=='TEXT' else entity.dxf.char_height
         parts.append(f'<text x="{p.x}" y="{-p.y}" fill="{color}" font-size="{text_height}" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" transform="rotate({-angle} {p.x} {-p.y})">{text}</text>')
@@ -92,9 +92,11 @@ for dim in dimensions:
     value=text.dxf.text if text.dxftype()=='TEXT' else text.plain_text()
     height=text.dxf.height if text.dxftype()=='TEXT' else text.dxf.char_height
     p=dim.dxf.text_midpoint
+    value=value.replace('%%c','Ø').replace('%%C','Ø')
     width=max(1,len(value))*.60*height
-    if abs(dim.dxf.angle%180-90)<1:dx,dy=height/2,width/2
-    else:dx,dy=width/2,height/2
+    angle=math.radians(text.get_rotation() if text.dxftype()=='MTEXT' else text.dxf.get('rotation',0))
+    dx=(abs(math.cos(angle))*width+abs(math.sin(angle))*height)/2
+    dy=(abs(math.sin(angle))*width+abs(math.cos(angle))*height)/2
     box=(p.x-dx,p.y-dy,p.x+dx,p.y+dy)
     for other in rectangles:
         overlap=min(box[2],other[2])-max(box[0],other[0])>0.05 and min(box[3],other[3])-max(box[1],other[1])>0.05

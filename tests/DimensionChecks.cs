@@ -18,7 +18,7 @@ internal static class DimensionChecks
             }
         contour.AddRange([Shift(300, 100), Shift(300, 0), Shift(0, 0)]);
         Projection2 front = new("front", [], [new(contour, true, "VISIBLE")], new(-40, 25, 260, 125));
-        Point2[] plan = [new(0, 0), new(300, 0), new(300, 50), new(291, 50), new(291, 110), new(300, 110), new(300, 160), new(0, 160)];
+        Point2[] plan = [new(0, 0), new(300, 0), new(300, 50), new(291, 50), new(291, 110), new(300, 110), new(300, 160), new(0, 160), new(0,120), new(9,120), new(9,40), new(0,40)];
         var planLines = new List<Line2>();
         foreach (double x in new[] { 30.0, 90.0, 150.0, 210.0 }) planLines.Add(new(new(x, 0), new(x, 160), "VISIBLE"));
         planLines.Add(new(new(35, 0), new(35, 80), "HIDDEN"));
@@ -43,10 +43,11 @@ internal static class DimensionChecks
                 if (code == 0) { current = new(); entities.Add((raw[i + 1], current)); }
                 else if (current != null) current[code] = raw[i + 1];
             }
-            var dimensions = entities.Where(e => e.Type == "DIMENSION").Select(e => e.Values).ToArray();
+            var allDimensions = entities.Where(e => e.Type == "DIMENSION").Select(e => e.Values).ToArray();
+            var dimensions = allDimensions.Where(d => (int.Parse(d[70],CultureInfo.InvariantCulture)&7)==0).ToArray();
             var blocks = entities.Where(e => e.Type == "BLOCK").Select(e => e.Values[2]).ToHashSet();
             Check(dimensions.Length >= 30 && dimensions.Length % 2 == 0, "Both pages need native editable dimensions");
-            Check(dimensions.All(d => blocks.Contains(d[2])) && dimensions.Select(d => d[2]).Distinct().Count() == dimensions.Length,
+            Check(allDimensions.All(d => blocks.Contains(d[2])) && allDimensions.Select(d => d[2]).Distinct().Count() == allDimensions.Length,
                 "Each native dimension needs a unique graphics block");
             double N(Dictionary<int, string> d, int code) => double.Parse(d[code], CultureInfo.InvariantCulture);
             double Measurement(Dictionary<int, string> d) => Math.Abs(N(d, 50) == 0 ? N(d, 14) - N(d, 13) : N(d, 24) - N(d, 23));
@@ -57,13 +58,13 @@ internal static class DimensionChecks
             Check(raw.Contains("AC1024") && raw.Contains("BLOCK_RECORD") && raw.Contains("OBJECTS"),
                 "DXF 2010 needs complete symbol tables, block records and object structure");
             var reopened = netDxf.DxfDocument.Load(file);
-            Check(reopened != null && reopened.Entities.Dimensions.Count() == dimensions.Length, "Saved DXF 2010 must reopen with all native dimensions");
-            Check(reopened!.Entities.Texts.Any(t => t.Value.Contains("序号", StringComparison.Ordinal)), "Unicode drawing titles must survive a complete library round trip");
+            Check(reopened != null && reopened.Entities.Dimensions.Count() == allDimensions.Length, "Saved DXF 2010 must reopen with all native dimensions");
+            Check(reopened!.Entities.Texts.Any(t => t.Value.StartsWith("辊密封", StringComparison.Ordinal)), "Unicode drawing titles must survive a complete library round trip");
             string rootOwner = entities.Single(e => e.Type == "DICTIONARY" && e.Values.GetValueOrDefault(330) == "0").Values[5];
             Check(entities.Where(e => e.Type == "RASTERVARIABLES").All(e => e.Values.GetValueOrDefault(330) == rootOwner),
                 "Raster variables must be owned by their root dictionary, not handle 0");
             var sizes = dimensions.Select(Measurement).ToArray();
-            foreach (double expected in new[] { 9.0, 20.0, 30.0, 50.0, 60.0, 100.0, 120.0, 140.0, 160.0, 300.0 })
+            foreach (double expected in new[] { 9.0, 20.0, 30.0, 50.0, 60.0, 100.0, 120.0, 160.0, 300.0 })
                 Check(sizes.Any(v => Math.Abs(v - expected) < 0.001), "Missing measured feature: " + expected);
             Check(!sizes.Any(v => Math.Abs(v - 35) < 0.001), "Hidden edges must not create plan dimension marks");
             Check(dimensions.Any(d => N(d, 50) == 90 && Math.Abs(Measurement(d) - 20) < 0.001 && N(d, 13) > 300),
@@ -85,6 +86,11 @@ internal static class DimensionChecks
             if (expectedVersion != null) Check(AppBuildInfo.WindowTitle.Contains("v" + expectedVersion + " ·", StringComparison.Ordinal), "Title version must match release version");
             Check(reopened.Entities.Polylines2D.Any(p => p.Layer.Name == "HIDDEN" && p.LinetypeGeneration && p.Vertexes.Count >= 3), "Connected hidden fragments need continuous polyline pattern generation");
             Check(reopened.DimensionStyles.Contains("_5") && Math.Abs(reopened.DimensionStyles["_5"].TextHeight-0.6)<1e-8 && Math.Abs(reopened.DimensionStyles["_5"].DimScaleOverall-20)<1e-8,"Default _5 dimensions must use the requested 0.6 x 20 text scale");
+            Check(reopened.Entities.Dimensions.OfType<netDxf.Entities.DiametricDimension>().Count()==2 && reopened.Entities.Dimensions.OfType<netDxf.Entities.DiametricDimension>().All(d=>Math.Abs(d.Measurement-60)<.01),"Hole diameter needs a native diameter dimension on each sheet");
+            Check(reopened.Entities.Texts.All(t=>t.Value.StartsWith("辊密封",StringComparison.Ordinal)),"Added drawing titles must contain only roller-seal name and number");
+            Check(dimensions.Count(d=>Math.Abs(Measurement(d)-9)<.001)==4,"Tongue and groove depth dimensions must be separate at both ends of both sheets");
+            Check(dimensions.Any(d=>N(d,50)==90&&Math.Abs(Measurement(d)-40)<.001)&&dimensions.Any(d=>N(d,50)==90&&Math.Abs(Measurement(d)-50)<.001),"Each end needs its own groove height chain");
+            Check(System.Text.RegularExpressions.Regex.IsMatch(AppBuildInfo.WindowTitle,@"编译于 \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"),"Build identity needs hours, minutes and seconds");
             count += TemplateChecks.Run(directory,page);
             if (externalTemplate != null)
             {
@@ -92,7 +98,7 @@ internal static class DimensionChecks
                 string actual = Path.Combine(directory, "actual-template-sample.dxf");
                 MachiningDxf.WriteCombined(actual, [page, page with { Name = "template-page-2" }], settings);
                 var preview = netDxf.DxfDocument.Load(actual) ?? throw new Exception("Cannot reopen actual template preview");
-                Check(preview.Entities.Dimensions.Count() == dimensions.Length, "Actual template must preserve all dimensions");
+                Check(preview.Entities.Dimensions.Count() == allDimensions.Length, "Actual template must preserve all dimensions");
                 Check(preview.Entities.Inserts.Count() >= 2, "Actual template must produce framed sheets");
                 Console.WriteLine("Actual template preview: " + actual);
             }

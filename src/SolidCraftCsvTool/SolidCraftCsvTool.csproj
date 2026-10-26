@@ -9,7 +9,7 @@
     <AssemblyName>SolidCraftCsvTool</AssemblyName>
     <Version>1.0.0</Version>
     <Product>标准辊密封批量生成</Product>
-    <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</BuildDate>
+    <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss'))</BuildDate>
     <Description>Windows CSV/STEP batch tool for SolidCraft and dimensioned DXF machining drawings</Description>
     <DebugType>embedded</DebugType>
   </PropertyGroup>

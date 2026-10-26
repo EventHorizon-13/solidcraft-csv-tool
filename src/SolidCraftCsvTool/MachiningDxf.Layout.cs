@@ -39,22 +39,19 @@ internal static partial class MachiningDxf
         double planY=frontScene.Bounds.MinY-writer.Options.ViewGap-planScene.Bounds.MaxY;
         var result=new Scene();result.Include(frontScene);result.Include(planScene,0,planY);result.Include(endScene,sideX,0);
         Box2 views=result.Bounds;
-        double titleHeight=Math.Max(5,writer.DimensionTextHeight*.85),lineHeight=titleHeight*1.6;
-        string title=sequence is int number ? $"序号 {number:D3}    {page.Name}" : page.Name;
-        var lines=new List<string>();string current="";
-        foreach(char c in title)
-        {
-            if(current.Length>0 && TextWidth(current+c,titleHeight)>views.Width){lines.Add(current);current="";}
-            current+=c;
-        }
-        if(current.Length>0)lines.Add(current);
-        double titleY=views.MaxY+writer.DimensionRow;
-        var header=writer.Record(()=>
-        {
-            writer.Text("第一角投影 · 单位 mm",new((views.MinX+views.MaxX)/2,titleY),titleHeight*.8,"TITLE");
-            for(int i=0;i<lines.Count;i++)writer.Text(lines[i],new((views.MinX+views.MaxX)/2,titleY+lineHeight*(lines.Count-i)),titleHeight,"TITLE");
-        });
+        double titleHeight=Math.Max(12,writer.DimensionTextHeight*1.8);
+        string title=DrawingName(page.Name,sequence??1);
+        double titleY=views.MaxY+writer.DimensionRow+titleHeight/2;
+        var header=writer.Record(()=>writer.Text(title,new((views.MinX+views.MaxX)/2,titleY),titleHeight,"TITLE"));
         result.Include(header);return result;
+    }
+
+    internal static string DrawingName(string name,int sequence)
+    {
+        var match=System.Text.RegularExpressions.Regex.Match(name,@"^(?:\d{3}_)?(.+?)_辊密封(?:_|$)");
+        string id=match.Success?match.Groups[1].Value:
+            System.Text.RegularExpressions.Regex.IsMatch(name,@"^[A-Za-z]*\d+[A-Za-z0-9-]*$")?name:sequence.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return "辊密封"+id;
     }
 
     static void RenderSheets(Writer writer,IReadOnlyList<StepDrawingPage> pages)
@@ -71,7 +68,7 @@ internal static partial class MachiningDxf
         for(int i=0;i<scenes.Length;i++)
         {
             double sheetY=-i*(sheetHeight+writer.Options.SheetGap);
-            if(writer.Options.IncludeFrame)writer.DrawFrame(sheetY,factor,sheetWidth,sheetHeight,pages[i].Name,i+1);
+            if(writer.Options.IncludeFrame)writer.DrawFrame(sheetY,factor,sheetWidth,sheetHeight,DrawingName(pages[i].Name,i+1),i+1);
             Scene scene=scenes[i];Box2 b=scene.Bounds;
             double x=margin*factor+(availableWidth*factor-b.Width)/2-b.MinX;
             double y=sheetY+bottom*factor+(availableHeight*factor-b.Height)/2-b.MinY;

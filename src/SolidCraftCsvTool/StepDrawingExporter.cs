@@ -437,7 +437,7 @@ internal static partial class MachiningDxf
     {
         readonly netDxf.DxfDocument document = new(netDxf.Header.DxfVersion.AutoCad2010) { BuildDimensionBlocks = true };
         readonly Dictionary<string, netDxf.Tables.Layer> layers = new();
-        readonly netDxf.Tables.TextStyle titleStyle = new("SC_TITLE", "txt.shx") { BigFont = "gbcbig.shx" };
+        netDxf.Tables.TextStyle titleStyle = null!;
         public DrawingOptions Options { get; } = options;
         public DrawingResources Resources { get; } = DrawingResources.Load(options);
         Scene? recording;
@@ -462,6 +462,7 @@ internal static partial class MachiningDxf
         }
         public void Initialize()
         {
+            titleStyle=Resources.TitleStyle??new netDxf.Tables.TextStyle("SC_TITLE","gbenor.shx"){BigFont="gbcbig.shx"};
             document.DrawingVariables.InsUnits=netDxf.Units.DrawingUnits.Millimeters;
             var hiddenType=new netDxf.Tables.Linetype("SC_HIDDEN",new netDxf.Tables.LinetypeSegment[]{new netDxf.Tables.LinetypeSimpleSegment(6),new netDxf.Tables.LinetypeSimpleSegment(-3)});
             foreach(var(name,color)in new[]{("VISIBLE",(short)7),("HIDDEN",(short)7),("DIM",(short)4),("TEXT",(short)3),("TITLE",(short)7),("FRAME",(short)7)})
@@ -495,6 +496,17 @@ internal static partial class MachiningDxf
             double distance=rotation==0 ? line.Y-a.Y : a.X-line.X;
             var dimension=new netDxf.Entities.LinearDimension(World2(a),World2(b),distance,rotation,Resources.Style)
             { UserText="<>",TextReferencePoint=World2(text) };
+            Add(dimension,"DIM");
+        }
+        public void DiameterDimension(Point2 center,double radius,Point2 text)
+        {
+            if(recording!=null)
+            {
+                Box2 b=Union([new(center.X-radius,center.Y-radius,center.X+radius,center.Y+radius),TextBounds("Ø"+FormatDimension(radius*2),text,DimensionTextHeight,0)]);
+                recording.Add((x,y)=>{SetOffset(x,y);DiameterDimension(center,radius,text);},b);return;
+            }
+            var dimension=new netDxf.Entities.DiametricDimension(World2(center),World2(new(center.X+radius,center.Y)),Resources.Style)
+            {UserText="<>",TextReferencePoint=World2(text)};
             Add(dimension,"DIM");
         }
         public void Line(Point2 a,Point2 b,string layer="DIM")
@@ -531,8 +543,8 @@ internal static partial class MachiningDxf
                 foreach(var reference in frame.Components)
                 {
                     var insert=(netDxf.Entities.Insert)reference.Clone();
-                    insert.Position=new((reference.Position.X-frame.Boundary.MinX)*factor,(reference.Position.Y-frame.Boundary.MinY)*factor+sheetY,reference.Position.Z);
-                    insert.Scale=new(reference.Scale.X*factor,reference.Scale.Y*factor,reference.Scale.Z*factor);
+                    insert.TransformBy(netDxf.Matrix3.Scale(new netDxf.Vector3(factor,factor,factor)),
+                        new netDxf.Vector3(-frame.Boundary.MinX*factor,-frame.Boundary.MinY*factor+sheetY,0));
                     foreach(var attribute in insert.Attributes)
                     {
                         string tag=attribute.Tag??"",value=Convert.ToString(attribute.Value,CultureInfo.InvariantCulture)??"";
@@ -546,8 +558,7 @@ internal static partial class MachiningDxf
             Polyline([new(0,0),new(width,0),new(width,height),new(0,height)],true,"FRAME");
             Polyline([new(m,m),new(width-m,m),new(width-m,height-m),new(m,height-m)],true,"FRAME");
             Line(new(m,band),new(width-m,band),"FRAME");
-            Text("标准辊密封批量生成",new(width*.25,band*.6),Math.Min(10*factor,DimensionTextHeight),"TITLE");
-            Text($"序号 {sequence:D3}  ·  第一角投影  ·  mm",new(width*.7,band*.6),Math.Min(9*factor,DimensionTextHeight),"TITLE");
+            Text(name,new(width*.5,band*.6),DimensionTextHeight,"TITLE");
         }
     }
 
