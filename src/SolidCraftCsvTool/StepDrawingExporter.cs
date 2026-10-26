@@ -437,6 +437,7 @@ internal static partial class MachiningDxf
         TextWriter output = null!;
         readonly StringBuilder dimensionBlocks = new();
         int blockInsertion = -1, dimensionCount;
+        public double DimensionTextHeight { get; set; } = 3.2;
         double offsetX, offsetY;
         public void SetOffset(double x, double y) { offsetX = x; offsetY = y; }
         public void Pair(int code, string value) { output ??= document; output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
@@ -513,6 +514,7 @@ internal static partial class MachiningDxf
     {
         using (var writer = new Writer(path))
         {
+            writer.DimensionTextHeight = Math.Clamp(page.Front.Bounds.Width / 66, 3.2, 10);
             Header(writer);
             DrawPage(writer, page, null);
             writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
@@ -523,6 +525,7 @@ internal static partial class MachiningDxf
     {
         if (pages.Count == 0) throw new InvalidDataException("没有可写入汇总图的 STEP 加工图。");
         using var writer = new Writer(path);
+        writer.DimensionTextHeight = Math.Clamp(pages.Max(page => page.Front.Bounds.Width) / 66, 3.2, 10);
         Header(writer);
         double cursorY = 0;
         for (int i = 0; i < pages.Count; i++)
@@ -545,7 +548,7 @@ internal static partial class MachiningDxf
         var frontArcs = DrawView(writer, front); DrawView(writer, top); DrawView(writer, end);
         DrawAnnotations(writer, front, top, end, frontArcs);
         string title = sequence is int number ? $"序号 {number:D3}    {page.Name}" : page.Name;
-        writer.Text(title, new(front.Min.X, front.Max.Y + 72), 5.0, "TITLE");
+        writer.Text(title, new((front.Min.X + end.Max.X) / 2, front.Max.Y + 72), Math.Max(5, writer.DimensionTextHeight * 0.9), "TITLE");
     }
 
     static void Header(Writer w)
@@ -568,7 +571,7 @@ internal static partial class MachiningDxf
         w.Pair(0, "TABLE"); w.Pair(2, "DIMSTYLE"); w.Pair(70, "1");
         w.Pair(0, "DIMSTYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0");
         w.Pair(40, "1"); w.Pair(41, "2"); w.Pair(42, "1"); w.Pair(44, "2");
-        w.Pair(77, "1"); w.Pair(78, "8"); w.Pair(140, "3.2"); w.Pair(147, "1");
+        w.Pair(77, "1"); w.Pair(78, "8"); w.Pair(140, F(w.DimensionTextHeight)); w.Pair(147, "1");
         w.Pair(176, "4"); w.Pair(177, "4"); w.Pair(178, "3"); w.Pair(271, "2");
         w.Pair(0, "ENDTAB");
         w.Pair(0, "ENDSEC");
@@ -860,7 +863,7 @@ internal static partial class MachiningDxf
         if (x2 < x1) (x1, x2) = (x2, x1);
         if (x2 - x1 < 0.05) return;
         double direction = Math.Sign(dimY - featureY);
-        Point2 text = new((x1 + x2) / 2, dimY + 2.8);
+        Point2 text = new((x1 + x2) / 2, dimY + w.DimensionTextHeight / 2 + 1.2);
         w.LinearDimension(new(x1, featureY), new(x2, featureY), new(x2, dimY), text, 0, () =>
         {
             w.Line(new(x1, featureY + direction), new(x1, dimY + direction * 2), "DIM");
@@ -868,7 +871,7 @@ internal static partial class MachiningDxf
             w.Line(new(x1, dimY), new(x2, dimY), "DIM");
             double size = Math.Min(2, (x2 - x1) / 3);
             Arrow(w, new(x1, dimY), new(x2, dimY), size); Arrow(w, new(x2, dimY), new(x1, dimY), size);
-            w.Text(label, text, 3.2);
+            w.Text(label, text, w.DimensionTextHeight);
         });
     }
 
@@ -877,7 +880,7 @@ internal static partial class MachiningDxf
         if (y2 < y1) (y1, y2) = (y2, y1);
         if (y2 - y1 < 0.05) return;
         double direction = Math.Sign(dimX - featureX);
-        Point2 text = new(dimX - 2.8, (y1 + y2) / 2);
+        Point2 text = new(dimX - w.DimensionTextHeight / 2 - 1.2, (y1 + y2) / 2);
         w.LinearDimension(new(featureX, y1), new(featureX, y2), new(dimX, y2), text, 90, () =>
         {
             w.Line(new(featureX + direction, y1), new(dimX + direction * 2, y1), "DIM");
@@ -885,7 +888,7 @@ internal static partial class MachiningDxf
             w.Line(new(dimX, y1), new(dimX, y2), "DIM");
             double size = Math.Min(2, (y2 - y1) / 3);
             Arrow(w, new(dimX, y1), new(dimX, y2), size); Arrow(w, new(dimX, y2), new(dimX, y1), size);
-            w.Text(label, text, 3.2, rotation: 90);
+            w.Text(label, text, w.DimensionTextHeight, rotation: 90);
         });
     }
 

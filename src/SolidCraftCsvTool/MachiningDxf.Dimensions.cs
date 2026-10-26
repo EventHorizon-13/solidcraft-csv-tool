@@ -48,11 +48,19 @@ internal static partial class MachiningDxf
     static void DrawPerimeterHeight(Writer w, Map map)
     {
         Box2 bounds = map.Projection.Bounds;
-        double[] marks = IncludeEnds(StraightEdges(map.Projection).Where(edge =>
+        var edges = StraightEdges(map.Projection).ToArray();
+        var horizontalMarks = edges.Where(edge =>
             Math.Abs(edge.A.Y - edge.B.Y) < 0.01 && Math.Abs(edge.A.X - edge.B.X) >= 2 &&
             (Math.Abs(edge.A.X - bounds.MinX) < 0.05 || Math.Abs(edge.B.X - bounds.MinX) < 0.05 ||
              Math.Abs(edge.A.X - bounds.MaxX) < 0.05 || Math.Abs(edge.B.X - bounds.MaxX) < 0.05))
-            .Select(edge => edge.A.Y).ToArray(), bounds.MinY, bounds.MaxY);
+            .Select(edge => edge.A.Y);
+        // A bevel's vertical leg ends on the outer side, even when no horizontal
+        // edge exists at that height. Include the actual side-edge endpoints.
+        var sideMarks = edges.Where(edge => Math.Abs(edge.A.X - edge.B.X) < 0.01 &&
+            Math.Abs(edge.A.Y - edge.B.Y) >= 2 &&
+            (Math.Abs(edge.A.X - bounds.MinX) < 0.05 || Math.Abs(edge.A.X - bounds.MaxX) < 0.05))
+            .SelectMany(edge => new[] { edge.A.Y, edge.B.Y });
+        double[] marks = IncludeEnds(horizontalMarks.Concat(sideMarks).ToArray(), bounds.MinY, bounds.MaxY);
         if (marks.Length > 2) DrawVerticalChain(w, map, marks, map.Max.X + 18);
     }
 

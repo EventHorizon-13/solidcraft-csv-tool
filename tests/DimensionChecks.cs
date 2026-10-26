@@ -57,6 +57,10 @@ internal static class DimensionChecks
             foreach (double expected in new[] { 9.0, 20.0, 30.0, 50.0, 60.0, 100.0, 120.0, 140.0, 160.0, 300.0 })
                 Check(sizes.Any(v => Math.Abs(v - expected) < 0.001), "Missing measured feature: " + expected);
             Check(!sizes.Any(v => Math.Abs(v - 35) < 0.001), "Hidden edges must not create plan dimension marks");
+            Check(dimensions.Any(d => N(d, 50) == 90 && Math.Abs(N(d, 42) - 20) < 0.001 && N(d, 13) > 300),
+                "End bevel needs a vertical depth dimension as well as its horizontal run");
+            Check(entities.Any(e => e.Type == "TEXT" && e.Values.TryGetValue(8, out string? layer) && layer == "TEXT" && N(e.Values, 40) > 4),
+                "Dimension text must scale with the drawing span");
             int half = dimensions.Length / 2;
             for (int i = 0; i < half; i++)
             {
