@@ -20,6 +20,7 @@ public sealed class MainForm : Form
     readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "settings.json");
     CancellationTokenSource? cancellation;
     string? solidCraftExe;
+    DrawingOptions drawingOptions = new();
 
     public MainForm()
     {
@@ -56,6 +57,7 @@ public sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("检查参数", () => { var rows = ModelRules.Validate(GetRows()); SetStatus($"{rows.Count} 行参数检查通过"); }));
         toolbar.Controls.Add(MakeButton("启动 SolidCraft…", LaunchSolidCraft));
         toolbar.Controls.Add(MakeButton("STEP 合并出图 DXF", () => { _ = RunStepDrawing(); }));
+        toolbar.Controls.Add(MakeButton("出图设置…", ConfigureDrawing));
         layout.Controls.Add(toolbar, 0, 2);
 
         grid.Dock = DockStyle.Fill; grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false;
@@ -221,7 +223,8 @@ public sealed class MainForm : Form
             var target = Path.GetFullPath(outputFolder.SelectedPath);
             cancellation = new(); SetRunning(true); progressBar.Maximum = files.Length; progressBar.Value = 0;
             Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
-            await Task.Run(() => StepDrawingExporter.RunAsync(files, target, (int)port.Value, progress, cancellation.Token));
+            var drawing = drawingOptions;
+            await Task.Run(() => StepDrawingExporter.RunAsync(files, target, (int)port.Value, progress, cancellation.Token, drawing));
             SetStatus($"加工图完成：1 个 DXF，含 {files.Length} 张图"); Log("汇总 DXF 输出文件夹：" + target);
             MessageBox.Show(this, $"已生成 1 个汇总 DXF，内含 {files.Length} 张带尺寸标注的三视图，按 STEP 文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, "STEP加工图_汇总.dxf")}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -231,6 +234,13 @@ public sealed class MainForm : Form
     }
 
     void SetRunning(bool running) { foreach (var control in editControls) control.Enabled = !running; run.Enabled = !running; stop.Enabled = running; grid.ReadOnly = running; if (!running) gap.Enabled = combined.Checked; }
+    void ConfigureDrawing()
+    {
+        using var dialog = new DrawingSettingsForm(drawingOptions);
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        drawingOptions = dialog.Value; SaveSettings();
+        Log($"出图设置：第一角投影，标注 {drawingOptions.DimensionStyleName}，隐藏线比例 {drawingOptions.HiddenLineScale:0.##}");
+    }
     void SetStatus(string text) => status.Text = text;
     void ShowError(string text) => MessageBox.Show(this, text, "请检查", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     static string DescribeException(Exception exception)
@@ -255,8 +265,13 @@ public sealed class MainForm : Form
             if (root.TryGetProperty("output", out var o)) output.Text = o.GetString() ?? output.Text;
             if (root.TryGetProperty("exe", out var e)) solidCraftExe = e.GetString();
             if (root.TryGetProperty("port", out var p) && p.TryGetInt32(out int value) && value >= 1 && value <= 65535) port.Value = value;
+            if (root.TryGetProperty("drawing", out var d))
+            {
+                var drawing = JsonSerializer.Deserialize<DrawingOptions>(d.GetRawText()) ?? new DrawingOptions();
+                drawing.Validate(); drawingOptions = drawing;
+            }
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException) { Log("未能读取上次设置：" + ex.Message); }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or InvalidDataException) { Log("未能读取上次设置：" + ex.Message); }
     }
 
     void SaveSettings()
@@ -265,7 +280,7 @@ public sealed class MainForm : Form
         {
             Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
             string stage = settingsPath + ".tmp";
-            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, exe = solidCraftExe, port = (int)port.Value }));
+            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, exe = solidCraftExe, port = (int)port.Value, drawing = drawingOptions }));
             File.Move(stage, settingsPath, true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log("未能保存设置：" + ex.Message); }

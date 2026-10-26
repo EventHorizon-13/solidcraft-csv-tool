@@ -4,7 +4,7 @@ using SolidCraftCsvTool;
 
 internal static class DimensionChecks
 {
-    public static int Run(string? outputDirectory)
+    public static int Run(string? outputDirectory, string? externalTemplate = null)
     {
         int count = 0;
         void Check(bool value, string reason) { if (!value) throw new Exception(reason); count++; }
@@ -21,10 +21,11 @@ internal static class DimensionChecks
         Point2[] plan = [new(0, 0), new(300, 0), new(300, 50), new(291, 50), new(291, 110), new(300, 110), new(300, 160), new(0, 160)];
         var planLines = new List<Line2>();
         foreach (double x in new[] { 30.0, 90.0, 150.0, 210.0 }) planLines.Add(new(new(x, 0), new(x, 160), "VISIBLE"));
-        planLines.Add(new(new(35, 0), new(35, 160), "HIDDEN"));
+        planLines.Add(new(new(35, 0), new(35, 80), "HIDDEN"));
+        planLines.Add(new(new(35, 80), new(35, 160), "HIDDEN"));
         Projection2 top = new("top", planLines, [new(plan, true, "VISIBLE")], new(0, 0, 300, 160));
         Point2[] side = [new(0, 0), new(140, 0), new(160, 20), new(160, 100), new(0, 100)];
-        Projection2 end = new("right", [], [new(side, true, "VISIBLE")], new(0, 0, 160, 100));
+        Projection2 end = new("left", [], [new(side, true, "VISIBLE")], new(0, 0, 160, 100));
         StepDrawingPage page = new("dimension-check", front, top, end, DxfFeatureDetector.Analyze(front, top));
         string directory = outputDirectory == null ? Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")) : Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(directory);
@@ -67,19 +68,34 @@ internal static class DimensionChecks
             Check(!sizes.Any(v => Math.Abs(v - 35) < 0.001), "Hidden edges must not create plan dimension marks");
             Check(dimensions.Any(d => N(d, 50) == 90 && Math.Abs(Measurement(d) - 20) < 0.001 && N(d, 13) > 300),
                 "End bevel needs a vertical depth dimension as well as its horizontal run");
-            Check(entities.Any(e => e.Type == "TEXT" && e.Values.TryGetValue(8, out string? layer) && layer == "TEXT" && N(e.Values, 40) > 4),
+            Check(entities.Any(e => e.Type is "TEXT" or "MTEXT" && e.Values.ContainsKey(40) && N(e.Values, 40) >= 12),
                 "Dimension text must scale with the drawing span");
             int half = dimensions.Length / 2;
+            double pageDelta=N(dimensions[0],23)-N(dimensions[half],23);
+            Check(pageDelta>=949,"Frame and annotation extents must determine sheet spacing");
             for (int i = 0; i < half; i++)
             {
                 Check(Math.Abs(Measurement(dimensions[i]) - Measurement(dimensions[i + half])) < 0.0001, "Page translation cannot change measurements");
-                Check(Math.Abs(N(dimensions[i], 23) - N(dimensions[i + half], 23) - 492) < 0.0001, "Definition points must use page offsets exactly once");
+                Check(Math.Abs(N(dimensions[i], 23) - N(dimensions[i + half], 23) - pageDelta) < 0.0001, "Definition points must use page offsets exactly once");
             }
             Check(entities.Any(e => e.Type == "ARC"), "Dimensioning must preserve fitted arcs");
             Check(AppBuildInfo.WindowTitle.StartsWith("标准辊密封批量生成 · v", StringComparison.Ordinal) &&
                 !AppBuildInfo.WindowTitle.Contains("未知", StringComparison.Ordinal), "Title must contain product name, version and embedded build date");
             string? expectedVersion = Environment.GetEnvironmentVariable("BUILD_VERSION");
             if (expectedVersion != null) Check(AppBuildInfo.WindowTitle.Contains("v" + expectedVersion + " ·", StringComparison.Ordinal), "Title version must match release version");
+            Check(reopened.Entities.Polylines2D.Any(p => p.Layer.Name == "HIDDEN" && p.LinetypeGeneration && p.Vertexes.Count >= 3), "Connected hidden fragments need continuous polyline pattern generation");
+            Check(reopened.DimensionStyles.Contains("_5") && Math.Abs(reopened.DimensionStyles["_5"].TextHeight-0.6)<1e-8 && Math.Abs(reopened.DimensionStyles["_5"].DimScaleOverall-20)<1e-8,"Default _5 dimensions must use the requested 0.6 x 20 text scale");
+            count += TemplateChecks.Run(directory,page);
+            if (externalTemplate != null)
+            {
+                var settings = new DrawingOptions { TemplatePath = externalTemplate, DimensionStyleName = "_5" };
+                string actual = Path.Combine(directory, "actual-template-sample.dxf");
+                MachiningDxf.WriteCombined(actual, [page, page with { Name = "template-page-2" }], settings);
+                var preview = netDxf.DxfDocument.Load(actual) ?? throw new Exception("Cannot reopen actual template preview");
+                Check(preview.Entities.Dimensions.Count() == dimensions.Length, "Actual template must preserve all dimensions");
+                Check(preview.Entities.Inserts.Count() >= 2, "Actual template must produce framed sheets");
+                Console.WriteLine("Actual template preview: " + actual);
+            }
             Console.WriteLine("DXF sample: " + file);
             Console.WriteLine("Window title: " + AppBuildInfo.WindowTitle);
         }

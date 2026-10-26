@@ -43,6 +43,13 @@ jobs:
           $process = Start-Process dist/app/SolidCraftCsvTool.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png" -PassThru
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Windows smoke check timed out' }
           if ($process.ExitCode -ne 0) { throw 'Windows smoke check failed' }
+      - name: Build resource-limited private template preview runner
+        run: dotnet publish tests/CoreChecks.csproj -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/template-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: template-preview-linux-arm64
+          path: dist/template-preview/CoreChecks
+          retention-days: 7
       - name: Package release
         shell: pwsh
         run: |
@@ -58,6 +65,8 @@ jobs:
           STEP 加工图按文件名排序，纵向排入一个汇总 DXF，每张图标注序号和文件名。
           按参考图样增加总长、宽、高、圆槽中心距、槽口、端部及台阶分段尺寸；尺寸线青色、文字绿色。
           输出可编辑的 CAD DIMENSION 尺寸对象，单位 mm；尺寸由 STEP 投影几何提取，加工前请核对。
+          统一第一角投影，主视图右侧为左视图；支持本地 DXF 模板图框、标题栏及自选标注样式（默认 _5）。
+          隐藏线采用清晰的 6/3 线型并支持比例设置；视图、标注和图框按实际边界留白排版。
           标题栏显示产品名称、发行版本与编译日期，沿用隐藏圆弧拟合修复。
           DXF 升级到 AutoCAD 2010（AC1024），由 netDxf 生成完整对象引用和 Unicode 文本，保留可编辑尺寸；通过双库读取及版本检查。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。

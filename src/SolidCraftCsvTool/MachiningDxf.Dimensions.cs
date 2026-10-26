@@ -2,7 +2,7 @@ namespace SolidCraftCsvTool;
 
 internal static partial class MachiningDxf
 {
-    static void DrawAnnotations(Writer w, Map front, Map top, Map end, IReadOnlyList<ArcPath> arcs)
+    static void DrawFrontAnnotations(Writer w, Map front, IReadOnlyList<ArcPath> arcs)
     {
         // Dimension only supported geometry. Circle tessellation vertices are never
         // treated as step edges, and hidden fragments cannot introduce extra marks.
@@ -10,22 +10,30 @@ internal static partial class MachiningDxf
                 (Math.Abs(a.Center.Y - front.Max.Y) < 0.08 || Math.Abs(a.Center.Y - front.Min.Y) < 0.08))
             .Select(a => a.Center.X - front.Dx).ToArray();
         if (centers.Length > 0)
-            DrawHorizontalChain(w, front, IncludeEnds(centers, front.Projection.Bounds.MinX, front.Projection.Bounds.MaxX), front.Max.Y + 18);
+            DrawHorizontalChain(w, front, IncludeEnds(centers, front.Projection.Bounds.MinX, front.Projection.Bounds.MaxX), front.Max.Y + w.DimensionRow);
 
         DrawLowerDimensions(w, front);
-        Vertical(w, front.Min.X, front.Min.X - 18, front.Min.Y, front.Max.Y, Fmt(front.Height));
+        Vertical(w, front.Min.X, front.Min.X - w.DimensionRow, front.Min.Y, front.Max.Y, w.FormatDimension(front.Height));
         DrawPerimeterHeight(w, front);
 
+    }
+
+    static void DrawPlanAnnotations(Writer w, Map top)
+    {
         double[] planMarks = AxisMarks(top.Projection, true);
-        if (planMarks.Length > 2) DrawHorizontalChain(w, top, planMarks, top.Max.Y + 18);
+        if (planMarks.Length > 2) DrawHorizontalChain(w, top, planMarks, top.Max.Y + w.DimensionRow);
         DrawLowerDimensions(w, top);
-        Vertical(w, top.Min.X, top.Min.X - 18, top.Min.Y, top.Max.Y, Fmt(top.Height));
+        Vertical(w, top.Min.X, top.Min.X - w.DimensionRow, top.Min.Y, top.Max.Y, w.FormatDimension(top.Height));
         DrawPerimeterHeight(w, top);
 
-        Horizontal(w, end.Min.X, end.Max.X, end.Max.Y, end.Max.Y + 18, Fmt(end.Width));
+    }
+
+    static void DrawEndAnnotations(Writer w, Map end)
+    {
+        Horizontal(w, end.Min.X, end.Max.X, end.Max.Y, end.Max.Y + w.DimensionRow, w.FormatDimension(end.Width));
         double[] endMarks = AxisMarks(end.Projection, true);
-        if (endMarks.Length > 2) DrawHorizontalChainBelow(w, end, endMarks, end.Min.Y - 18);
-        Vertical(w, end.Min.X, end.Min.X - 18, end.Min.Y, end.Max.Y, Fmt(end.Height));
+        if (endMarks.Length > 2) DrawHorizontalChainBelow(w, end, endMarks, end.Min.Y - w.DimensionRow);
+        Vertical(w, end.Min.X, end.Min.X - w.DimensionRow, end.Min.Y, end.Max.Y, w.FormatDimension(end.Height));
         DrawPerimeterHeight(w, end);
     }
 
@@ -41,8 +49,8 @@ internal static partial class MachiningDxf
              Math.Abs(Math.Max(edge.A.X, edge.B.X) - bounds.MaxX) < 0.05))
             .OrderByDescending(edge => Math.Abs(edge.A.X - edge.B.X)).FirstOrDefault();
         if (body != null)
-            Horizontal(w, map.P(body.A).X, map.P(body.B).X, map.Min.Y, map.Min.Y - 18, Fmt(Math.Abs(body.A.X - body.B.X)));
-        Horizontal(w, map.Min.X, map.Max.X, map.Min.Y, map.Min.Y - (body == null ? 18 : 36), Fmt(map.Width));
+            Horizontal(w, map.P(body.A).X, map.P(body.B).X, map.Min.Y, map.Min.Y - w.DimensionRow, w.FormatDimension(Math.Abs(body.A.X - body.B.X)));
+        Horizontal(w, map.Min.X, map.Max.X, map.Min.Y, map.Min.Y - (body == null ? w.DimensionRow : w.DimensionRow*2), w.FormatDimension(map.Width));
     }
 
     static void DrawPerimeterHeight(Writer w, Map map)
@@ -61,7 +69,7 @@ internal static partial class MachiningDxf
             (Math.Abs(edge.A.X - bounds.MinX) < 0.05 || Math.Abs(edge.A.X - bounds.MaxX) < 0.05))
             .SelectMany(edge => new[] { edge.A.Y, edge.B.Y });
         double[] marks = IncludeEnds(horizontalMarks.Concat(sideMarks).ToArray(), bounds.MinY, bounds.MaxY);
-        if (marks.Length > 2) DrawVerticalChain(w, map, marks, map.Max.X + 18);
+        if (marks.Length > 2) DrawVerticalChain(w, map, marks, map.Max.X + w.DimensionRow);
     }
 
     static double[] AxisMarks(Projection2 view, bool axisX)
@@ -95,8 +103,9 @@ internal static partial class MachiningDxf
 
     static void DrawHorizontalChainBelow(Writer w, Map map, double[] marks, double y)
     {
-        for (int i = 1; i < marks.Length; i++)
-            if (marks[i] - marks[i - 1] > 0.2)
-                Horizontal(w, map.Dx + marks[i - 1], map.Dx + marks[i], map.Min.Y, y, Fmt(marks[i] - marks[i - 1]));
+        int[] lanes=ChainLanes(w,marks);
+        for(int i=1;i<marks.Length;i++)
+            if(marks[i]-marks[i-1]>.2)
+                Horizontal(w,map.Dx+marks[i-1],map.Dx+marks[i],map.Min.Y,y-lanes[i-1]*w.DimensionRow,w.FormatDimension(marks[i]-marks[i-1]));
     }
 }

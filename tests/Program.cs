@@ -4,6 +4,13 @@ using System.Text;
 using System.Text.Json;
 using SolidCraftCsvTool;
 
+if (args.Length == 3 && args[0] == "--template-preview")
+{
+    int passed = DimensionChecks.Run(args[2], args[1]);
+    Console.WriteLine($"Template preview passed: {passed} checks");
+    return;
+}
+
 int checks = 0;
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }
 void Reject(Action action, string message) { try { action(); } catch (InvalidDataException) { checks++; return; } throw new Exception(message); }

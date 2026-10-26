@@ -15,6 +15,8 @@
     <Compile Include="../src/SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />
     <Compile Include="../src/SolidCraftCsvTool/AppBuildInfo.cs" Link="AppBuildInfo.cs" />
     <Compile Include="../src/SolidCraftCsvTool/Dxf2010Compatibility.cs" Link="Dxf2010Compatibility.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/DrawingOptions.cs" Link="DrawingOptions.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/MachiningDxf.Layout.cs" Link="MachiningDxf.Layout.cs" />
     <AssemblyMetadata Include="BuildDate" Value="$(BuildDate)" />
   </ItemGroup>
 </Project>
