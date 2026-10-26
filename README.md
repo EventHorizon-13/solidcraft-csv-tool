@@ -24,6 +24,8 @@ Windows 10/11 x64 桌面程序，使用 C# / WinForms 原生窗口与表格控�
 
 标题栏显示“标准辊密封批量生成 · v版本号 · 编译于 yyyy-MM-dd”。正式版本号与发布标签一致，编译日期在构建时写入，复制 EXE 不会改变日期。
 
+DXF 使用 AutoCAD 2010（AC1024）格式，单位 mm，文字采用 Unicode。由 netDxf 写入完整的图层、文字/尺寸样式、块记录、句柄、引用及 OBJECTS 结构；保留原生可编辑尺寸。构建检查包含双库读取、对象引用和字段版本检查；实际 AutoCAD 打开结果以用户端验证为准。
+
 “停止”会等当前 SolidCraft 命令完成，再停止后续操作。长任务通过控制协议查询原请求结果，不会自动重发修改或导出命令。生成期间请勿手动切换 SolidCraft 标签或修改模型。
 
 ## CSV
@@ -52,7 +54,7 @@ CSV、模板和最终输出可放 NAS；SolidCraft 读写的中间文件位于 `
 .\build.ps1
 ```
 
-输出位于 `dist/app/SolidCraftCsvTool.exe`。DXF 由程序直接写出，不依赖 CAD 转换器或额外字体库。GitHub Actions 在 Windows 构建机发布自包含程序包和 SHA256 校验文件。
+输出位于 `dist/app/SolidCraftCsvTool.exe`。DXF 由随程序打包的 netDxf 库写出，无需另装 CAD 转换器。GitHub Actions 在 Windows 构建机发布自包含程序包和 SHA256 校验文件。
 
 构建不连接 SolidCraft 桌面端，也不生成 CAD 模型。真实导入、摆放和组合导出仍以 Windows 桌面端实际运行为准。
 

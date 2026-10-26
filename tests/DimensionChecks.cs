@@ -32,7 +32,7 @@ internal static class DimensionChecks
         try
         {
             MachiningDxf.WriteCombined(file, [page, page with { Name = "second-page" }]);
-            string[] raw = File.ReadAllLines(file, Encoding.GetEncoding(936));
+            string[] raw = File.ReadAllLines(file, Encoding.UTF8);
             Check(raw.Length % 2 == 0, "DXF group pairs must be complete");
             var entities = new List<(string Type, Dictionary<int, string> Values)>();
             Dictionary<int, string>? current = null;
@@ -48,23 +48,28 @@ internal static class DimensionChecks
             Check(dimensions.All(d => blocks.Contains(d[2])) && dimensions.Select(d => d[2]).Distinct().Count() == dimensions.Length,
                 "Each native dimension needs a unique graphics block");
             double N(Dictionary<int, string> d, int code) => double.Parse(d[code], CultureInfo.InvariantCulture);
+            double Measurement(Dictionary<int, string> d) => Math.Abs(N(d, 50) == 0 ? N(d, 14) - N(d, 13) : N(d, 24) - N(d, 23));
             foreach (var d in dimensions)
             {
-                double actual = Math.Abs(N(d, 50) == 0 ? N(d, 14) - N(d, 13) : N(d, 24) - N(d, 23));
-                Check(actual > 0 && Math.Abs(actual - N(d, 42)) < 0.0001 && d[1] == "<>", "Native measurements must match definition points and allow automatic updates");
+                Check(Measurement(d) > 0 && d[1] == "<>" && d.ContainsKey(5) && d.ContainsKey(330), "Native dimensions need measurements, handles and owning block records");
             }
-            var sizes = dimensions.Select(d => N(d, 42)).ToArray();
+            Check(raw.Contains("AC1024") && raw.Contains("BLOCK_RECORD") && raw.Contains("OBJECTS"),
+                "DXF 2010 needs complete symbol tables, block records and object structure");
+            var reopened = netDxf.DxfDocument.Load(file);
+            Check(reopened != null && reopened.Entities.Dimensions.Count() == dimensions.Length, "Saved DXF 2010 must reopen with all native dimensions");
+            Check(reopened!.Entities.Texts.Any(t => t.Value.Contains("序号", StringComparison.Ordinal)), "Unicode drawing titles must survive a complete library round trip");
+            var sizes = dimensions.Select(Measurement).ToArray();
             foreach (double expected in new[] { 9.0, 20.0, 30.0, 50.0, 60.0, 100.0, 120.0, 140.0, 160.0, 300.0 })
                 Check(sizes.Any(v => Math.Abs(v - expected) < 0.001), "Missing measured feature: " + expected);
             Check(!sizes.Any(v => Math.Abs(v - 35) < 0.001), "Hidden edges must not create plan dimension marks");
-            Check(dimensions.Any(d => N(d, 50) == 90 && Math.Abs(N(d, 42) - 20) < 0.001 && N(d, 13) > 300),
+            Check(dimensions.Any(d => N(d, 50) == 90 && Math.Abs(Measurement(d) - 20) < 0.001 && N(d, 13) > 300),
                 "End bevel needs a vertical depth dimension as well as its horizontal run");
             Check(entities.Any(e => e.Type == "TEXT" && e.Values.TryGetValue(8, out string? layer) && layer == "TEXT" && N(e.Values, 40) > 4),
                 "Dimension text must scale with the drawing span");
             int half = dimensions.Length / 2;
             for (int i = 0; i < half; i++)
             {
-                Check(Math.Abs(N(dimensions[i], 42) - N(dimensions[i + half], 42)) < 0.0001, "Page translation cannot change measurements");
+                Check(Math.Abs(Measurement(dimensions[i]) - Measurement(dimensions[i + half])) < 0.0001, "Page translation cannot change measurements");
                 Check(Math.Abs(N(dimensions[i], 23) - N(dimensions[i + half], 23) - 492) < 0.0001, "Definition points must use page offsets exactly once");
             }
             Check(entities.Any(e => e.Type == "ARC"), "Dimensioning must preserve fitted arcs");

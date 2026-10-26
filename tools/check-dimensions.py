@@ -4,15 +4,28 @@ import html
 import math
 import sys
 import ezdxf
+from dxf_version_check import version_errors
 
 path = Path(sys.argv[1])
+raw = path.read_text(encoding='utf-8-sig')
+assert not version_errors(raw), version_errors(raw)
+# A mixed-version regression must fail even if a tolerant viewer can display it.
+import re
+legacy = re.sub(r'(?m)(^\s*9\n\$ACADVER\n\s*1\n)AC1024', r'\g<1>AC1009', raw, count=1)
+errors = version_errors(legacy)
+assert errors and any('$INSUNITS' in error for error in errors), errors
+print('Strict DXF version check passed; downgraded-header regression detected')
 doc = ezdxf.readfile(path)
 audit = doc.audit()
-assert not audit.has_errors, audit.errors
+assert not audit.has_errors and not audit.fixes, (audit.errors, audit.fixes)
+assert doc.dxfversion == 'AC1024' and doc.header['$INSUNITS'] == 4
 dimensions = list(doc.modelspace().query('DIMENSION'))
 assert len(dimensions) >= 30
 for dim in dimensions:
-    assert abs(dim.get_measurement() - dim.dxf.actual_measurement) < 0.0001
+    labels = [e.dxf.text for e in dim.virtual_entities() if e.dxftype() == 'TEXT']
+    assert len(labels) == 1 and abs(dim.get_measurement() - float(labels[0])) <= 0.00501
+    assert dim.dxf.handle in doc.entitydb and dim.dxf.owner in doc.entitydb
+    assert dim.dxf.dimstyle in doc.dimstyles
     assert dim.dxf.text == '<>'
     assert list(dim.virtual_entities()), 'Missing cached dimension graphics'
 print(f'Independent DXF audit passed: {len(dimensions)} editable dimensions; {len(audit.fixes)} repairs')

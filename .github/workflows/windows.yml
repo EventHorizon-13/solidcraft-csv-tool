@@ -59,6 +59,7 @@ jobs:
           按参考图样增加总长、宽、高、圆槽中心距、槽口、端部及台阶分段尺寸；尺寸线青色、文字绿色。
           输出可编辑的 CAD DIMENSION 尺寸对象，单位 mm；尺寸由 STEP 投影几何提取，加工前请核对。
           标题栏显示产品名称、发行版本与编译日期，沿用隐藏圆弧拟合修复。
+          DXF 升级到 AutoCAD 2010（AC1024），由 netDxf 生成完整对象引用和 Unicode 文本，保留可编辑尺寸；通过双库读取及版本检查。
           本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8

@@ -433,70 +433,83 @@ internal static partial class MachiningDxf
 {
     sealed class Writer(string path) : IDisposable
     {
-        readonly StringWriter document = new(CultureInfo.InvariantCulture);
-        TextWriter output = null!;
-        readonly StringBuilder dimensionBlocks = new();
-        int blockInsertion = -1, dimensionCount;
-        public double DimensionTextHeight { get; set; } = 3.2;
+        readonly netDxf.DxfDocument document = new(netDxf.Header.DxfVersion.AutoCad2010);
+        readonly Dictionary<string, netDxf.Tables.Layer> layers = new();
+        readonly netDxf.Tables.TextStyle textStyle = new("SC_TEXT", "txt.shx") { BigFont = "gbcbig.shx" };
+        netDxf.Tables.DimensionStyle dimensionStyle = null!;
+        List<netDxf.Entities.EntityObject>? capture;
+        int dimensionCount;
         double offsetX, offsetY;
+        public double DimensionTextHeight { get; set; } = 3.2;
         public void SetOffset(double x, double y) { offsetX = x; offsetY = y; }
-        public void Pair(int code, string value) { output ??= document; output.WriteLine(code.ToString(CultureInfo.InvariantCulture)); output.WriteLine(value); }
-        public void MarkBlockInsertion() => blockInsertion = document.GetStringBuilder().Length;
+        public void Initialize()
+        {
+            document.DrawingVariables.InsUnits = netDxf.Units.DrawingUnits.Millimeters;
+            foreach (var (name, color) in new[] { ("VISIBLE", (short)7), ("HIDDEN", (short)7), ("DIM", (short)4), ("TEXT", (short)3), ("TITLE", (short)7) })
+            {
+                var layer = new netDxf.Tables.Layer(name) { Color = new netDxf.AciColor(color) };
+                if (name == "HIDDEN") layer.Linetype = netDxf.Tables.Linetype.Dashed;
+                layers.Add(name, layer);
+                document.Layers.Add(layer);
+            }
+            document.TextStyles.Add(textStyle);
+            dimensionStyle = new("SC_DIM")
+            {
+                TextStyle = textStyle, TextHeight = DimensionTextHeight,
+                TextColor = new netDxf.AciColor(3), DimLineColor = new netDxf.AciColor(4), ExtLineColor = new netDxf.AciColor(4),
+                ArrowSize = 2, ExtLineOffset = 1, ExtLineExtend = 2, TextOffset = 1, LengthPrecision = 2,
+                TextVerticalPlacement = netDxf.Tables.DimensionStyleTextVerticalPlacement.Above
+            };
+            document.DimensionStyles.Add(dimensionStyle);
+        }
         public void Dispose()
         {
-            using var file = new StreamWriter(path, false, DxfEncoding());
-            string text = document.ToString();
-            if (blockInsertion < 0) { file.Write(text); return; }
-            file.Write(text.AsSpan(0, blockInsertion));
-            file.Write(dimensionBlocks.ToString());
-            file.Write(text.AsSpan(blockInsertion));
-            document.Dispose();
+            if (!document.Save(path)) throw new IOException("无法保存 DXF 2010 文件：" + path);
+        }
+        netDxf.Vector2 World2(Point2 p) => new(p.X + offsetX, p.Y + offsetY);
+        netDxf.Vector3 World3(Point2 p) => new(p.X + offsetX, p.Y + offsetY, 0);
+        void Add(netDxf.Entities.EntityObject entity, string layer)
+        {
+            entity.Layer = layers[layer];
+            if (capture != null) capture.Add(entity);
+            else document.Entities.Add(entity);
         }
         public void LinearDimension(Point2 a, Point2 b, Point2 line, Point2 text, double rotation, Action drawGraphics)
         {
-            string name = "*D" + (++dimensionCount).ToString(CultureInfo.InvariantCulture);
-            using var block = new StringWriter(CultureInfo.InvariantCulture);
-            TextWriter previous = output ?? document;
-            output = block;
-            try
+            var graphics = new List<netDxf.Entities.EntityObject>();
+            capture = graphics;
+            try { drawGraphics(); }
+            finally { capture = null; }
+            double offset = rotation == 0 ? line.Y - a.Y : a.X - line.X;
+            var dimension = new netDxf.Entities.LinearDimension(World2(a), World2(b), offset, rotation, dimensionStyle)
             {
-                Pair(0, "BLOCK"); Pair(8, "DIM"); Pair(2, name); Pair(70, "1");
-                Pair(10, "0"); Pair(20, "0"); Pair(30, "0"); Pair(3, name); Pair(1, "");
-                drawGraphics();
-                Pair(0, "ENDBLK"); Pair(8, "DIM");
-            }
-            finally { output = previous; }
-            dimensionBlocks.Append(block.ToString());
-            Pair(0, "DIMENSION"); Pair(8, "DIM"); Pair(2, name); Pair(3, "STANDARD"); Pair(70, "32"); Pair(1, "<>"); Pair(50, F(rotation));
-            void Point(int code, Point2 p) { Pair(code, F(p.X + offsetX)); Pair(code + 10, F(p.Y + offsetY)); Pair(code + 20, "0"); }
-            Point(10, line); Point(11, text); Point(13, a); Point(14, b);
-            Pair(42, F(Math.Abs(rotation == 0 ? b.X - a.X : b.Y - a.Y)));
+                UserText = "<>",
+                Block = new netDxf.Blocks.Block("SC_DIM_GRAPHICS_" + ++dimensionCount, graphics)
+            };
+            // netDxf assigns anonymous dimension-block names, handles and owners,
+            // and writes the complete DIMSTYLE / BLOCK_RECORD / OBJECTS structure.
+            Add(dimension, "DIM");
         }
         public void Line(Point2 a, Point2 b, string layer = "DIM")
         {
-            a = new(a.X + offsetX, a.Y + offsetY); b = new(b.X + offsetX, b.Y + offsetY);
-            if (Math.Abs(a.X - b.X) + Math.Abs(a.Y - b.Y) < 0.00001) return;
-            Pair(0, "LINE"); Pair(8, layer); Pair(10, F(a.X)); Pair(20, F(a.Y)); Pair(30, "0"); Pair(11, F(b.X)); Pair(21, F(b.Y)); Pair(31, "0");
+            if (Distance(a, b) < 0.00001) return;
+            Add(new netDxf.Entities.Line(World3(a), World3(b)), layer);
         }
         public void Arc(Point2 center, double radius, double startDegrees, double endDegrees, string layer)
         {
-            center = new(center.X + offsetX, center.Y + offsetY);
-            Pair(0, "ARC"); Pair(8, layer); Pair(10, F(center.X)); Pair(20, F(center.Y)); Pair(30, "0"); Pair(40, F(radius)); Pair(50, F(startDegrees)); Pair(51, F(endDegrees));
+            static double Normalize(double a) => (a % 360 + 360) % 360;
+            Add(new netDxf.Entities.Arc(World3(center), radius, Normalize(startDegrees), Normalize(endDegrees)), layer);
         }
         public void Polyline(IReadOnlyList<Point2> points, bool closed, string layer)
         {
-            if (points.Count < 2) return;
             for (int i = 1; i < points.Count; i++) Line(points[i - 1], points[i], layer);
-            if (closed) Line(points[^1], points[0], layer);
+            if (closed && points.Count > 2) Line(points[^1], points[0], layer);
         }
         public void Text(string value, Point2 at, double height, string layer = "TEXT", double rotation = 0)
         {
-            at = new(at.X + offsetX, at.Y + offsetY);
-            Pair(0, "TEXT"); Pair(8, layer); Pair(10, F(at.X)); Pair(20, F(at.Y)); Pair(30, "0"); Pair(40, F(height)); Pair(1, Escape(value)); Pair(7, "STANDARD");
-            Pair(50, F(rotation));
-            Pair(72, "1"); Pair(73, "2"); Pair(11, F(at.X)); Pair(21, F(at.Y)); Pair(31, "0");
+            Add(new netDxf.Entities.Text(value.Replace("\r", " ").Replace("\n", " "), World3(at), height, textStyle)
+            { Alignment = netDxf.Entities.TextAlignment.MiddleCenter, Rotation = rotation }, layer);
         }
-        public void Raw(string value) { output ??= document; output.Write(value); }
     }
 
     sealed record Map(Projection2 Projection, double Dx, double Dy)
@@ -517,7 +530,6 @@ internal static partial class MachiningDxf
             writer.DimensionTextHeight = Math.Clamp(page.Front.Bounds.Width / 66, 3.2, 10);
             Header(writer);
             DrawPage(writer, page, null);
-            writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
         }
     }
 
@@ -536,7 +548,6 @@ internal static partial class MachiningDxf
             // Include dimension rows and title clearance between adjacent drawings.
             cursorY -= page.Front.Bounds.Height + page.Top.Bounds.Height + 232;
         }
-        writer.Pair(0, "ENDSEC"); writer.Pair(0, "EOF");
     }
 
     static void DrawPage(Writer writer, StepDrawingPage page, int? sequence)
@@ -551,39 +562,7 @@ internal static partial class MachiningDxf
         writer.Text(title, new((front.Min.X + end.Max.X) / 2, front.Max.Y + 72), Math.Max(5, writer.DimensionTextHeight * 0.9), "TITLE");
     }
 
-    static void Header(Writer w)
-    {
-        w.Pair(0, "SECTION"); w.Pair(2, "HEADER"); w.Pair(9, "$ACADVER"); w.Pair(1, "AC1009");
-        w.Pair(9, "$DWGCODEPAGE"); w.Pair(3, "ANSI_936");
-        w.Pair(9, "$INSUNITS"); w.Pair(70, "4");
-        w.Pair(0, "ENDSEC");
-        w.Pair(0, "SECTION"); w.Pair(2, "TABLES");
-        w.Pair(0, "TABLE"); w.Pair(2, "LTYPE"); w.Pair(70, "2");
-        w.Pair(0, "LTYPE"); w.Pair(2, "CONTINUOUS"); w.Pair(70, "0"); w.Pair(3, "Solid line"); w.Pair(72, "65"); w.Pair(73, "0"); w.Pair(40, "0");
-        w.Pair(0, "LTYPE"); w.Pair(2, "DASHED"); w.Pair(70, "0"); w.Pair(3, "Dashed __ __ __"); w.Pair(72, "65"); w.Pair(73, "2"); w.Pair(40, "6"); w.Pair(49, "4"); w.Pair(49, "-2");
-        w.Pair(0, "ENDTAB");
-        string[] layers = ["VISIBLE", "HIDDEN", "DIM", "TEXT", "TITLE"];
-        short[] colors = [7, 7, 4, 3, 7];
-        w.Pair(0, "TABLE"); w.Pair(2, "LAYER"); w.Pair(70, layers.Length.ToString(CultureInfo.InvariantCulture));
-        for (int i = 0; i < layers.Length; i++) { w.Pair(0, "LAYER"); w.Pair(2, layers[i]); w.Pair(70, "0"); w.Pair(62, colors[i].ToString(CultureInfo.InvariantCulture)); w.Pair(6, layers[i] == "HIDDEN" ? "DASHED" : "CONTINUOUS"); }
-        w.Pair(0, "ENDTAB");
-        w.Pair(0, "TABLE"); w.Pair(2, "STYLE"); w.Pair(70, "1"); w.Pair(0, "STYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0"); w.Pair(40, "0"); w.Pair(41, "1"); w.Pair(50, "0"); w.Pair(71, "0"); w.Pair(42, "2.5"); w.Pair(3, "txt.shx"); w.Pair(4, "gbcbig.shx"); w.Pair(0, "ENDTAB");
-        w.Pair(0, "TABLE"); w.Pair(2, "DIMSTYLE"); w.Pair(70, "1");
-        w.Pair(0, "DIMSTYLE"); w.Pair(2, "STANDARD"); w.Pair(70, "0");
-        w.Pair(40, "1"); w.Pair(41, "2"); w.Pair(42, "1"); w.Pair(44, "2");
-        w.Pair(77, "1"); w.Pair(78, "8"); w.Pair(140, F(w.DimensionTextHeight)); w.Pair(147, "1");
-        w.Pair(176, "4"); w.Pair(177, "4"); w.Pair(178, "3"); w.Pair(271, "2");
-        w.Pair(0, "ENDTAB");
-        w.Pair(0, "ENDSEC");
-        w.Pair(0, "SECTION"); w.Pair(2, "BLOCKS");
-        foreach (string block in new[] { "$MODEL_SPACE", "$PAPER_SPACE" })
-        {
-            w.Pair(0, "BLOCK"); w.Pair(8, "0"); w.Pair(2, block); w.Pair(70, "0"); w.Pair(10, "0"); w.Pair(20, "0"); w.Pair(30, "0"); w.Pair(3, block); w.Pair(1, "");
-            w.Pair(0, "ENDBLK"); w.Pair(8, "0");
-        }
-        w.MarkBlockInsertion();
-        w.Pair(0, "ENDSEC"); w.Pair(0, "SECTION"); w.Pair(2, "ENTITIES");
-    }
+    static void Header(Writer w) => w.Initialize();
 
     static List<ArcPath> DrawView(Writer w, Map map)
     {
