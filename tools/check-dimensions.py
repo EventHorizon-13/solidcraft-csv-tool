@@ -17,6 +17,7 @@ assert errors and any('$INSUNITS' in error for error in errors), errors
 print('Strict DXF version check passed; downgraded-header regression detected')
 doc = ezdxf.readfile(path)
 audit = doc.audit()
+print('DXF audit details:', [(e.code, e.message) for e in audit.errors + audit.fixes], flush=True)
 assert not audit.has_errors and not audit.fixes, (audit.errors, audit.fixes)
 assert doc.dxfversion == 'AC1024' and doc.header['$INSUNITS'] == 4
 dimensions = list(doc.modelspace().query('DIMENSION'))
