@@ -465,6 +465,7 @@ internal static partial class MachiningDxf
         public void Dispose()
         {
             if (!document.Save(path)) throw new IOException("无法保存 DXF 2010 文件：" + path);
+            Dxf2010Compatibility.NormalizeRasterOwner(path);
         }
         netDxf.Vector2 World2(Point2 p) => new(p.X + offsetX, p.Y + offsetY);
         netDxf.Vector3 World3(Point2 p) => new(p.X + offsetX, p.Y + offsetY, 0);

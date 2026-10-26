@@ -58,6 +58,9 @@ internal static class DimensionChecks
             var reopened = netDxf.DxfDocument.Load(file);
             Check(reopened != null && reopened.Entities.Dimensions.Count() == dimensions.Length, "Saved DXF 2010 must reopen with all native dimensions");
             Check(reopened!.Entities.Texts.Any(t => t.Value.Contains("序号", StringComparison.Ordinal)), "Unicode drawing titles must survive a complete library round trip");
+            string rootOwner = entities.Single(e => e.Type == "DICTIONARY" && e.Values.GetValueOrDefault(330) == "0").Values[5];
+            Check(entities.Where(e => e.Type == "RASTERVARIABLES").All(e => e.Values.GetValueOrDefault(330) == rootOwner),
+                "Raster variables must be owned by their root dictionary, not handle 0");
             var sizes = dimensions.Select(Measurement).ToArray();
             foreach (double expected in new[] { 9.0, 20.0, 30.0, 50.0, 60.0, 100.0, 120.0, 140.0, 160.0, 300.0 })
                 Check(sizes.Any(v => Math.Abs(v - expected) < 0.001), "Missing measured feature: " + expected);

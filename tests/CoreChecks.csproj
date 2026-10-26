@@ -14,6 +14,7 @@
     <Compile Include="../src/SolidCraftCsvTool/StepDrawingExporter.cs" Link="StepDrawingExporter.cs" />
     <Compile Include="../src/SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />
     <Compile Include="../src/SolidCraftCsvTool/AppBuildInfo.cs" Link="AppBuildInfo.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/Dxf2010Compatibility.cs" Link="Dxf2010Compatibility.cs" />
     <AssemblyMetadata Include="BuildDate" Value="$(BuildDate)" />
   </ItemGroup>
 </Project>
