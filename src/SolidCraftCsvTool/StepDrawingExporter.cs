@@ -540,6 +540,24 @@ internal static partial class MachiningDxf
             Add(new netDxf.Entities.Text(value.Replace("\r"," ").Replace("\n"," "),World3(at),height,style)
             {Alignment=netDxf.Entities.TextAlignment.MiddleCenter,Rotation=rotation},layer);
         }
+        void ApplyFrameFonts(netDxf.Entities.Insert insert,HashSet<netDxf.Blocks.Block> visited)
+        {
+            foreach(var attribute in insert.Attributes)attribute.Style=titleStyle;
+            if(!visited.Add(insert.Block))return;
+            foreach(var definition in insert.Block.AttributeDefinitions.Values)definition.Style=titleStyle;
+            foreach(var entity in insert.Block.Entities)
+            {
+                switch(entity)
+                {
+                    case netDxf.Entities.Text text:text.Style=titleStyle;break;
+                    case netDxf.Entities.MText text:
+                        text.Style=titleStyle;
+                        text.Value=System.Text.RegularExpressions.Regex.Replace(text.Value,@"\\[fF][^;]*;","");
+                        break;
+                    case netDxf.Entities.Insert child:ApplyFrameFonts(child,visited);break;
+                }
+            }
+        }
         public void DrawFrame(double sheetY,double factor,double width,double height,string name,int sequence)
         {
             SetOffset(0,sheetY);
@@ -548,6 +566,7 @@ internal static partial class MachiningDxf
                 foreach(var reference in frame.Components)
                 {
                     var insert=(netDxf.Entities.Insert)reference.Clone();
+                    ApplyFrameFonts(insert,new HashSet<netDxf.Blocks.Block>());
                     insert.TransformBy(netDxf.Matrix3.Scale(new netDxf.Vector3(factor,factor,factor)),
                         new netDxf.Vector3(-frame.Boundary.MinX*factor,-frame.Boundary.MinY*factor+sheetY,0));
                     foreach(var attribute in insert.Attributes)

@@ -39,6 +39,33 @@ internal static class PlanAnnotationChecks
             if(!Near(N(d,23),N(first,23)-60)||N(d,20)<N(first,23)-100||N(d,20)>N(first,23))
                 throw new Exception("Joint depth dimension must stay at the upper shoulder, not below the view.");
 
+        // Middle hole pairs calibrate an end-clipping offset in the projections.
+        // Hidden, fragmented left shoulders still form a complete female groove.
+        var projected=new List<Line2>();
+        for(int i=0;i<plan.Length;i++)
+        {
+            var a=plan[i];var z=plan[(i+1)%plan.Length];
+            if(Math.Abs(a.Y-z.Y)<.01&&Math.Min(a.X,z.X)==0&&Math.Max(a.X,z.X)==9)
+            {
+                projected.Add(new(new(0,a.Y),new(1.26,a.Y),"VISIBLE"));
+                projected.Add(new(new(1.26,a.Y),new(9,a.Y),"HIDDEN"));
+            }
+            else projected.Add(new(a,z,a.X==9&&z.X==9?"HIDDEN":"VISIBLE"));
+        }
+        foreach(double x in new[]{25.0,115.0,145.0,235.0})projected.Add(new(new(x,0),new(x,200),"VISIBLE"));
+        var shifted=top with{Lines=projected,Polylines=[]};
+        string calibrated=Path.Combine(directory,"plan-calibrated-sample.dxf");
+        MachiningDxf.Write(calibrated,new("3",front,shifted,end,DxfFeatureDetector.Analyze(front,shifted)));
+        var corrected=ReadDimensions(calibrated).Where(d=>(int.Parse(d[70],CultureInfo.InvariantCulture)&7)==0&&Near(N(d,50),0)).ToArray();
+        var leading=corrected.Single(d=>Near(Width(d),25));
+        if(!corrected.Any(d=>Near(Width(d),56)&&Near(N(d,23),N(leading,23))))
+            throw new Exception("First and last plan gaps must share the actual middle-hole alignment.");
+        if(corrected.Count(d=>Near(Width(d),9))!=2)
+            throw new Exception("Hidden or split left female groove must retain its depth dimension.");
+        var female=ReadDimensions(calibrated).Where(d=>(int.Parse(d[70],CultureInfo.InvariantCulture)&7)==0&&Near(N(d,50),90)).ToArray();
+        if(!female.Any(d=>Near(Math.Abs(N(d,24)-N(d,23)),80)&&N(d,10)<N(leading,13)))
+            throw new Exception("Left female groove opening needs its own height dimension.");
+
         string input=Path.Combine(directory,"batch-inputs");Directory.CreateDirectory(input);
         try
         {
@@ -49,7 +76,7 @@ internal static class PlanAnnotationChecks
                 throw new Exception("One-click input must include sorted individual STEP files and exclude the combined STEP.");
         }
         finally{Directory.Delete(input,true);}
-        Console.WriteLine("PASS: arc-based 15/90/30/90/66 plan chain; both groove depths beside shoulders; one-click STEP selection excludes assembly.");
+        Console.WriteLine("PASS: arc-based 15/90/30/90/66 plan chain; both groove depths beside shoulders; hidden split female groove retained; first/last calibrated to middle pairs; one-click STEP selection excludes assembly.");
     }
 
     static List<Dictionary<int,string>> ReadDimensions(string file)

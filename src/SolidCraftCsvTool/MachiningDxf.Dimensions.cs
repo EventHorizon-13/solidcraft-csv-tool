@@ -59,13 +59,13 @@ internal static partial class MachiningDxf
         return IncludeEnds(marks, axisX ? b.MinX : b.MinY, axisX ? b.MaxX : b.MaxY);
     }
 
-    static IEnumerable<Line2> StraightEdges(Projection2 view)
+    static IEnumerable<Line2> StraightEdges(Projection2 view,bool includeHidden=false)
     {
         foreach (Line2 line in view.Lines)
-            if (!IsHidden(line.Layer)) yield return line;
+            if (includeHidden || !IsHidden(line.Layer)) yield return line;
         foreach (Polyline2 poly in view.Polylines)
         {
-            if (IsHidden(poly.Layer)) continue;
+            if (!includeHidden && IsHidden(poly.Layer)) continue;
             for (int i = 1; i < poly.Points.Count; i++) yield return new(poly.Points[i - 1], poly.Points[i], poly.Layer);
             if (poly.Closed && poly.Points.Count > 2) yield return new(poly.Points[^1], poly.Points[0], poly.Layer);
         }

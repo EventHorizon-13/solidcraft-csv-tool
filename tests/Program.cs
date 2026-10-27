@@ -15,6 +15,7 @@ if (args.Length == 2 && args[0] == "--front-height-check")
 {
     FrontHeightChecks.Run(args[1]);
     PlanAnnotationChecks.Run(args[1]);
+    FrameFontChecks.Run(args[1]);
     return;
 }
 

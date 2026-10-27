@@ -30,7 +30,19 @@ internal static partial class MachiningDxf
     static EndGroove? FindGroove(Map map,bool left)
     {
         var b=map.Projection.Bounds;double outer=left?b.MinX:b.MaxX;
-        var steps=StraightEdges(map.Projection).Where(e=>Math.Abs(e.A.Y-e.B.Y)<.01&&
+        // A shoulder may be split at projected intersections, or hidden by
+        // a bevel. Join collinear fragments before looking for the two shoulders.
+        var horizontal=StraightEdges(map.Projection,true).Where(e=>Math.Abs(e.A.Y-e.B.Y)<.01)
+            .OrderBy(e=>e.A.Y).ThenBy(e=>Math.Min(e.A.X,e.B.X)).ToArray();
+        var joined=new List<Line2>();
+        foreach(var edge in horizontal)
+        {
+            double lo=Math.Min(edge.A.X,edge.B.X),hi=Math.Max(edge.A.X,edge.B.X),y=edge.A.Y;
+            if(joined.Count>0&&Math.Abs(joined[^1].A.Y-y)<.02&&lo<=joined[^1].B.X+.02)
+            {var previous=joined[^1];joined[^1]=new(previous.A,new(Math.Max(previous.B.X,hi),previous.B.Y),"VISIBLE");}
+            else joined.Add(new(new(lo,y),new(hi,y),"VISIBLE"));
+        }
+        var steps=joined.Where(e=>e.A.Y>b.MinY+.05&&e.A.Y<b.MaxY-.05&&
             Math.Abs(e.A.X-e.B.X)>.2&&Math.Abs(e.A.X-e.B.X)<=Math.Min(b.Width*.18,b.Height*.5)&&
             (Math.Abs(e.A.X-outer)<.05||Math.Abs(e.B.X-outer)<.05)).ToArray();
         if(steps.Length==0)return null;
@@ -67,8 +79,33 @@ internal static partial class MachiningDxf
         // Front-view circles and plan-view bore edges share the aligned X axis.
         // Use fitted circle tangents, never tessellation vertices or unrelated
         // joint lines, for edge-to-bore / bore-width / web-width dimensions.
-        double[] boreEdges=frontArcs.Where(a=>a.Layer=="VISIBLE"&&a.SweepDegrees>=15)
-            .SelectMany(a=>new[]{a.Center.X-a.Radius+b.MinX,a.Center.X+a.Radius+b.MinX})
+        var circles=frontArcs.Where(a=>a.Layer=="VISIBLE"&&a.SweepDegrees>=15).ToArray();
+        // Match the middle holes to actual plan edges. The two projections can
+        // have different clipping bounds at their ends; normalizing both to zero
+        // alone shifts the first and last measurements while middle widths agree.
+        var planEdges=StraightEdges(map.Projection).Where(e=>Math.Abs(e.A.X-e.B.X)<.01&&Math.Abs(e.A.Y-e.B.Y)>=b.Height*.4)
+            .Select(e=>(e.A.X+e.B.X)/2).Where(x=>x>bodyMin+.05&&x<bodyMax-.05&&
+                (left==null||Math.Abs(x-left.InnerX)>.05)&&(right==null||Math.Abs(x-right.InnerX)>.05)).Distinct().ToArray();
+        var references=circles.Where(a=>a.SweepDegrees>=170).ToArray();
+        if(references.Length==0)references=circles;
+        var offsets=new List<double>();
+        foreach(var arc in references)
+            if(planEdges.Length>=2)
+            {
+                double a=arc.Center.X-arc.Radius+b.MinX,z=arc.Center.X+arc.Radius+b.MinX;
+                double nearA=planEdges.MinBy(p=>Math.Abs(p-a)),nearZ=planEdges.MinBy(p=>Math.Abs(p-z));
+                double tolerance=Math.Max(.1,arc.Radius*.35);
+                if(nearZ-nearA>.2&&Math.Abs((nearZ-nearA)-arc.Radius*2)<.2&&
+                    Math.Abs(nearA-a)<=tolerance&&Math.Abs(nearZ-z)<=tolerance)
+                    offsets.Add(((nearA-a)+(nearZ-z))/2);
+            }
+        // A lone projection fragment is not enough to calibrate a hole pair.
+        if(offsets.Count==0)planEdges=[];
+        offsets.Sort();
+        double alignment=offsets.Count==0?0:offsets.Count%2==1?offsets[offsets.Count/2]:(offsets[offsets.Count/2-1]+offsets[offsets.Count/2])/2;
+        double[] boreEdges=circles.SelectMany(a=>new[]{a.Center.X-a.Radius+b.MinX+alignment,a.Center.X+a.Radius+b.MinX+alignment})
+            .Select(x=>planEdges.Length>0&&Math.Abs(planEdges.MinBy(p=>Math.Abs(p-x))-x)<=Math.Max(.1,(references.FirstOrDefault()?.Radius??1)*.05)
+                ?planEdges.MinBy(p=>Math.Abs(p-x)):x)
             .Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05).ToArray();
         var marks=(boreEdges.Length>0 ? boreEdges : AxisMarks(map.Projection,true))
             .Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05&&
