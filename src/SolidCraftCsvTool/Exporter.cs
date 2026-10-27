@@ -79,6 +79,7 @@ public static class Exporter
                     double offset = ModelRules.TranslationX(piece.Box, cursor);
                     var inserted = await client.ExecuteAsync("file.insert_step", new { path = piece.Path, name = piece.Row.Name, up = "z" });
                     var occurrence = ModelRules.ReadOccurrenceReference(inserted);
+                    await client.ExecuteAsync("occurrence.ground",new{occurrence,grounded=false});
                     await client.ExecuteAsync("occurrence.move", new { occurrence, space = "world", translate = new double[] { offset, 0, 0 } });
                     cursor += piece.Box.Max[0] - piece.Box.Min[0] + options.Gap;
                     progress.Report(new($"已将 {piece.Row.Name} 沿 X 方向移至组合位置，目标间距 {options.Gap:0.###} mm。", completed));
