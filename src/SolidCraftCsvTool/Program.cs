@@ -7,6 +7,14 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        if(args.Length==4&&args[0]=="--apply-update")
+        {
+            try{return UpdateInstaller.Apply(args);}catch(Exception ex){MessageBox.Show("更新未能完成：\n"+ex.Message,"软件更新",MessageBoxButtons.OK,MessageBoxIcon.Error);return 1;}
+        }
+        if(args.Length==3&&args[0]=="--cleanup-update")
+        {
+            UpdateInstaller.CleanupStage(args);args=[];
+        }
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         ApplicationConfiguration.Initialize();
         try
