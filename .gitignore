@@ -3,3 +3,4 @@
 dist/
 *.user
 .vs/
+tools/pdf-export/node_modules/

@@ -19,6 +19,7 @@
     <Compile Include="../SolidCraftCsvTool/Dxf2010Compatibility.cs" Link="Dxf2010Compatibility.cs" />
     <Compile Include="../SolidCraftCsvTool/StepDrawingExporter.cs" Link="StepDrawingExporter.cs" />
     <Compile Include="../SolidCraftCsvTool/DrawingOptions.cs" Link="DrawingOptions.cs" />
+    <Compile Include="../SolidCraftCsvTool/PdfExportService.cs" Link="PdfExportService.cs" />
     <Compile Include="../SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />
     <Compile Include="../SolidCraftCsvTool/MachiningDxf.Features.cs" Link="MachiningDxf.Features.cs" />
     <Compile Include="../SolidCraftCsvTool/MachiningDxf.Layout.cs" Link="MachiningDxf.Layout.cs" />

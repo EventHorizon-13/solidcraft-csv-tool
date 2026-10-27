@@ -6,8 +6,8 @@ namespace SolidCraftCsvTool;
 
 internal static class Program
 {
-    static readonly HashSet<string> Flags = ["--combine-step", "--export-current-csv", "--export-dxf", "--overwrite"];
-    static readonly HashSet<string> Values = ["--csv", "--template", "--output", "--engine", "--drawing-template", "--step-name", "--dxf-name", "--stamp", "--dimension-style", "--hidden-line-scale", "--view-gap"];
+    static readonly HashSet<string> Flags = ["--combine-step", "--export-current-csv", "--export-dxf", "--export-pdf", "--overwrite"];
+    static readonly HashSet<string> Values = ["--csv", "--template", "--output", "--engine", "--drawing-template", "--step-name", "--dxf-name", "--stamp", "--dimension-style", "--hidden-line-scale", "--view-gap", "--font-dir"];
 
     static async Task<int> Main(string[] args)
     {
@@ -28,6 +28,8 @@ internal static class Program
         try
         {
             Dictionary<string, string> options = Parse(args);
+            bool exportPdf = options.ContainsKey("--export-pdf");
+            bool exportDxf = options.ContainsKey("--export-dxf") || exportPdf;
             string csvPath = RequiredPath(options, "--csv");
             string templatePath = RequiredPath(options, "--template");
             string outputPath = Path.GetFullPath(options.GetValueOrDefault("--output") ?? Path.GetDirectoryName(csvPath)!);
@@ -35,13 +37,15 @@ internal static class Program
             if (!File.Exists(engine)) throw new FileNotFoundException("找不到 SolidCraft CLI。请保留软件包中的 SolidCraft 文件夹，或用 --engine 指定路径。", engine);
             if (!File.Exists(csvPath)) throw new FileNotFoundException("找不到输入 CSV。", csvPath);
             if (!File.Exists(templatePath)) throw new FileNotFoundException("找不到 SolidCraft 模板。", templatePath);
-            if (options.ContainsKey("--drawing-template") && !options.ContainsKey("--export-dxf"))
-                throw new ArgumentException("指定 --drawing-template 时还需要 --export-dxf。");
+            if (options.ContainsKey("--drawing-template") && !exportDxf)
+                throw new ArgumentException("指定 --drawing-template 时还需要 --export-dxf 或 --export-pdf。");
             if (options.ContainsKey("--step-name") && !options.ContainsKey("--combine-step"))
                 throw new ArgumentException("指定 --step-name 时还需要 --combine-step。");
-            if (options.ContainsKey("--dxf-name") && !options.ContainsKey("--export-dxf"))
-                throw new ArgumentException("指定 --dxf-name 时还需要 --export-dxf。");
-            if ((options.ContainsKey("--dimension-style") || options.ContainsKey("--hidden-line-scale") || options.ContainsKey("--view-gap")) && !options.ContainsKey("--export-dxf"))
+            if (options.ContainsKey("--dxf-name") && !exportDxf)
+                throw new ArgumentException("指定 --dxf-name 时还需要 --export-dxf 或 --export-pdf。");
+            if (options.ContainsKey("--font-dir") && !options.ContainsKey("--export-pdf"))
+                throw new ArgumentException("指定 --font-dir 时还需要 --export-pdf。");
+            if ((options.ContainsKey("--dimension-style") || options.ContainsKey("--hidden-line-scale") || options.ContainsKey("--view-gap")) && !exportDxf)
                 throw new ArgumentException("标注样式和出图间距参数需要同时启用 --export-dxf。");
 
             string stamp = options.GetValueOrDefault("--stamp") ?? OutputNames.Stamp;
@@ -54,13 +58,14 @@ internal static class Program
             bool combine = options.ContainsKey("--combine-step");
             bool exportCsv = options.ContainsKey("--export-current-csv");
             DrawingOptions? drawing = null;
-            if (options.ContainsKey("--export-dxf"))
+            if (exportDxf)
             {
                 drawing = new DrawingOptions
                 {
                     OverwriteOutput = overwrite,
                     OutputFileName = options.GetValueOrDefault("--dxf-name") ?? OutputNames.DefaultBase(stamp),
                     TemplatePath = options.GetValueOrDefault("--drawing-template") ?? "",
+                    FontDirectory = options.GetValueOrDefault("--font-dir") ?? (exportPdf ? Path.Combine(AppContext.BaseDirectory, "模板", "字体") : ""),
                     DimensionStyleName = options.GetValueOrDefault("--dimension-style") ?? "_5",
                     HiddenLineScale = Number(options, "--hidden-line-scale", 1),
                     ViewGap = Number(options, "--view-gap", 60)
@@ -68,6 +73,15 @@ internal static class Program
                 drawing.Validate();
                 string dxfPath = Path.Combine(outputPath, drawing.ResolvedFileName);
                 if (!overwrite && File.Exists(dxfPath)) throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + dxfPath);
+                if (exportPdf)
+                {
+                    if (string.IsNullOrWhiteSpace(drawing.TemplatePath))
+                        throw new ArgumentException("PDF 需要指定固定 A4 图框 DXF 模板：--drawing-template PATH。");
+                    _ = DrawingResources.Load(drawing);
+                    PdfExportService.ValidateFontDirectory(drawing.FontDirectory);
+                    string pdfPath = Path.Combine(outputPath, Path.ChangeExtension(drawing.ResolvedFileName, ".pdf"));
+                    if (!overwrite && File.Exists(pdfPath)) throw new IOException("汇总 PDF 已存在，未覆盖原文件：" + pdfPath);
+                }
             }
             var progress = new InlineProgress<ExportProgress>(entry => Console.WriteLine(entry.Message));
             var export = new ExportOptions(rows, templatePath, outputPath, 7878, 10, combine, overwrite,
@@ -77,7 +91,7 @@ internal static class Program
             if (drawing != null)
             {
                 string[] steps = rows.Select(row => Path.Combine(outputPath, OutputNames.Part(row.Name, stamp) + ".step")).ToArray();
-                await StepDrawingExporter.RunAsync(steps, outputPath, 7878, progress, cancellation.Token, drawing);
+                await StepDrawingExporter.RunAsync(steps, outputPath, 7878, progress, cancellation.Token, drawing, exportPdf);
             }
             return 0;
         }
@@ -141,7 +155,9 @@ internal static class Program
         Console.WriteLine("  --step-name NAME           合并 STEP 文件名，需同时启用 --combine-step");
         Console.WriteLine("  --export-current-csv       输出本次采用的完整参数 CSV");
         Console.WriteLine("  --export-dxf               从单件 STEP 生成汇总加工图 DXF");
+        Console.WriteLine("  --export-pdf               按每张固定 A4 图框另导出多页 PDF（同时生成 DXF）");
         Console.WriteLine("  --drawing-template PATH    图框/标注样式 DXF 模板；默认无图框");
+        Console.WriteLine("  --font-dir PATH            外置 SHX 字体目录，需含 gbenor.shx 和 gbcbig.shx；默认 模板/字体");
         Console.WriteLine("  --dimension-style NAME     标注样式，默认 _5");
         Console.WriteLine("  --dxf-name NAME            汇总 DXF 文件名");
         Console.WriteLine("  --hidden-line-scale N      隐藏线比例，默认 1");

@@ -10,6 +10,7 @@ public sealed record DrawingOptions
     public string OutputFileName { get; init; } = "";
     public string ResolvedFileName => OutputNames.FileName(OutputFileName,".dxf");
     public string TemplatePath { get; init; } = "";
+    public string FontDirectory { get; init; } = "";
     public string DimensionStyleName { get; init; } = "_5";
     public double HiddenLineScale { get; init; } = 1;
     public double ViewGap { get; init; } = 60;
@@ -26,6 +27,8 @@ public sealed record DrawingOptions
             throw new InvalidDataException("出图间距或隐藏线比例超出有效范围。");
         if (!string.IsNullOrWhiteSpace(TemplatePath) && !File.Exists(TemplatePath))
             throw new FileNotFoundException("找不到图框与标注模板，请重新选择 DXF 文件。", TemplatePath);
+        if (!string.IsNullOrWhiteSpace(FontDirectory) && !Directory.Exists(FontDirectory))
+            throw new DirectoryNotFoundException("找不到 SHX 字体文件夹，请重新选择字体目录。 " + FontDirectory);
     }
 }
 

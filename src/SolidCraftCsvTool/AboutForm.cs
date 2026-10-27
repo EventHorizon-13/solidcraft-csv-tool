@@ -24,7 +24,7 @@ internal sealed class AboutForm : Form
         author.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13");content.Controls.Add(author,1,2);
         content.Controls.Add(new Label{Text="编译  "+AppBuildInfo.BuildDate,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},1,3);
         content.Controls.Add(new Label{Text="调用工具",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,4);
-        content.Controls.Add(new Label{Text="SolidCraft CLI 0.23.0 — 参数建模、STEP 与三视图投影\nnetDxf 2023.11.10 — DXF 写入\nGitHub Releases API — 在线检查更新",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},1,4);
+        content.Controls.Add(new Label{Text="SolidCraft CLI 0.23.0 — 参数建模与 STEP\nnetDxf 2023.11.10 — DXF 写入\nMLightCAD 1.7.8-preview.1 — SHX 与矢量 PDF\nNode.js 24 — PDF 渲染运行时；GitHub Releases API — 更新",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},1,4);
         FlowLayoutPanel updateRow=new(){Dock=DockStyle.Fill,Padding=new Padding(0,3,0,0),WrapContents=false};
         Button checkUpdate=new(){Text="检查更新",AutoSize=true,MinimumSize=new Size(100,27),UseVisualStyleBackColor=true,Margin=new Padding(0,0,12,0)};
         Label updateStatus=new(){Text="",AutoSize=true,ForeColor=SystemColors.GrayText,TextAlign=ContentAlignment.MiddleLeft,Margin=new Padding(0,6,0,0)};

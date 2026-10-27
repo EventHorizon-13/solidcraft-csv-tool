@@ -21,7 +21,8 @@ internal sealed record StepDrawingPage(string Name, Projection2 Front, Projectio
 public static class StepDrawingExporter
 {
     public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outputFolder, int port,
-        IProgress<ExportProgress> progress, CancellationToken cancellation, DrawingOptions? drawingOptions = null)
+        IProgress<ExportProgress> progress, CancellationToken cancellation, DrawingOptions? drawingOptions = null,
+        bool exportPdf = false)
     {
         drawingOptions ??= new DrawingOptions();
         drawingOptions.Validate();
@@ -36,10 +37,21 @@ public static class StepDrawingExporter
         string outputName = drawingOptions.ResolvedFileName;
         string outputPath = Path.Combine(destination, outputName);
         if (!drawingOptions.OverwriteOutput&&File.Exists(outputPath)) throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
+        string pdfOutputPath = Path.Combine(destination, Path.ChangeExtension(outputName, ".pdf"));
+        if (exportPdf)
+        {
+            if (string.IsNullOrWhiteSpace(drawingOptions.TemplatePath))
+                throw new InvalidDataException("PDF 开发者预览需要选择包含固定 A4 图框的 DXF 模板。");
+            _ = DrawingResources.Load(drawingOptions);
+            if (!drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath))
+                throw new IOException("汇总 PDF 已存在，未覆盖原文件：" + pdfOutputPath);
+            PdfExportService.ValidateFontDirectory(drawingOptions.FontDirectory);
+        }
 
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "step-drawings-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         var pages = new List<StepDrawingPage>(inputFiles.Count);
+        string? stagedPdf = null;
         try
         {
             using var client = await ControlClient.ConnectAsync(port);
@@ -90,13 +102,35 @@ public static class StepDrawingExporter
             string staged = Path.Combine(work, outputName);
             progress.Report(new($"正在将 {pages.Count} 张加工图排版到一个 DXF…", pages.Count - 1));
             MachiningDxf.WriteCombined(staged, pages, drawingOptions);
+            if (exportPdf)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                string[] pdfPages = new string[pages.Count];
+                for (int i = 0; i < pages.Count; i++)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    pdfPages[i] = Path.Combine(work, $"pdf-page-{i + 1:D4}.dxf");
+                    MachiningDxf.Write(pdfPages[i], pages[i], drawingOptions);
+                }
+                stagedPdf = Path.Combine(destination, $".{Path.GetFileNameWithoutExtension(outputName)}-{Guid.NewGuid():N}.tmp.pdf");
+                progress.Report(new($"正在用外置 SHX 字体渲染 {pages.Count} 页 A4 PDF…", pages.Count - 1));
+                await PdfExportService.ExportAsync(pdfPages, stagedPdf, drawingOptions.FontDirectory, work, progress, cancellation);
+            }
             cancellation.ThrowIfCancellationRequested();
             if (!drawingOptions.OverwriteOutput&&File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
+            if (exportPdf && !drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath)) throw new IOException("PDF 目标文件在出图期间出现，未覆盖原文件：" + pdfOutputPath);
+            if (stagedPdf != null) { File.Move(stagedPdf, pdfOutputPath, drawingOptions.OverwriteOutput); stagedPdf = null; }
             File.Move(staged, outputPath,drawingOptions.OverwriteOutput);
-            progress.Report(new($"已保存汇总 DXF：{outputName}（含 {pages.Count} 张加工图）", inputFiles.Count));
+            progress.Report(new(exportPdf
+                ? $"已保存汇总 DXF 和 A4 PDF：{outputName}（{pages.Count} 页）"
+                : $"已保存汇总 DXF：{outputName}（含 {pages.Count} 张加工图）", inputFiles.Count));
         }
         finally
         {
+            if (stagedPdf != null && File.Exists(stagedPdf))
+            {
+                try { File.Delete(stagedPdf); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
             if (Directory.Exists(work))
             {
                 try { Directory.Delete(work, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }

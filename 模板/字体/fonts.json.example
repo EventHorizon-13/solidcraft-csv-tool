@@ -1,0 +1,13 @@
+[
+  {
+    "name": ["gbenor", "gbenor.shx"],
+    "file": "gbenor.shx",
+    "type": "shx"
+  },
+  {
+    "name": ["gbcbig", "gbcbig.shx"],
+    "file": "gbcbig.shx",
+    "type": "shx",
+    "encoding": "gbk"
+  }
+]

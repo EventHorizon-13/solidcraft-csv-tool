@@ -1,0 +1,15 @@
+{
+  "name": "standard-roller-seal-pdf-exporter",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mlightcad/data-model": "1.15.14",
+    "@mlightcad/mtext-parser": "1.5.5",
+    "@mlightcad/mtext-renderer": "0.13.6",
+    "@mlightcad/pdf-renderer": "1.7.8-preview.1",
+    "@mlightcad/three-renderer": "1.7.8-preview.1",
+    "@velipso/polybool": "1.1.1",
+    "pdf-lib": "1.17.1",
+    "three": "0.186.1"
+  }
+}

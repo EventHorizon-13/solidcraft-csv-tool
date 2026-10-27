@@ -12,6 +12,7 @@ public sealed class MainForm : Form
     string displayedStamp=OutputNames.Stamp;
     readonly CheckBox taskCsv = new(){Text="导出当前任务 CSV",Checked=true,AutoSize=true};
     readonly CheckBox openDxf = new(){Text="完成后打开 DXF",AutoSize=true};
+    readonly CheckBox exportPdf = new(){Text="同时导出 PDF",AutoSize=true};
     const int ControlPort=7878;
     const double CombinedGap=10;
     readonly CheckBox combined = new() { Text = "合并 STEP", Checked = true, AutoSize = true };
@@ -110,11 +111,11 @@ public sealed class MainForm : Form
         TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,8)};
         footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));
         footer.RowStyles.Add(new(SizeType.AutoSize));
-        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
+        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=true,Margin=Padding.Empty};
         FlowLayoutPanel actions = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
-        choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);
+        choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);choices.Controls.Add(exportPdf);
         actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
-        stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite,openDxf]);
+        stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite,openDxf,exportPdf]);
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
         footer.Controls.Add(choices,0,0);footer.Controls.Add(actions,1,0);layout.Controls.Add(footer,0,4);
@@ -149,6 +150,8 @@ public sealed class MainForm : Form
         var found=LocalTemplates.Find(AppContext.BaseDirectory,Environment.CurrentDirectory);
         if(!File.Exists(template.Text)&&found.Native!=null)template.Text=found.Native;
         if(!File.Exists(drawingOptions.TemplatePath)&&found.Dxf!=null)drawingOptions=drawingOptions with{TemplatePath=found.Dxf};
+        string bundledFonts=Path.Combine(AppContext.BaseDirectory,"模板","字体");
+        if(!Directory.Exists(drawingOptions.FontDirectory)&&Directory.Exists(bundledFonts))drawingOptions=drawingOptions with{FontDirectory=bundledFonts};
     }
     void RefreshDefaultNames()
     {
@@ -247,12 +250,22 @@ public sealed class MainForm : Form
             if (!File.Exists(templateFile) || !string.Equals(Path.GetExtension(templateFile), ".solidcraft", StringComparison.OrdinalIgnoreCase)) throw new IOException("请选择 SolidCraft .solidcraft 模板。");
             if (outputFolder.Length == 0) throw new IOException("请选择输出文件夹。");
             var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), ControlPort, CombinedGap, combined.Checked, overwrite.Checked,stamp,stepName,taskCsv.Checked,csvRows);
+            bool createPdf=exportPdf.Checked,createDrawing=exportDxf||createPdf;
             var drawing = drawingOptions with{OutputFileName=dxfName,OverwriteOutput=overwrite.Checked};
-            if(exportDxf)
+            if(createDrawing)
             {
                 drawing.Validate();
+                if(createPdf)
+                {
+                    if(string.IsNullOrWhiteSpace(drawing.TemplatePath))
+                        throw new IOException("PDF 开发者预览需要在“出图设置”中选择固定 A4 图框 DXF 模板。");
+                    _=DrawingResources.Load(drawing);
+                    PdfExportService.ValidateFontDirectory(drawing.FontDirectory);
+                }
                 if(!overwrite.Checked&&File.Exists(Path.Combine(options.Output,drawing.ResolvedFileName)))
                     throw new IOException("汇总 DXF 已存在，请更换输出目录或移走旧 DXF 后重新生成。");
+                if(createPdf&&!overwrite.Checked&&File.Exists(Path.Combine(options.Output,Path.ChangeExtension(drawing.ResolvedFileName,".pdf"))))
+                    throw new IOException("汇总 PDF 已存在，请更换输出目录或移走旧 PDF 后重新生成。");
             }
             SaveSettings(); cancellation = new(); SetRunning(true); progressBar.Maximum = rows.Count; progressBar.Value = 0;
             Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
@@ -260,17 +273,17 @@ public sealed class MainForm : Form
             await EnsureEngineAsync(token);
             await Task.Run(() => Exporter.RunAsync(options, progress, token));
             int drawingCount=0;
-            if(exportDxf)
+            if(createDrawing)
             {
                 token.ThrowIfCancellationRequested();
                 string[] files=BatchDrawingInputs.FromFolder(options.Output,stepName);
                 drawingCount=files.Length;progressBar.Maximum=files.Length;progressBar.Value=0;
                 Log($"正在汇总同文件夹的 {files.Length} 个零件 STEP，已排除组合 STEP。");
-                await Task.Run(()=>StepDrawingExporter.RunAsync(files,options.Output,options.Port,progress,token,drawing));
+                await Task.Run(()=>StepDrawingExporter.RunAsync(files,options.Output,options.Port,progress,token,drawing,createPdf));
             }
-            SetStatus($"完成：{rows.Count} 个型号"+(exportDxf?$"，1 个 DXF（{drawingCount} 张图）":"")); Log("输出目录：" + options.Output);
-            MessageBox.Show(this, $"已导出 {rows.Count} 个型号。"+(exportDxf?$"\n已生成汇总 DXF，含 {drawingCount} 张图。":"")+$"\n{options.Output}", "导出完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            if(exportDxf)OpenCompletedDxf(Path.Combine(options.Output,drawing.ResolvedFileName));
+            SetStatus($"完成：{rows.Count} 个型号"+(createDrawing?$"，1 个 DXF"+(createPdf?$" 和 {drawingCount} 页 PDF":"") :"")); Log("输出目录：" + options.Output);
+            MessageBox.Show(this, $"已导出 {rows.Count} 个型号。"+(createDrawing?$"\n已生成汇总 DXF"+(createPdf?$" 和 {drawingCount} 页 A4 PDF":"")+"。":"")+$"\n{options.Output}", "导出完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if(createDrawing)OpenCompletedDxf(Path.Combine(options.Output,drawing.ResolvedFileName));
         }
         catch (OperationCanceledException) { SetStatus("已停止，已导出的文件保留。"); Log("已按请求停止。"); }
         catch (Exception ex) { string details = DescribeException(ex); Log("导出中止：" + details); ShowError(details); SetStatus("导出中止"); }
@@ -291,10 +304,18 @@ public sealed class MainForm : Form
             cancellation = new(); SetRunning(true); progressBar.Maximum = files.Length; progressBar.Value = 0;
             Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
             var drawing = drawingOptions with{OutputFileName=OutputNames.FileName(dxfBase.Text,".dxf"),OverwriteOutput=overwrite.Checked};
+            bool createPdf=exportPdf.Checked;
+            if(createPdf)
+            {
+                if(string.IsNullOrWhiteSpace(drawing.TemplatePath))
+                    throw new IOException("PDF 开发者预览需要在“出图设置”中选择固定 A4 图框 DXF 模板。");
+                _=DrawingResources.Load(drawing);
+                PdfExportService.ValidateFontDirectory(drawing.FontDirectory);
+            }
             await EnsureEngineAsync(cancellation.Token);
-            await Task.Run(() => StepDrawingExporter.RunAsync(files, target, ControlPort, progress, cancellation.Token, drawing));
-            SetStatus($"加工图完成：1 个 DXF，含 {files.Length} 张图"); Log("汇总 DXF 输出文件夹：" + target);
-            MessageBox.Show(this, $"已生成 1 个汇总 DXF，内含 {files.Length} 张带尺寸标注的三视图，按 STEP 文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, drawing.ResolvedFileName)}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            await Task.Run(() => StepDrawingExporter.RunAsync(files, target, ControlPort, progress, cancellation.Token, drawing,createPdf));
+            SetStatus($"加工图完成：1 个 DXF"+(createPdf?$" 和 {files.Length} 页 A4 PDF":"")); Log("汇总 DXF 输出文件夹：" + target);
+            MessageBox.Show(this, $"已生成 1 个汇总 DXF"+(createPdf?$" 和 {files.Length} 页 A4 PDF":"")+ $"，含 {files.Length} 张带尺寸标注的三视图，按 STEP 文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, drawing.ResolvedFileName)}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             OpenCompletedDxf(Path.Combine(target,drawing.ResolvedFileName));
         }
         catch (OperationCanceledException) { SetStatus("已停止；已完成的 DXF 保留。"); Log("STEP 批量出图已停止。"); }
@@ -350,6 +371,7 @@ public sealed class MainForm : Form
             if(root.TryGetProperty("combined",out var c))combined.Checked=c.GetBoolean();
             if(root.TryGetProperty("taskCsv",out var csv))taskCsv.Checked=csv.GetBoolean();
             if(root.TryGetProperty("openDxf",out var od))openDxf.Checked=od.GetBoolean();
+            if(root.TryGetProperty("exportPdf",out var ep))exportPdf.Checked=ep.GetBoolean();
             if(root.TryGetProperty("dxfBase",out var dn)&&dn.ValueKind==JsonValueKind.String)dxfBase.Text=dn.GetString();
             if(root.TryGetProperty("stepBase",out var sn)&&sn.ValueKind==JsonValueKind.String)stepBase.Text=sn.GetString();
             if (root.TryGetProperty("drawing", out var d))
@@ -367,7 +389,7 @@ public sealed class MainForm : Form
         {
             Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
             string stage = settingsPath + ".tmp";
-            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, combined=combined.Checked, taskCsv=taskCsv.Checked, openDxf=openDxf.Checked, dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text, stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text, drawing = drawingOptions }));
+            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, combined=combined.Checked, taskCsv=taskCsv.Checked, openDxf=openDxf.Checked, exportPdf=exportPdf.Checked, dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text, stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text, drawing = drawingOptions }));
             File.Move(stage, settingsPath, true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log("未能保存设置：" + ex.Message); }
@@ -391,8 +413,8 @@ public sealed class MainForm : Form
             new[]{run,runDxf,stop}.Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds)!=b.Bounds)||
             run.Parent!.Right!=run.Parent.Parent!.ClientSize.Width-run.Parent.Parent.Padding.Right)
             throw new InvalidOperationException("生成与停止按钮必须在底部右对齐并完整显示。");
-        if(!openDxf.Visible||Rectangle.Intersect(openDxf.Parent!.ClientRectangle,openDxf.Bounds)!=openDxf.Bounds)
-            throw new InvalidOperationException("完成后打开 DXF 选项必须完整显示。");
+        if(!openDxf.Visible||Rectangle.Intersect(openDxf.Parent!.ClientRectangle,openDxf.Bounds)!=openDxf.Bounds||!exportPdf.Visible||Rectangle.Intersect(exportPdf.Parent!.ClientRectangle,exportPdf.Bounds)!=exportPdf.Bounds)
+            throw new InvalidOperationException("完成后打开 DXF 与同时导出 PDF 选项必须完整显示。");
         if(editControls.OfType<Button>().Where(b=>b.Parent==import.Parent).Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds).Width<b.Width))
             throw new InvalidOperationException("常用工具按钮必须完整显示。");
         if(help.Owner!=status.Owner || help.Owner!.Items.IndexOf(help)>=help.Owner.Items.IndexOf(progressBar) || editControls.OfType<NumericUpDown>().Any() || editControls.OfType<Button>().Any(b=>b.Text.StartsWith("启动 SolidCraft")))
