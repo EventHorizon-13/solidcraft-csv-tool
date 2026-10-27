@@ -9,5 +9,5 @@ internal static class AppBuildInfo
         ??typeof(AppBuildInfo).Assembly.GetName().Version?.ToString(3)??"未知";
     public static string BuildDate=>typeof(AppBuildInfo).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
         .FirstOrDefault(attribute=>attribute.Key=="BuildDate")?.Value??"未知";
-    public static string WindowTitle=>$"{ProductName} · v{Version} · 编译于 {BuildDate}";
+    public static string WindowTitle=>$"{ProductName} · v{Version}";
 }

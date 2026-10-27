@@ -29,6 +29,13 @@ internal static class Program
                     using Bitmap shot=new(about.Width,about.Height);about.DrawToBitmap(shot,new Rectangle(Point.Empty,about.Size));
                     shot.Save(args[aboutIndex+1],System.Drawing.Imaging.ImageFormat.Png);about.Close();
                 }
+                int minimumIndex=Array.IndexOf(args,"--minimum-screenshot");
+                if(minimumIndex>=0&&minimumIndex+1<args.Length)
+                {
+                    form.Size=form.MinimumSize;Application.DoEvents();form.VerifyUi();
+                    using Bitmap shot=new(form.Width,form.Height);form.DrawToBitmap(shot,new Rectangle(Point.Empty,form.Size));
+                    shot.Save(args[minimumIndex+1],System.Drawing.Imaging.ImageFormat.Png);
+                }
                 form.Close(); return 0;
             }
             Application.Run(form);

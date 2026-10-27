@@ -20,7 +20,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=1.0.${{ github.run_number }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=1.1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Bundle official SolidCraft 0.23 CLI and notices
@@ -43,7 +43,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/checks | Out-Null
-          $process = Start-Process dist/app/标准辊密封批量生成.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png", '--about-screenshot', "$env:GITHUB_WORKSPACE/dist/checks/about.png" -PassThru
+          $process = Start-Process dist/app/标准辊密封批量生成.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png", '--about-screenshot', "$env:GITHUB_WORKSPACE/dist/checks/about.png", '--minimum-screenshot', "$env:GITHUB_WORKSPACE/dist/checks/minimum.png" -PassThru
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Compact layout check timed out' }
           if ($process.ExitCode -ne 0) { throw 'Compact layout check failed' }
       - name: Package release
@@ -62,8 +62,8 @@ jobs:
           生成并导出Step / 一键生成并导出 DXF；支持合并 STEP 和导出当前任务 CSV 开关。
           汇总 DXF、组合 STEP 文件名可独立设置，默认辊密封_MMDD；单件命名辊密封_MMDD_编号。
           CSV 同输出文件夹，默认辊密封_MMDD.csv，附带6行参数模板。
-          生成与停止按钮位于底部导出选项旁；选中单元格蓝框，说明位于进度条左侧，SolidCraft模板标签。
-          加入用户批准的实心液态玻璃图标与右对齐关于按钮；关于界面含版本、编译时间、项目主页和许可。
+          生成与停止按钮位于底部右侧，操作行自动撑高，避免底部截断；选中单元格蓝框，说明位于进度条左侧，SolidCraft模板标签。
+          加入用户批准的实心液态玻璃图标与右对齐关于按钮；标题栏仅保留版本号；关于界面去掉重复标题，版本下增加作者 Wei Yunhui 及 GitHub 主页链接，保留编译时间和许可。
           去掉图框内重复大图名，只在标题栏保留辊密封编号；图框和标题栏字体 gbenor/gbcbig。
           仍支持桌面版自动启动；后台运行不操作或关闭已打开的桌面窗口。
           CSV新增子头宽、子头突出、母槽宽、母槽深、配合间隙，空白逐行恢复模板默认值；软件目录/模板自动识别V13和DXF。
@@ -82,7 +82,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "win-1.0.${{ github.run_number }}" dist/SolidCraftRollerSeal-win-x64.zip dist/roller-seal-template.csv --target "$env:GITHUB_SHA" --title "Windows 1.0.${{ github.run_number }}" --notes-file dist/release-notes.md
+        run: gh release create "win-$env:BUILD_VERSION" dist/SolidCraftRollerSeal-win-x64.zip dist/roller-seal-template.csv --target "$env:GITHUB_SHA" --title "Windows $env:BUILD_VERSION" --notes-file dist/release-notes.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:

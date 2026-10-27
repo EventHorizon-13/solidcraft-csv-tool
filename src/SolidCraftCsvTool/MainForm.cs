@@ -39,7 +39,7 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new(SizeType.Absolute,48));
         layout.RowStyles.Add(new(SizeType.Percent,100));
         layout.RowStyles.Add(new(SizeType.Absolute,98));
-        layout.RowStyles.Add(new(SizeType.Absolute,36));
+        layout.RowStyles.Add(new(SizeType.AutoSize));
         Controls.Add(layout);
 
         TableLayoutPanel paths = new() { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3 };
@@ -105,13 +105,17 @@ public sealed class MainForm : Form
         log.BackColor = Color.White; log.BorderStyle = BorderStyle.FixedSingle;
         layout.Controls.Add(log, 0, 3);
 
-        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoScroll=true,WrapContents=false,Padding=new Padding(0,6,0,0)};
+        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,8)};
+        footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));
+        footer.RowStyles.Add(new(SizeType.AutoSize));
+        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
+        FlowLayoutPanel actions = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);
-        run.Margin=new Padding(12,0,4,0);choices.Controls.Add(run);choices.Controls.Add(runDxf);choices.Controls.Add(stop);
+        actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
         stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite]);
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
-        layout.Controls.Add(choices,0,4);
+        footer.Controls.Add(choices,0,0);footer.Controls.Add(actions,1,0);layout.Controls.Add(footer,0,4);
         StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor };
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;
         strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); Controls.Add(strip); strip.Dock = DockStyle.Bottom;
@@ -363,11 +367,10 @@ public sealed class MainForm : Form
             throw new InvalidOperationException("两个文件名必须位于同一行。");
         var import=editControls.OfType<Button>().Single(b=>b.Text=="导入 CSV");
         int y=run.PointToScreen(Point.Empty).Y;
-        if(new[]{runDxf,stop}.Any(b=>Math.Abs(b.PointToScreen(Point.Empty).Y-y)>1)||run.Parent!=combined.Parent||run.Parent!=taskCsv.Parent||
-            Rectangle.Intersect(run.Parent!.ClientRectangle,run.Bounds).Width<run.Width ||
-            Rectangle.Intersect(runDxf.Parent!.ClientRectangle,runDxf.Bounds).Width<runDxf.Width ||
-            Rectangle.Intersect(stop.Parent!.ClientRectangle,stop.Bounds).Width<stop.Width)
-            throw new InvalidOperationException("生成与停止按钮必须与底部导出选项同行并完整显示。");
+        if(new[]{runDxf,stop}.Any(b=>Math.Abs(b.PointToScreen(Point.Empty).Y-y)>1)||run.Parent?.Parent!=combined.Parent?.Parent||run.Parent?.Parent!=taskCsv.Parent?.Parent||
+            new[]{run,runDxf,stop}.Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds)!=b.Bounds)||
+            run.Parent!.Right!=run.Parent.Parent!.ClientSize.Width-run.Parent.Parent.Padding.Right)
+            throw new InvalidOperationException("生成与停止按钮必须在底部右对齐并完整显示。");
         if(editControls.OfType<Button>().Where(b=>b.Parent==import.Parent).Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds).Width<b.Width))
             throw new InvalidOperationException("常用工具按钮必须完整显示。");
         if(help.Owner!=status.Owner || help.Owner!.Items.IndexOf(help)>=help.Owner.Items.IndexOf(progressBar) || editControls.OfType<NumericUpDown>().Any() || editControls.OfType<Button>().Any(b=>b.Text.StartsWith("启动 SolidCraft")))
