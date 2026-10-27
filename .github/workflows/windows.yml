@@ -57,13 +57,13 @@ jobs:
           Copy-Item 模板 dist/app/模板 -Recurse
           Copy-Item examples/辊密封参数模板.csv dist/app/辊密封参数模板.csv
           Copy-Item examples/辊密封参数模板.csv dist/roller-seal-template.csv
-          Compress-Archive -Path dist/app/* -DestinationPath dist/SolidCraftRollerSeal-win-x64.zip
+          Compress-Archive -Path dist/app/* -DestinationPath dist/StandardRollerSeal-windows-amd64.zip
           @"
           标准辊密封批量生成 $env:BUILD_VERSION，编译于 $env:BUILD_DATE。
           程序文件名：标准辊密封批量生成.exe。
           固定使用随包附带的官方 SolidCraft 0.23 CLI，无窗口自动启动与退出；无需手动启动桌面版。请完整解压全部文件夹。
           修复 CAD 匿名标题栏（*U 块）导入；补回实心 HATCH 多段边界的闭合标记，避免 Logo 填充封住开口或遮住红色图形。
-          关于页面增加更新检查：发现新版可下载并自动覆盖更新、重启；程序目录无写入权限时提供手动下载。
+          关于页面增加平台识别更新：按 Windows/macOS/Linux 与 amd64/arm64 精确匹配安装包；Windows amd64 支持自动更新，其他平台未来提供独立下载包。当前发布 Windows amd64 安装包。
           新增可记住的“完成后打开 DXF”选项：生成成功后用默认软件打开，取消或失败不打开。
           生成并导出Step / 一键生成并导出 DXF；支持合并 STEP 和导出当前任务 CSV 开关。
           汇总 DXF、组合 STEP 文件名可独立设置，默认辊密封_MMDD；单件命名辊密封_MMDD_编号。
@@ -79,16 +79,16 @@ jobs:
           "@ | Set-Content dist/release-notes.md -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:
-          name: SolidCraftRollerSeal-win-x64
+          name: StandardRollerSeal-windows-amd64
           path: |
-            dist/SolidCraftRollerSeal-win-x64.zip
+            dist/StandardRollerSeal-windows-amd64.zip
             dist/roller-seal-template.csv
           retention-days: 30
       - name: Publish downloadable Windows release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "win-$env:BUILD_VERSION" dist/SolidCraftRollerSeal-win-x64.zip dist/roller-seal-template.csv --target "$env:GITHUB_SHA" --title "Windows $env:BUILD_VERSION" --notes-file dist/release-notes.md
+        run: gh release create "win-$env:BUILD_VERSION" dist/StandardRollerSeal-windows-amd64.zip dist/roller-seal-template.csv --target "$env:GITHUB_SHA" --title "Windows $env:BUILD_VERSION" --notes-file dist/release-notes.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:

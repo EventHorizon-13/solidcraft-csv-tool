@@ -1,16 +1,37 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace SolidCraftCsvTool;
 
-internal sealed record AppRelease(Version Version, string Tag, string PageUrl, Uri PackageUrl, long PackageBytes);
+internal sealed record UpdateTarget(string Os,string Architecture,string PackageName,string PackageExtension,bool CanInstallInPlace)
+{
+    public static UpdateTarget Current
+    {
+        get
+        {
+            string os=RuntimeInformation.IsOSPlatform(OSPlatform.Windows)?"windows":
+                RuntimeInformation.IsOSPlatform(OSPlatform.OSX)?"macos":
+                RuntimeInformation.IsOSPlatform(OSPlatform.Linux)?"linux":throw new PlatformNotSupportedException("此操作系统暂不支持软件更新。");
+            string architecture=RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.X64=>"amd64",Architecture.Arm64=>"arm64",
+                _=>throw new PlatformNotSupportedException("仅支持 amd64 和 arm64 版本更新。")
+            };
+            string extension=os switch{"linux"=>".tar.gz",_=>".zip"};
+            return new(os,architecture,$"StandardRollerSeal-{os}-{architecture}{extension}",extension,os=="windows"&&architecture=="amd64");
+        }
+    }
+    public string DisplayName=>$"{Os}-{Architecture}";
+}
+
+internal sealed record AppRelease(Version Version, string Tag, string PageUrl, Uri PackageUrl, long PackageBytes, UpdateTarget Target);
 
 internal static class UpdateService
 {
     const string Repository="EventHorizon-13/solidcraft-roller-seal";
-    const string PackageName="SolidCraftRollerSeal-win-x64.zip";
     static readonly Uri ReleaseApi=new($"https://api.github.com/repos/{Repository}/releases/latest");
     static readonly Uri ReleasesPage=new($"https://github.com/{Repository}/releases/latest");
     static readonly HttpClient Client=CreateClient();
@@ -30,16 +51,17 @@ internal static class UpdateService
         await using var stream=await response.Content.ReadAsStreamAsync(token);
         using var json=await JsonDocument.ParseAsync(stream,cancellationToken:token);
         var root=json.RootElement;
+        var target=UpdateTarget.Current;
         string tag=root.GetProperty("tag_name").GetString()??throw new InvalidDataException("GitHub 发布信息没有版本号。");
         if(!tag.StartsWith("win-",StringComparison.OrdinalIgnoreCase)||!Version.TryParse(tag[4..],out var version))
             throw new InvalidDataException("GitHub 最新发布的版本号格式不正确。");
         string page=root.GetProperty("html_url").GetString()??ReleasesPage.ToString();
-        var asset=root.GetProperty("assets").EnumerateArray().FirstOrDefault(a=>string.Equals(a.GetProperty("name").GetString(),PackageName,StringComparison.Ordinal));
-        if(asset.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("GitHub 最新发布缺少 Windows 安装包。");
-        string url=asset.GetProperty("browser_download_url").GetString()??throw new InvalidDataException("Windows 安装包链接为空。");
+        var asset=root.GetProperty("assets").EnumerateArray().FirstOrDefault(a=>string.Equals(a.GetProperty("name").GetString(),target.PackageName,StringComparison.Ordinal));
+        if(asset.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("GitHub 最新发布缺少当前平台安装包。");
+        string url=asset.GetProperty("browser_download_url").GetString()??throw new InvalidDataException("当前平台安装包链接为空。");
         long bytes=asset.GetProperty("size").GetInt64();
-        if(bytes<=0||bytes>600L*1024*1024)throw new InvalidDataException("Windows 安装包大小超出安全范围。");
-        return new(version,tag,page,new Uri(url),bytes);
+        if(bytes<=0||bytes>600L*1024*1024)throw new InvalidDataException("当前平台安装包大小超出安全范围。");
+        return new(version,tag,page,new Uri(url),bytes,target);
     }
 
     public static bool IsNewer(AppRelease release)=>release.Version>Version.Parse(AppBuildInfo.Version);
@@ -94,7 +116,7 @@ internal static class UpdateService
         string stagedExe=Path.Combine(stage,AppBuildInfo.ProductName+".exe");
         var start=new ProcessStartInfo(stagedExe){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=stage};
         start.ArgumentList.Add("--apply-update");start.ArgumentList.Add(Environment.ProcessId.ToString());start.ArgumentList.Add(target);start.ArgumentList.Add(stage);
-        Process.Start(start)??throw new InvalidOperationException("无法启动更新程序。");
+        _=Process.Start(start)??throw new InvalidOperationException("无法启动更新程序。");
     }
 
     public static string ReleasesUrl=>ReleasesPage.ToString();
@@ -127,7 +149,7 @@ internal static class UpdateInstaller
         int updaterPid=Environment.ProcessId;
         var start=new ProcessStartInfo(installedExe){UseShellExecute=false,WorkingDirectory=target};
         start.ArgumentList.Add("--cleanup-update");start.ArgumentList.Add(stage);start.ArgumentList.Add(updaterPid.ToString());
-        Process.Start(start)??throw new InvalidOperationException("更新后无法重新打开程序。");
+        _=Process.Start(start)??throw new InvalidOperationException("更新后无法重新打开程序。");
         return 0;
     }
 

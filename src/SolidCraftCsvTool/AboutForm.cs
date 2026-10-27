@@ -52,8 +52,13 @@ internal sealed class AboutForm : Form
                 MessageBox.Show(this,$"当前已是最新版本 {AppBuildInfo.Version}。","检查更新",MessageBoxButtons.OK,MessageBoxIcon.Information);
                 return;
             }
+            if(!release.Target.CanInstallInPlace)
+            {
+                if(MessageBox.Show(this,$"发现适用于 {release.Target.DisplayName} 的新版本 {release.Version}。打开下载页面？","发现新版本",MessageBoxButtons.YesNo,MessageBoxIcon.Information)==DialogResult.Yes)OpenLink(release.PageUrl);
+                return;
+            }
             string size=release.PackageBytes>=1024*1024?$"约 {release.PackageBytes/(1024*1024)} MB":$"{release.PackageBytes/1024} KB";
-            if(MessageBox.Show(this,$"发现新版本 {release.Version}（当前 {AppBuildInfo.Version}），安装包 {size}。\n下载并更新后程序会自动重新启动。","发现新版本",MessageBoxButtons.YesNo,MessageBoxIcon.Information)!=DialogResult.Yes)return;
+            if(MessageBox.Show(this,$"发现 {release.Target.DisplayName} 新版本 {release.Version}（当前 {AppBuildInfo.Version}），安装包 {size}。\n下载并更新后程序会自动重新启动。","发现新版本",MessageBoxButtons.YesNo,MessageBoxIcon.Information)!=DialogResult.Yes)return;
             string install=Path.GetDirectoryName(Environment.ProcessPath??"")??AppContext.BaseDirectory;
             string probe=Path.Combine(install,".update-permission-"+Guid.NewGuid().ToString("N"));
             try{using(File.Create(probe)){}File.Delete(probe);}

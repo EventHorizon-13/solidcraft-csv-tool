@@ -1,12 +1,12 @@
 # 标准辊密封批量生成
 
-Windows 10/11 x64。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。
+Windows 10/11 amd64（x64）。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。
 自包含 .NET，附带官方 SolidCraft 0.23 CLI 与许可说明。后台模式无需手动启动 SolidCraft 桌面版；模型生成仍需选择自己的 V13 `.solidcraft` 模板。
 
 ## 使用
 
 1. 选择 V13 模板与输出文件夹，导入 `辊密封参数模板.csv` 或编辑参数表。
-2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。可在“关于”页面检查并安装新版本。
+2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。可在“关于”页面检查并安装新版本。更新按 `Windows/macOS/Linux + amd64/arm64` 匹配安装包；Windows amd64 当前支持自动更新，其他平台有对应发行包时跳转下载页。发行文件采用 `StandardRollerSeal-{windows|macos|linux}-{amd64|arm64}` 平台标识。
 3. 可分别填写 DXF 文件名和组合 STEP 名。留空使用当天 `辊密封_MMDD`，不用填写后缀。
 4. 勾选是否“合并 STEP”“导出当前任务 CSV”“覆盖已有文件”“完成后打开 DXF”（默认不勾选、记住设置，DXF 生成成功后用系统默认软件打开），SolidCraft 固定自动后台运行，无需手动启动。
 5. “生成并导出Step”生成各单件 SolidCraft、STEP，以及选中的组合 STEP/任务 CSV；“一键生成并导出 DXF”再将同目录零件 STEP 汇总出图，排除组合 STEP。
