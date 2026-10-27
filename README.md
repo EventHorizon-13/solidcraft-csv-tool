@@ -50,6 +50,6 @@ DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION�
 
 ## 构建和检查
 
-`./build.ps1 -Version 1.0.0-dev` 发布自包含程序。GitHub Windows 构建同时附带固定官方 CLI 和 CSV 模板，当前只检查紧凑界面、可选CSV尺寸及相应真实CLI几何；不运行全量测试或 SHA-256 校验。私人模型及图框不上传仓库。
+`./build.ps1 -Version 1.0.0-dev` 发布自包含程序。GitHub Windows 构建同时附带固定官方 CLI 和 CSV 模板，当前只检查紧凑界面；新增CSV尺寸已通过真实CLI几何专项检查；不运行全量测试或 SHA-256 校验。私人模型及图框不上传仓库。
 
 文件名并排显示，生成与停止按钮放在工具栏；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。

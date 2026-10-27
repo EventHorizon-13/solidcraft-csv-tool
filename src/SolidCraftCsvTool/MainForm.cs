@@ -18,7 +18,7 @@ public sealed class MainForm : Form
     readonly Button runDxf = CreateButton("一键生成并导出 DXF");
     readonly Button stop = CreateButton("停止");
     readonly ToolStripStatusLabel status = new("准备就绪");
-    readonly ToolStripStatusLabel help = new(".5 孔选一侧半孔；整数孔选两侧或都不选。尺寸单位：mm。") { ForeColor=SystemColors.GrayText };
+    readonly ToolStripStatusLabel help = new("x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm") { ForeColor=SystemColors.GrayText };
     readonly ToolStripProgressBar progressBar = new() { Width = 150 };
     readonly List<Control> editControls = [];
     readonly string settingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "settings.json");
@@ -141,7 +141,7 @@ public sealed class MainForm : Form
         var button = MakeButton("选择…", choose); button.Dock = DockStyle.Fill; button.Margin = new Padding(0, 5, 0, 5); panel.Controls.Add(button, 2, row);
     }
 
-    static Button CreateButton(string text) => new() { Text = text, AutoSize = true, Height = 31, Padding = new Padding(2, 0, 2, 0), Margin = new Padding(0, 0, 4, 0), UseVisualStyleBackColor = true };
+    static Button CreateButton(string text) => new() { Text = text, AutoSize = true, AutoSizeMode=AutoSizeMode.GrowAndShrink, Height = 31, Padding = new Padding(2, 0, 2, 0), Margin = new Padding(0, 0, 4, 0), UseVisualStyleBackColor = true };
 
     Button MakeButton(string text, Action action)
     {
@@ -350,6 +350,8 @@ public sealed class MainForm : Form
             Rectangle.Intersect(runDxf.Parent!.ClientRectangle,runDxf.Bounds).Width<runDxf.Width ||
             Rectangle.Intersect(stop.Parent!.ClientRectangle,stop.Bounds).Width<stop.Width)
             throw new InvalidOperationException("生成与停止按钮必须与工具栏同行并完整显示。");
+        if(editControls.OfType<Button>().Where(b=>b.Parent==import.Parent).Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds).Width<b.Width))
+            throw new InvalidOperationException("常用工具按钮必须完整显示。");
         if(help.Owner!=status.Owner || editControls.OfType<NumericUpDown>().Any() || editControls.OfType<Button>().Any(b=>b.Text.StartsWith("启动 SolidCraft")))
             throw new InvalidOperationException("说明必须位于状态栏，端口、间距及启动按钮不应显示。");
         if (!run.Enabled || !runDxf.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");

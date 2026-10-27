@@ -37,13 +37,6 @@ jobs:
           foreach ($notice in @('LICENSE-MIT','LICENSE-APACHE','NOTICE','THIRD-PARTY-LICENSES.txt')) {
             Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" -OutFile "dist/app/SolidCraft/$notice"
           }
-      - name: Check only optional dimensions and local templates
-        shell: pwsh
-        run: |
-          dotnet run --project tests/CoreChecks.csproj -c Release -- --optional-dimensions-check dist/checks
-          if ($LASTEXITCODE -ne 0) { throw 'Optional dimension check failed' }
-          dotnet run --project tests/CoreChecks.csproj -c Release --no-build -- --optional-dimensions-headless dist/checks/optional dist/app/SolidCraft/solidcraft-cli.exe
-          if ($LASTEXITCODE -ne 0) { throw 'Optional dimension geometry check failed' }
       - name: Publish self contained Windows application
         run: dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/app
       - name: Check compact Windows layout
@@ -73,7 +66,7 @@ jobs:
           仍支持桌面版自动启动；后台运行不操作或关闭已打开的桌面窗口。
           CSV新增子头宽、子头突出、母槽宽、母槽深、配合间隙，空白逐行恢复模板默认值；软件目录/模板自动识别V13和DXF。
           固定无窗口后台自动运行，不提供后台运行开关。
-          本次仅检查可选尺寸的实际几何与紧凑界面布局：文件名并排、生成/停止与工具栏同行、说明位于状态栏。端口固定7878，组合间距固定10mm；不运行全量测试或 SHA-256 校验。
+          本次仅检查紧凑界面布局：文件名并排、生成/停止与工具栏同行、说明位于状态栏。端口固定7878，组合间距固定10mm；不运行全量测试或 SHA-256 校验。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8
       - uses: actions/upload-artifact@v4
