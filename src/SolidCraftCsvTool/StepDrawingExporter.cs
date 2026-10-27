@@ -488,10 +488,10 @@ internal static partial class MachiningDxf
         }
         public void LinearDimension(Point2 a,Point2 b,Point2 line,Point2 text,double rotation,Action drawGraphics)
         {
-            // Omit only the unwanted 1.11 mm plan detail, without merging
+            // Omit only the unwanted 1.11/1.26 mm plan details, without merging
             // neighboring dimensions or changing the projected geometry.
             double measured=rotation==0 ? Math.Abs(b.X-a.X) : Math.Abs(b.Y-a.Y);
-            if(SuppressPlanTongueDetail && FormatDimension(measured)=="1.11")return;
+            if(SuppressPlanTongueDetail && (FormatDimension(measured) is "1.11" or "1.26"))return;
             if(recording!=null)
             {
                 Scene parent=recording;Scene graphics=Record(drawGraphics);Box2 box=graphics.Bounds;

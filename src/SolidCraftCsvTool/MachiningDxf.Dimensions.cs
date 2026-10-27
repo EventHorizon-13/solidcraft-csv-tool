@@ -18,11 +18,11 @@ internal static partial class MachiningDxf
 
     }
 
-    static void DrawPlanAnnotations(Writer w,Map top)
+    static void DrawPlanAnnotations(Writer w,Map top,IReadOnlyList<ArcPath> frontArcs)
     {
         bool previous=w.SuppressPlanTongueDetail;
         w.SuppressPlanTongueDetail=true;
-        try{DrawPlanGrooves(w,top);}finally{w.SuppressPlanTongueDetail=previous;}
+        try{DrawPlanGrooves(w,top,frontArcs);}finally{w.SuppressPlanTongueDetail=previous;}
     }
     static void DrawEndAnnotations(Writer w,Map end)=>DrawEndSizeAndBevel(w,end);
 

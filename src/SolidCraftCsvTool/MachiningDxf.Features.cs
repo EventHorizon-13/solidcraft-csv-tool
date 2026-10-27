@@ -49,19 +49,31 @@ internal static partial class MachiningDxf
             double x=feature+(groove.Left?-1:1)*w.DimensionRow*(lanes[i-1]+1);
             Vertical(w,feature,x,map.Dy+groove.Heights[i-1],map.Dy+groove.Heights[i],w.FormatDimension(groove.Heights[i]-groove.Heights[i-1]));
         }
-        Horizontal(w,map.Dx+groove.OuterX,map.Dx+groove.InnerX,map.Min.Y,map.Min.Y-w.DimensionRow*3,w.FormatDimension(Math.Abs(groove.InnerX-groove.OuterX)));
+        // Keep the depth dimension at the actual upper shoulder of the joint.
+        // Its definition points and text stay beside the groove, not below the sheet.
+        double shoulder=map.Dy+groove.Heights[^2];
+        double opening=groove.Heights[^2]-groove.Heights[1];
+        double inset=Math.Min(w.DimensionRow*.5,Math.Max(w.DimensionTextHeight,opening*.25));
+        Horizontal(w,map.Dx+groove.OuterX,map.Dx+groove.InnerX,shoulder,shoulder-inset,w.FormatDimension(Math.Abs(groove.InnerX-groove.OuterX)));
     }
 
-    static void DrawPlanGrooves(Writer w,Map map)
+    static void DrawPlanGrooves(Writer w,Map map,IReadOnlyList<ArcPath> frontArcs)
     {
         EndGroove? left=FindGroove(map,true),right=FindGroove(map,false);
         var b=map.Projection.Bounds;
         var topEdges=StraightEdges(map.Projection).Where(e=>Math.Abs(e.A.Y-b.MaxY)<.02&&Math.Abs(e.B.Y-b.MaxY)<.02&&Math.Abs(e.A.X-e.B.X)>1).ToArray();
         double bodyMin=topEdges.Length==0?b.MinX:topEdges.Min(e=>Math.Min(e.A.X,e.B.X));
         double bodyMax=topEdges.Length==0?b.MaxX:topEdges.Max(e=>Math.Max(e.A.X,e.B.X));
-        var marks=AxisMarks(map.Projection,true).Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05&&
-            (left==null||Math.Abs(x-left.InnerX)>.05||Math.Abs(x-bodyMin)<.05||Math.Abs(x-bodyMax)<.05)&&
-            (right==null||Math.Abs(x-right.InnerX)>.05||Math.Abs(x-bodyMin)<.05||Math.Abs(x-bodyMax)<.05)).ToArray();
+        // Front-view circles and plan-view bore edges share the aligned X axis.
+        // Use fitted circle tangents, never tessellation vertices or unrelated
+        // joint lines, for edge-to-bore / bore-width / web-width dimensions.
+        double[] boreEdges=frontArcs.Where(a=>a.Layer=="VISIBLE"&&a.SweepDegrees>=15)
+            .SelectMany(a=>new[]{a.Center.X-a.Radius+b.MinX,a.Center.X+a.Radius+b.MinX})
+            .Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05).ToArray();
+        var marks=(boreEdges.Length>0 ? boreEdges : AxisMarks(map.Projection,true))
+            .Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05&&
+                (left==null||Math.Abs(x-left.InnerX)>.05||Math.Abs(x-bodyMin)<.05||Math.Abs(x-bodyMax)<.05)&&
+                (right==null||Math.Abs(x-right.InnerX)>.05||Math.Abs(x-bodyMin)<.05||Math.Abs(x-bodyMax)<.05)).ToArray();
         marks=IncludeEnds(marks,bodyMin,bodyMax);
         if(marks.Length>2)DrawHorizontalChain(w,map,marks,map.Max.Y+w.DimensionRow);
         DrawLowerDimensions(w,map);

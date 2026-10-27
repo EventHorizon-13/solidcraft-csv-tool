@@ -12,7 +12,8 @@ public sealed class MainForm : Form
     readonly NumericUpDown gap = new() { Minimum = 0.1m, Maximum = 1000000, DecimalPlaces = 1, Value = 10, Width = 82 };
     readonly CheckBox combined = new() { Text = "另导出组合 STEP", Checked = true, AutoSize = true };
     readonly CheckBox overwrite = new() { Text = "覆盖已有文件", AutoSize = true };
-    readonly Button run = new() { Text = "生成并导出", AutoSize = true, Height = 34, BackColor = Color.FromArgb(29, 78, 216), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+    readonly Button run = CreateButton("生成并导出");
+    readonly Button runDxf = CreateButton("一键生成并导出 DXF");
     readonly Button stop = new() { Text = "停止", AutoSize = true, Enabled = false };
     readonly ToolStripStatusLabel status = new("准备就绪");
     readonly ToolStripProgressBar progressBar = new() { Width = 150 };
@@ -93,9 +94,10 @@ public sealed class MainForm : Form
         FlowLayoutPanel footer = new() { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
         footer.Controls.Add(combined); footer.Controls.Add(new Label { Text = "间距", AutoSize = true, Margin = new Padding(12, 5, 3, 0) }); footer.Controls.Add(gap);
         footer.Controls.Add(overwrite); footer.Controls.Add(new Label { Text = "控制端口", AutoSize = true, Margin = new Padding(12, 5, 3, 0) }); footer.Controls.Add(port);
-        footer.Controls.Add(run); footer.Controls.Add(stop);
+        footer.Controls.Add(run); footer.Controls.Add(runDxf); footer.Controls.Add(stop);
         editControls.AddRange([combined, gap, overwrite, port]);
         run.Click += async (_, _) => await RunExport();
+        runDxf.Click += async (_, _) => await RunExport(exportDxf:true);
         stop.Click += (_, _) => { cancellation?.Cancel(); stop.Enabled = false; SetStatus("当前命令完成后停止；已导出的单件会保留。"); };
         combined.CheckedChanged += (_, _) => gap.Enabled = combined.Checked;
         layout.Controls.Add(footer, 0, 6);
@@ -119,9 +121,11 @@ public sealed class MainForm : Form
         var button = MakeButton("选择…", choose); button.Dock = DockStyle.Fill; button.Margin = new Padding(0, 5, 0, 5); panel.Controls.Add(button, 2, row);
     }
 
+    static Button CreateButton(string text) => new() { Text = text, AutoSize = true, Height = 31, Padding = new Padding(4, 0, 4, 0), Margin = new Padding(0, 0, 8, 0), UseVisualStyleBackColor = true };
+
     Button MakeButton(string text, Action action)
     {
-        Button button = new() { Text = text, AutoSize = true, Height = 31, Padding = new Padding(4, 0, 4, 0), Margin = new Padding(0, 0, 8, 0) };
+        Button button = CreateButton(text);
         button.Click += (_, _) => { try { grid.EndEdit(); action(); } catch (Exception ex) { ShowError(ex.Message); } };
         editControls.Add(button); return button;
     }
@@ -190,7 +194,7 @@ public sealed class MainForm : Form
         Process.Start(start); SaveSettings(); Log("已启动 SolidCraft；桌面版加载完成后可生成导出。");
     }
 
-    async Task RunExport()
+    async Task RunExport(bool exportDxf=false)
     {
         try
         {
@@ -199,12 +203,28 @@ public sealed class MainForm : Form
             if (!File.Exists(templateFile) || !string.Equals(Path.GetExtension(templateFile), ".solidcraft", StringComparison.OrdinalIgnoreCase)) throw new IOException("请选择 V13 .solidcraft 模板。");
             if (outputFolder.Length == 0) throw new IOException("请选择输出文件夹。");
             var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), (int)port.Value, (double)gap.Value, combined.Checked, overwrite.Checked);
+            var drawing = drawingOptions;
+            if(exportDxf)
+            {
+                drawing.Validate();
+                if(File.Exists(Path.Combine(options.Output,"STEP加工图_汇总.dxf")))
+                    throw new IOException("汇总 DXF 已存在，请更换输出目录或移走旧 DXF 后重新生成。");
+            }
             SaveSettings(); cancellation = new(); SetRunning(true); progressBar.Maximum = rows.Count; progressBar.Value = 0;
             Progress<ExportProgress> progress = new(p => { SetStatus(p.Message); progressBar.Value = Math.Min(progressBar.Maximum, p.Completed); if (p.Log) Log(p.Message); });
             var token = cancellation.Token;
             await Task.Run(() => Exporter.RunAsync(options, progress, token));
-            SetStatus($"完成：{rows.Count} 个型号"); Log("输出目录：" + options.Output);
-            MessageBox.Show(this, $"已导出 {rows.Count} 个型号。\n{options.Output}", "导出完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            int drawingCount=0;
+            if(exportDxf)
+            {
+                token.ThrowIfCancellationRequested();
+                string[] files=BatchDrawingInputs.FromFolder(options.Output);
+                drawingCount=files.Length;progressBar.Maximum=files.Length;progressBar.Value=0;
+                Log($"正在汇总同文件夹的 {files.Length} 个零件 STEP，已排除组合 STEP。");
+                await Task.Run(()=>StepDrawingExporter.RunAsync(files,options.Output,options.Port,progress,token,drawing));
+            }
+            SetStatus($"完成：{rows.Count} 个型号"+(exportDxf?$"，1 个 DXF（{drawingCount} 张图）":"")); Log("输出目录：" + options.Output);
+            MessageBox.Show(this, $"已导出 {rows.Count} 个型号。"+(exportDxf?$"\n已生成汇总 DXF，含 {drawingCount} 张图。":"")+$"\n{options.Output}", "导出完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (OperationCanceledException) { SetStatus("已停止，已导出的文件保留。"); Log("已按请求停止。"); }
         catch (Exception ex) { string details = DescribeException(ex); Log("导出中止：" + details); ShowError(details); SetStatus("导出中止"); }
@@ -233,7 +253,7 @@ public sealed class MainForm : Form
         finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
     }
 
-    void SetRunning(bool running) { foreach (var control in editControls) control.Enabled = !running; run.Enabled = !running; stop.Enabled = running; grid.ReadOnly = running; if (!running) gap.Enabled = combined.Checked; }
+    void SetRunning(bool running) { foreach (var control in editControls) control.Enabled = !running; run.Enabled = !running; runDxf.Enabled = !running; stop.Enabled = running; grid.ReadOnly = running; if (!running) gap.Enabled = combined.Checked; }
     void ConfigureDrawing()
     {
         using var dialog = new DrawingSettingsForm(drawingOptions);
@@ -291,6 +311,10 @@ public sealed class MainForm : Form
         if (grid.Columns.Count != 14 || grid.Rows.Count == 0 || grid.Columns.Cast<DataGridViewColumn>().Count(c => c is DataGridViewCheckBoxColumn) != 6)
             throw new InvalidOperationException("GUI 参数表初始化失败。");
         ModelRules.Validate(GetRows());
-        if (!run.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");
+        if(!run.UseVisualStyleBackColor || !runDxf.UseVisualStyleBackColor ||
+            run.FlatStyle!=FlatStyle.Standard || runDxf.FlatStyle!=run.FlatStyle ||
+            run.Padding!=runDxf.Padding || !runDxf.Visible)
+            throw new InvalidOperationException("生成按钮样式或一键出图按钮不正确。");
+        if (!run.Enabled || !runDxf.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");
     }
 }

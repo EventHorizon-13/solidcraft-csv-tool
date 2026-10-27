@@ -32,8 +32,9 @@ internal static partial class MachiningDxf
         if (!page.End.Name.Equals("left",StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("第一角投影要求左视图位于主视图右侧，不能使用右视图。");
         Map front=Normalize(page.Front),top=Normalize(page.Top),end=Normalize(page.End);
-        var frontScene=writer.Record(()=> {var arcs=DrawView(writer,front);DrawFrontAnnotations(writer,front,arcs);});
-        var planScene=writer.Record(()=> {DrawView(writer,top);DrawPlanAnnotations(writer,top);});
+        IReadOnlyList<ArcPath> frontArcs=[];
+        var frontScene=writer.Record(()=> {frontArcs=DrawView(writer,front);DrawFrontAnnotations(writer,front,frontArcs);});
+        var planScene=writer.Record(()=> {DrawView(writer,top);DrawPlanAnnotations(writer,top,frontArcs.Where(a=>Math.Abs(a.Center.Y-front.Max.Y)<.08||Math.Abs(a.Center.Y-front.Min.Y)<.08).ToArray());});
         var endScene=writer.Record(()=> {DrawView(writer,end);DrawEndAnnotations(writer,end);});
         double sideX=frontScene.Bounds.MaxX+writer.Options.ViewGap-endScene.Bounds.MinX;
         double planY=frontScene.Bounds.MinY-writer.Options.ViewGap-planScene.Bounds.MaxY;

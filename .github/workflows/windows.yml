@@ -30,6 +30,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Drawing annotation check failed' }
       - name: Publish self contained Windows application
         run: dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/app
+      - name: Check changed export buttons on Windows
+        shell: pwsh
+        run: |
+          $process = Start-Process dist/app/SolidCraftCsvTool.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png" -PassThru
+          if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Export button check timed out' }
+          if ($process.ExitCode -ne 0) { throw 'Export button check failed' }
       - name: Package release
         shell: pwsh
         run: |
@@ -42,7 +48,8 @@ jobs:
           自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
           STEP 加工图按文件名排序，纵向排入一个汇总 DXF，图名仅显示辊密封和编号。
           主视图右侧不标注尺寸，左侧仅标注总高度。
-          上视图取消多余的 1.11 mm 子头尺寸，保留其他尺寸。
+          上视图按辊孔圆弧边缘确定尺寸链；槽深标在槽口附近，取消多余的 1.11/1.26 mm 尺寸。
+          新增一键生成并导出 DXF：自动读取同输出文件夹的零件 STEP，排除组合 STEP；按钮样式统一。
           孔径使用原生直径尺寸；左视图仅保留宽、高及斜角；俯视图子母槽分端标注。
           图名简化放大，使用 gbenor.shx 与 gbcbig.shx；模板其他字体保留；编译时间精确到秒。
           输出可编辑的 CAD DIMENSION 尺寸对象，单位 mm；尺寸由 STEP 投影几何提取，加工前请核对。

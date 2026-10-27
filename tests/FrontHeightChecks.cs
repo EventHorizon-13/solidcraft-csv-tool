@@ -14,7 +14,7 @@ internal static class FrontHeightChecks
         Projection2 front = new("front", [], [new(outline,true,"VISIBLE")], new(0,0,300,100));
         var top = Rectangle("top",300,160) with
         {
-            Lines = [new(new(1.11,0),new(1.11,160),"VISIBLE"),new(new(3.11,0),new(3.11,160),"VISIBLE")]
+            Lines = [new(new(1.11,0),new(1.11,160),"VISIBLE"),new(new(3.11,0),new(3.11,160),"VISIBLE"),new(new(298.74,0),new(298.74,160),"VISIBLE")]
         };
         var end = Rectangle("left",160,80);
         string file = Path.Combine(outputDirectory,"front-height-sample.dxf");
@@ -45,14 +45,14 @@ internal static class FrontHeightChecks
         var reopened = netDxf.DxfDocument.Load(file);
         if(reopened==null || reopened.Entities.Dimensions.Count()!=dimensions.Count)
             throw new Exception("Saved dimensions must reopen.");
-        if(dimensions.Any(d=>Near(Math.Abs(N(d,50)==0 ? N(d,14)-N(d,13) : N(d,24)-N(d,23)),1.11)))
-            throw new Exception("Unwanted 1.11 mm plan detail must be absent.");
+        if(dimensions.Any(d=>new[]{1.11,1.26}.Any(value=>Near(Math.Abs(N(d,50)==0 ? N(d,14)-N(d,13) : N(d,24)-N(d,23)),value))))
+            throw new Exception("Unwanted 1.11 and 1.26 mm plan details must be absent.");
         if(!dimensions.Any(d=>Near(N(d,50),0) && Near(Math.Abs(N(d,14)-N(d,13)),2)))
             throw new Exception("Other small plan dimensions must remain.");
         var titles = reopened.Entities.Texts.Where(t=>t.Value=="辊密封1").ToArray();
         if(titles.Length==0 || titles.Any(title=>!title.Style.FontFile.Equals("gbenor.shx",StringComparison.OrdinalIgnoreCase) ||
             !title.Style.BigFont.Equals("gbcbig.shx",StringComparison.OrdinalIgnoreCase)))
             throw new Exception("Added drawing title must use gbenor/gbcbig.");
-        Console.WriteLine("PASS: targeted front-view check; no right-side heights, one left overall height, lower length retained; 1.11 mm plan detail omitted, 2 mm kept; title uses gbenor/gbcbig; DXF reopened.");
+        Console.WriteLine("PASS: targeted front-view check; no right-side heights, one left overall height, lower length retained; 1.11/1.26 mm plan details omitted, 2 mm kept; title uses gbenor/gbcbig; DXF reopened.");
     }
 }

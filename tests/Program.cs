@@ -14,6 +14,7 @@ if (args.Length == 3 && args[0] == "--template-preview")
 if (args.Length == 2 && args[0] == "--front-height-check")
 {
     FrontHeightChecks.Run(args[1]);
+    PlanAnnotationChecks.Run(args[1]);
     return;
 }
 
