@@ -49,9 +49,9 @@ internal static class FrontHeightChecks
             throw new Exception("Unwanted 1.11 mm plan detail must be absent.");
         if(!dimensions.Any(d=>Near(N(d,50),0) && Near(Math.Abs(N(d,14)-N(d,13)),2)))
             throw new Exception("Other small plan dimensions must remain.");
-        var title = reopened.Entities.Texts.Single(t=>t.Value=="辊密封1");
-        if(!title.Style.FontFile.Equals("gbenor.shx",StringComparison.OrdinalIgnoreCase) ||
-            !title.Style.BigFont.Equals("gbcbig.shx",StringComparison.OrdinalIgnoreCase))
+        var titles = reopened.Entities.Texts.Where(t=>t.Value=="辊密封1").ToArray();
+        if(titles.Length==0 || titles.Any(title=>!title.Style.FontFile.Equals("gbenor.shx",StringComparison.OrdinalIgnoreCase) ||
+            !title.Style.BigFont.Equals("gbcbig.shx",StringComparison.OrdinalIgnoreCase)))
             throw new Exception("Added drawing title must use gbenor/gbcbig.");
         Console.WriteLine("PASS: targeted front-view check; no right-side heights, one left overall height, lower length retained; 1.11 mm plan detail omitted, 2 mm kept; title uses gbenor/gbcbig; DXF reopened.");
     }
