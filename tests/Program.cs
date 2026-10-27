@@ -4,6 +4,15 @@ using System.Text;
 using System.Text.Json;
 using SolidCraftCsvTool;
 
+if(args.Length==2&&args[0]=="--optional-dimensions-check")
+{
+    OptionalDimensionsChecks.Run(args[1]);return;
+}
+if(args.Length==3&&args[0]=="--optional-dimensions-headless")
+{
+    await OptionalDimensionsChecks.HeadlessAsync(args[1],args[2]);return;
+}
+
 if(args.Length==2&&args[0]=="--batch-options-check")
 {
     BatchOptionsChecks.Run(args[1]);return;

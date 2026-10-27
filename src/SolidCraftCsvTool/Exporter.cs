@@ -36,16 +36,31 @@ public static class Exporter
             if (!parameterResult.TryGetProperty("parameters", out var parameterList) || parameterList.ValueKind != JsonValueKind.Array)
                 throw new IOException("无法读取模板参数。");
             var names = parameterList.EnumerateArray().Select(p => p.GetProperty("name").GetString()).ToHashSet();
-            var missing = ModelRules.ParameterNames.Append("半孔校验").Where(p => !names.Contains(p)).ToArray();
+            var missing = ModelRules.RequiredParameterNames.Append("半孔校验").Where(p => !names.Contains(p)).ToArray();
             if (missing.Length > 0) throw new IOException("请使用 V13 模板，缺少参数：" + string.Join("、", missing));
-            progress.Report(new("已连接 SolidCraft，已在新标签打开模板副本。"));
+            // Capture expressions once from the user's selected template. Restore
+            // them for every row before applying optional explicit dimensions.
+            var defaults=new Dictionary<string,string>();
+            foreach(var parameter in parameterList.EnumerateArray())
+            {
+                string name=parameter.GetProperty("name").GetString()!;
+                if(!ModelRules.OptionalParameterNames.Contains(name))continue;
+                if(parameter.TryGetProperty("expression",out var expression))
+                    defaults[name]=expression.ValueKind==JsonValueKind.String?expression.GetString()!:expression.GetRawText();
+                else if(parameter.TryGetProperty("value",out var value)&&TryNumber(value,out double numeric))
+                    defaults[name]=numeric.ToString("R",CultureInfo.InvariantCulture);
+                else throw new IOException("无法读取模板默认尺寸："+name);
+            }
+            foreach(var row in options.Rows)_=ModelRules.ChangesWithDefaults(row,defaults);
+            progress.Report(new("已连接 SolidCraft，模板副本与默认子母槽尺寸已读取。"));
             List<(PreparedRow Row, string Path, Bounds Box)> pieces = [];
             int completed = 0;
+            List<string[]> snapshotRows=[];
             foreach (var row in options.Rows)
             {
                 cancellation.ThrowIfCancellationRequested();
                 progress.Report(new($"正在生成 {completed + 1}/{options.Rows.Count}：{row.Name}", completed));
-                await client.ExecuteAsync("parameters.change", new { changes = row.Parameters });
+                await client.ExecuteAsync("parameters.change", new { changes = ModelRules.ChangesWithDefaults(row,defaults) });
                 var check = await client.ExecuteAsync("parameters.list", new { filter = "user" });
                 var checks = check.GetProperty("parameters").EnumerateArray().Where(p => p.GetProperty("name").GetString() == "半孔校验").ToArray();
                 if (checks.Length != 1 || !checks[0].TryGetProperty("value", out var value) || !TryNumber(value, out double half) || Math.Abs(half) > 1e-9)
@@ -57,6 +72,19 @@ public static class Exporter
                     foreach (var feature in timeline.EnumerateArray())
                         if (feature.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null && !string.IsNullOrWhiteSpace(error.ToString()))
                             throw new IOException($"型号 {row.Name} 重算失败：{error}");
+                if(options.ExportCsv)
+                {
+                    string[] snapshot=options.CsvRows!=null?ModelRules.ExpandRow(options.CsvRows[completed]).ToArray():
+                        new[]{row.Name}.Concat(ModelRules.ParameterNames.Select(p=>row.Parameters.GetValueOrDefault(p,""))).ToArray();
+                    var actual=check.GetProperty("parameters").EnumerateArray().ToDictionary(p=>p.GetProperty("name").GetString()!);
+                    for(int column=ModelRules.RequiredColumnCount;column<ModelRules.Columns.Length;column++)
+                    {
+                        string name=ModelRules.ParameterNames[column-1];
+                        if(actual.TryGetValue(name,out var parameter)&&parameter.TryGetProperty("value",out var actualValue)&&TryNumber(actualValue,out double numeric))
+                            snapshot[column]=numeric.ToString("0.########",CultureInfo.InvariantCulture);
+                    }
+                    snapshotRows.Add(snapshot);
+                }
                 Bounds? bounds = options.Combined ? ModelRules.ReadBounds(info) : null;
                 cancellation.ThrowIfCancellationRequested();
                 string native = Path.Combine(work, OutputNames.Part(row.Name,stamp) + ".solidcraft"), step = Path.Combine(work, OutputNames.Part(row.Name,stamp) + ".step");
@@ -100,7 +128,7 @@ public static class Exporter
             }
             if(options.ExportCsv)
             {
-                var csvRows=options.CsvRows??options.Rows.Select(row=>new[]{row.Name}.Concat(ModelRules.ParameterNames.Select(p=>row.Parameters[p])).ToArray()).ToArray();
+                var csvRows=snapshotRows;
                 string stagedCsv=Path.Combine(work,csvName);CsvFiles.Write(stagedCsv,csvRows);
                 PublishFile(stagedCsv,Path.Combine(options.Output,csvName),options.Overwrite);
                 progress.Report(new("当前任务 CSV 已保存："+csvName,completed));

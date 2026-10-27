@@ -11,6 +11,7 @@
     <Compile Include="../src/SolidCraftCsvTool/BatchDrawingInputs.cs" Link="BatchDrawingInputs.cs" />
     <Compile Include="../src/SolidCraftCsvTool/OutputNames.cs" Link="OutputNames.cs" />
     <Compile Include="../src/SolidCraftCsvTool/HeadlessSession.cs" Link="HeadlessSession.cs" />
+    <Compile Include="../src/SolidCraftCsvTool/LocalTemplates.cs" Link="LocalTemplates.cs" />
     <Compile Include="../src/SolidCraftCsvTool/Core.cs" Link="Core.cs" />
     <Compile Include="../src/SolidCraftCsvTool/ControlClient.cs" Link="ControlClient.cs" />
     <Compile Include="../src/SolidCraftCsvTool/Exporter.cs" Link="Exporter.cs" />
