@@ -80,7 +80,7 @@ internal static class DimensionChecks
                 Check(Math.Abs(N(dimensions[i], 23) - N(dimensions[i + half], 23) - pageDelta) < 0.0001, "Definition points must use page offsets exactly once");
             }
             Check(entities.Any(e => e.Type == "ARC"), "Dimensioning must preserve fitted arcs");
-            Check(AppBuildInfo.WindowTitle.StartsWith("标准辊密封批量生成 · v", StringComparison.Ordinal) &&
+            Check(AppBuildInfo.WindowTitle.StartsWith(AppBuildInfo.ProductName+" · v", StringComparison.Ordinal) &&
                 !AppBuildInfo.WindowTitle.Contains("未知", StringComparison.Ordinal), "Title must contain product name, version and embedded build date");
             string? expectedVersion = Environment.GetEnvironmentVariable("BUILD_VERSION");
             if (expectedVersion != null) Check(AppBuildInfo.WindowTitle.Contains("v" + expectedVersion + " ·", StringComparison.Ordinal), "Title version must match release version");

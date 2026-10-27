@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+ <linearGradient id="bg" x1="120" y1="70" x2="860" y2="980" gradientUnits="userSpaceOnUse"><stop stop-color="#2B517E"/><stop offset=".5" stop-color="#193959"/><stop offset="1" stop-color="#0A192F"/></linearGradient>
+ <linearGradient id="face" x1="220" y1="430" x2="810" y2="735" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset=".42" stop-color="#F1FAFF"/><stop offset=".8" stop-color="#D8EBF5"/><stop offset="1" stop-color="#B8D3E5"/></linearGradient>
+ <linearGradient id="top" x1="370" y1="314" x2="550" y2="460" gradientUnits="userSpaceOnUse"><stop stop-color="#F4FEFF"/><stop offset=".5" stop-color="#D3F2FF"/><stop offset="1" stop-color="#94CBE5"/></linearGradient>
+ <linearGradient id="side" x1="820" y1="350" x2="880" y2="710" gradientUnits="userSpaceOnUse"><stop stop-color="#D3F5FF"/><stop offset=".22" stop-color="#9BCCE5"/><stop offset=".76" stop-color="#70ACD1"/><stop offset="1" stop-color="#ABD8EE"/></linearGradient>
+ <linearGradient id="groove" x1="0" y1="320" x2="0" y2="500" gradientUnits="userSpaceOnUse"><stop stop-color="#6EACC9"/><stop offset=".32" stop-color="#B7DEEB"/><stop offset=".65" stop-color="#6EA8C6"/><stop offset="1" stop-color="#3E779E"/></linearGradient>
+</defs>
+<rect x="48" y="48" width="928" height="928" rx="218" fill="url(#bg)"/>
+<path d="M196 420H236A76 76 0 0 0 388 420H436A76 76 0 0 0 588 420H636A76 76 0 0 0 788 420H828V690Q828 714 804 714H220Q196 714 196 690Z" transform="translate(0 18)" fill="#05152A" fill-opacity=".3"/>
+<path d="M196 420H236A76 76 0 0 0 388 420H436A76 76 0 0 0 588 420H636A76 76 0 0 0 788 420H828V690Q828 714 804 714H220Q196 714 196 690Z" transform="translate(52 -100)" fill="#80B6CF"/>
+<path d="M828 420L880 320V590Q880 614 856 614L804 714Q828 714 828 690Z" fill="url(#side)"/>
+<path d="M196 420L248 320H288L236 420ZM388 420L440 320H488L436 420ZM588 420L640 320H688L636 420ZM788 420L840 320H880L828 420Z" fill="url(#top)"/>
+<path d="M236 420A76 76 0 0 0 388 420L440 320A76 76 0 0 1 288 320Z
+ M436 420A76 76 0 0 0 588 420L640 320A76 76 0 0 1 488 320Z
+ M636 420A76 76 0 0 0 788 420L840 320A76 76 0 0 1 688 320Z" fill="url(#groove)"/>
+<path d="M196 420H236A76 76 0 0 0 388 420H436A76 76 0 0 0 588 420H636A76 76 0 0 0 788 420H828V690Q828 714 804 714H220Q196 714 196 690Z" fill="url(#face)"/>
+<path d="M199 421H236A76 76 0 0 0 388 421H436A76 76 0 0 0 588 421H636A76 76 0 0 0 788 421H826" fill="none" stroke="#FFFFFF" stroke-opacity=".87" stroke-width="5" stroke-linejoin="round"/>
+<path d="M249 321H288A76 76 0 0 0 440 321H488A76 76 0 0 0 640 321H688A76 76 0 0 0 840 321H878" fill="none" stroke="#CFF6FF" stroke-opacity=".55" stroke-width="3"/>
+<path d="M211 445V678Q211 700 235 700H787" fill="none" stroke="#FFFFFF" stroke-opacity=".48" stroke-width="5" stroke-linecap="round"/>
+<path d="M868 350V589Q868 604 854 604" fill="none" stroke="#ECFFFF" stroke-opacity=".5" stroke-width="4" stroke-linecap="round"/>
+</svg>

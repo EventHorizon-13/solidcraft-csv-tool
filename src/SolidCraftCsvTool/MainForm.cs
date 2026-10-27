@@ -17,6 +17,7 @@ public sealed class MainForm : Form
     readonly Button run = CreateButton("生成并导出Step");
     readonly Button runDxf = CreateButton("一键生成并导出 DXF");
     readonly Button stop = CreateButton("停止");
+    readonly Button about = CreateButton("关于");
     readonly ToolStripStatusLabel status = new("准备就绪");
     readonly ToolStripStatusLabel help = new("x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm") { ForeColor=SystemColors.GrayText };
     readonly ToolStripProgressBar progressBar = new() { Width = 150 };
@@ -27,7 +28,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = AppBuildInfo.WindowTitle;
+        Text = AppBuildInfo.WindowTitle;Icon=AppArtwork.LoadIcon();
         Font = new Font("Microsoft YaHei UI", 9F);
         ClientSize = new Size(1360, 810); MinimumSize = new Size(1000, 680);
         StartPosition = FormStartPosition.CenterScreen;
@@ -42,12 +43,12 @@ public sealed class MainForm : Form
         Controls.Add(layout);
 
         TableLayoutPanel paths = new() { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3 };
-        paths.ColumnStyles.Add(new(SizeType.Absolute,98));paths.ColumnStyles.Add(new(SizeType.Percent,100));paths.ColumnStyles.Add(new(SizeType.Absolute,96));
-        PathRow(paths,0,"V13 模板",template,ChooseTemplate);
+        paths.ColumnStyles.Add(new(SizeType.Absolute,124));paths.ColumnStyles.Add(new(SizeType.Percent,100));paths.ColumnStyles.Add(new(SizeType.Absolute,96));
+        PathRow(paths,0,"SolidCraft 模板",template,ChooseTemplate);
         PathRow(paths,1,"输出文件夹",output,ChooseOutput);
         paths.RowStyles.Add(new(SizeType.Percent,33.3333F));
         TableLayoutPanel names = new(){Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
-        names.ColumnStyles.Add(new(SizeType.Absolute,98));names.ColumnStyles.Add(new(SizeType.Percent,50));
+        names.ColumnStyles.Add(new(SizeType.Absolute,124));names.ColumnStyles.Add(new(SizeType.Percent,50));
         names.ColumnStyles.Add(new(SizeType.Absolute,112));names.ColumnStyles.Add(new(SizeType.Percent,50));
         names.Controls.Add(new Label{Text="DXF 文件名",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,0);
         names.Controls.Add(dxfBase,1,0);dxfBase.Dock=DockStyle.Fill;dxfBase.Margin=new Padding(0,8,8,4);
@@ -56,8 +57,6 @@ public sealed class MainForm : Form
         editControls.AddRange([dxfBase,stepBase]);paths.Controls.Add(names,0,2);paths.SetColumnSpan(names,3);
         layout.Controls.Add(paths,0,0);
 
-        TableLayoutPanel commandRow = new(){Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
-        commandRow.ColumnStyles.Add(new(SizeType.Percent,100));commandRow.ColumnStyles.Add(new(SizeType.AutoSize));
         FlowLayoutPanel toolbar = new() { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, Padding = new Padding(0, 6, 0, 0), Margin=Padding.Empty };
         toolbar.Controls.Add(MakeButton("导入 CSV", ImportCsv));
         toolbar.Controls.Add(MakeButton("导出 CSV", ExportCsv));
@@ -67,10 +66,12 @@ public sealed class MainForm : Form
         toolbar.Controls.Add(MakeButton("检查参数", () => { var rows = ModelRules.Validate(GetRows()); SetStatus($"{rows.Count} 行参数检查通过"); }));
         toolbar.Controls.Add(MakeButton("STEP 合并出图 DXF", () => { _ = RunStepDrawing(); }));
         toolbar.Controls.Add(MakeButton("出图设置…", ConfigureDrawing));
-        FlowLayoutPanel actions = new(){AutoSize=true,Dock=DockStyle.Fill,WrapContents=false,Padding=new Padding(0,6,0,0),Margin=Padding.Empty};
-        actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);
-        commandRow.Controls.Add(toolbar,0,0);commandRow.Controls.Add(actions,1,0);
-        layout.Controls.Add(commandRow,0,1);
+        TableLayoutPanel tools=new(){Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+        tools.ColumnStyles.Add(new(SizeType.Percent,100));tools.ColumnStyles.Add(new(SizeType.AutoSize));
+        FlowLayoutPanel info=new(){AutoSize=true,Dock=DockStyle.Fill,WrapContents=false,Padding=new Padding(0,6,0,0),Margin=Padding.Empty};
+        info.Controls.Add(about);editControls.Add(about);
+        about.Click+=(_,_)=>{using var dialog=new AboutForm();dialog.ShowDialog(this);};
+        tools.Controls.Add(toolbar,0,0);tools.Controls.Add(info,1,0);layout.Controls.Add(tools,0,1);
 
         grid.Dock = DockStyle.Fill; grid.AllowUserToAddRows = false; grid.AllowUserToDeleteRows = false;
         grid.BackgroundColor = Color.White; grid.BorderStyle = BorderStyle.None; grid.RowHeadersVisible = true;
@@ -96,6 +97,8 @@ public sealed class MainForm : Form
         }
         grid.CurrentCellDirtyStateChanged += (_, _) => { if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewCheckBoxCell) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
         grid.RowPostPaint += (_, e) => TextRenderer.DrawText(e.Graphics, (e.RowIndex + 1).ToString(), Font, new Rectangle(e.RowBounds.Left, e.RowBounds.Top, grid.RowHeadersWidth - 5, e.RowBounds.Height), Color.DimGray, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+        grid.CellPainting+=PaintCurrentCell;
+        grid.CurrentCellChanged+=(_,_)=>grid.Invalidate();
         grid.DataError += (_, e) => { e.ThrowException = false; SetStatus("此单元格的值无效，请重新输入。"); };
         editControls.Add(grid); layout.Controls.Add(grid, 0, 2);
         log.Multiline = true; log.ReadOnly = true; log.ScrollBars = ScrollBars.Vertical; log.Dock = DockStyle.Fill;
@@ -104,20 +107,35 @@ public sealed class MainForm : Form
 
         FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoScroll=true,WrapContents=false,Padding=new Padding(0,6,0,0)};
         choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);
+        run.Margin=new Padding(12,0,4,0);choices.Controls.Add(run);choices.Controls.Add(runDxf);choices.Controls.Add(stop);
         stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite]);
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
         layout.Controls.Add(choices,0,4);
         StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor };
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;
-        strip.Items.Add(status); strip.Items.Add(progressBar); strip.Items.Add(help); Controls.Add(strip); strip.Dock = DockStyle.Bottom;
+        strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); Controls.Add(strip); strip.Dock = DockStyle.Bottom;
         output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SolidCraft输出");
         LoadSettings(); ResolveLocalTemplates(); AddRow(ModelRules.DefaultRow());
+        Shown+=(_,_)=>{help.AutoSize=false;help.Width=TextRenderer.MeasureText(help.Text,help.Font).Width+12;};
         FormClosing += (_, e) =>
         {
             if (cancellation != null) { cancellation.Cancel(); e.Cancel = true; stop.Enabled = false; SetStatus("当前命令完成后停止。停止完成后可以关闭窗口。"); }
             else SaveSettings();
         };
+    }
+
+    void PaintCurrentCell(object? sender,DataGridViewCellPaintingEventArgs e)
+    {
+        if(e.RowIndex<0||e.ColumnIndex<0||grid.CurrentCell==null||
+            e.RowIndex!=grid.CurrentCell.RowIndex||e.ColumnIndex!=grid.CurrentCell.ColumnIndex||e.Graphics==null)return;
+        e.Paint(e.ClipBounds,e.PaintParts&~DataGridViewPaintParts.Focus);
+        float width=Math.Max(2,grid.DeviceDpi/48F);
+        int inset=(int)Math.Ceiling(width/2);
+        Rectangle box=Rectangle.Inflate(e.CellBounds,-inset,-inset);
+        box.Width--;box.Height--;
+        using var pen=new Pen(Color.FromArgb(37,99,235),width);
+        e.Graphics.DrawRectangle(pen,box);e.Handled=true;
     }
 
     void ResolveLocalTemplates()
@@ -220,7 +238,7 @@ public sealed class MainForm : Form
             string stepName=OutputNames.FileName(stepBase.Text,".step",stamp);
             string dxfName=OutputNames.FileName(dxfBase.Text,".dxf",stamp);
             string templateFile = template.Text.Trim(), outputFolder = output.Text.Trim();
-            if (!File.Exists(templateFile) || !string.Equals(Path.GetExtension(templateFile), ".solidcraft", StringComparison.OrdinalIgnoreCase)) throw new IOException("请选择 V13 .solidcraft 模板。");
+            if (!File.Exists(templateFile) || !string.Equals(Path.GetExtension(templateFile), ".solidcraft", StringComparison.OrdinalIgnoreCase)) throw new IOException("请选择 SolidCraft .solidcraft 模板。");
             if (outputFolder.Length == 0) throw new IOException("请选择输出文件夹。");
             var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), ControlPort, CombinedGap, combined.Checked, overwrite.Checked,stamp,stepName,taskCsv.Checked,csvRows);
             var drawing = drawingOptions with{OutputFileName=dxfName,OverwriteOutput=overwrite.Checked};
@@ -345,15 +363,17 @@ public sealed class MainForm : Form
             throw new InvalidOperationException("两个文件名必须位于同一行。");
         var import=editControls.OfType<Button>().Single(b=>b.Text=="导入 CSV");
         int y=run.PointToScreen(Point.Empty).Y;
-        if(new[]{runDxf,stop,import}.Any(b=>Math.Abs(b.PointToScreen(Point.Empty).Y-y)>1)||
+        if(new[]{runDxf,stop}.Any(b=>Math.Abs(b.PointToScreen(Point.Empty).Y-y)>1)||run.Parent!=combined.Parent||run.Parent!=taskCsv.Parent||
             Rectangle.Intersect(run.Parent!.ClientRectangle,run.Bounds).Width<run.Width ||
             Rectangle.Intersect(runDxf.Parent!.ClientRectangle,runDxf.Bounds).Width<runDxf.Width ||
             Rectangle.Intersect(stop.Parent!.ClientRectangle,stop.Bounds).Width<stop.Width)
-            throw new InvalidOperationException("生成与停止按钮必须与工具栏同行并完整显示。");
+            throw new InvalidOperationException("生成与停止按钮必须与底部导出选项同行并完整显示。");
         if(editControls.OfType<Button>().Where(b=>b.Parent==import.Parent).Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds).Width<b.Width))
             throw new InvalidOperationException("常用工具按钮必须完整显示。");
-        if(help.Owner!=status.Owner || editControls.OfType<NumericUpDown>().Any() || editControls.OfType<Button>().Any(b=>b.Text.StartsWith("启动 SolidCraft")))
-            throw new InvalidOperationException("说明必须位于状态栏，端口、间距及启动按钮不应显示。");
+        if(help.Owner!=status.Owner || help.Owner!.Items.IndexOf(help)>=help.Owner.Items.IndexOf(progressBar) || editControls.OfType<NumericUpDown>().Any() || editControls.OfType<Button>().Any(b=>b.Text.StartsWith("启动 SolidCraft")))
+            throw new InvalidOperationException("说明必须在状态栏进度条左侧；端口、间距及启动按钮不应显示。");
+        if(!about.Visible || about.PointToScreen(Point.Empty).X<=import.PointToScreen(Point.Empty).X || Icon==null)
+            throw new InvalidOperationException("关于按钮或软件图标不正确。");
         if (!run.Enabled || !runDxf.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");
     }
 }

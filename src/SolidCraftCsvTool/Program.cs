@@ -22,6 +22,13 @@ internal static class Program
                     form.DrawToBitmap(screenshot, new Rectangle(Point.Empty, form.Size));
                     screenshot.Save(args[index + 1], System.Drawing.Imaging.ImageFormat.Png);
                 }
+                int aboutIndex=Array.IndexOf(args,"--about-screenshot");
+                if(aboutIndex>=0&&aboutIndex+1<args.Length)
+                {
+                    using var about=new AboutForm();about.Show(form);Application.DoEvents();
+                    using Bitmap shot=new(about.Width,about.Height);about.DrawToBitmap(shot,new Rectangle(Point.Empty,about.Size));
+                    shot.Save(args[aboutIndex+1],System.Drawing.Imaging.ImageFormat.Png);about.Close();
+                }
                 form.Close(); return 0;
             }
             Application.Run(form);

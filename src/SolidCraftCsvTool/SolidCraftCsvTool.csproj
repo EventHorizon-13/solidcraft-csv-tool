@@ -6,7 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <AssemblyName>SolidCraftCsvTool</AssemblyName>
+    <ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
+    <AssemblyName>标准辊密封批量生成</AssemblyName>
+    <RootNamespace>SolidCraftCsvTool</RootNamespace>
     <Version>1.0.0</Version>
     <Product>标准辊密封批量生成</Product>
     <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss'))</BuildDate>
@@ -14,6 +16,8 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Assets/AppIcon.ico" LogicalName="SolidCraftCsvTool.AppIcon.ico" />
+    <EmbeddedResource Include="Assets/AppIcon.png" LogicalName="SolidCraftCsvTool.AppIcon.png" />
     <PackageReference Include="netDxf" Version="2023.11.10" />
     <AssemblyMetadata Include="BuildDate" Value="$(BuildDate)" />
   </ItemGroup>

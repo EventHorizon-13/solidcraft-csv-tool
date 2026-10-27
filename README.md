@@ -1,6 +1,6 @@
 # 标准辊密封批量生成
 
-Windows 10/11 x64。完整解压后运行 `SolidCraftCsvTool.exe`，保留同目录 `SolidCraft` 文件夹。
+Windows 10/11 x64。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。
 自包含 .NET，附带官方 SolidCraft 0.23 CLI 与许可说明。后台模式无需手动启动 SolidCraft 桌面版；模型生成仍需选择自己的 V13 `.solidcraft` 模板。
 
 ## 使用
@@ -52,4 +52,8 @@ DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION�
 
 `./build.ps1 -Version 1.0.0-dev` 发布自包含程序。GitHub Windows 构建同时附带固定官方 CLI 和 CSV 模板，当前只检查紧凑界面；新增CSV尺寸已通过真实CLI几何专项检查；不运行全量测试或 SHA-256 校验。私人模型及图框不上传仓库。
 
-文件名并排显示，生成与停止按钮放在工具栏；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。
+文件名并排显示，生成与停止按钮放在底部导出选项同一行；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。
+
+当前单元格用蓝色外框定位；状态栏说明在进度条左侧。SolidCraft 模板标签、顶部右侧关于按钮及关于界面已加入，程序和窗口使用用户确认的实心浅玻璃辊密封图标。可编辑SVG源见 assets/roller-seal-icon.svg。
+
+项目主页：https://github.com/EventHorizon-13/solidcraft-roller-seal 。程序文件、窗口与关于界面名称统一为“标准辊密封批量生成”。

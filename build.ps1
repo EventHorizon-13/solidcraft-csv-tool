@@ -5,4 +5,4 @@ dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
 Copy-Item README.md dist/app/README.md
 Copy-Item THIRD_PARTY_NOTICES.md dist/app/THIRD_PARTY_NOTICES.md
-Write-Host 'Windows EXE: dist/app/SolidCraftCsvTool.exe'
+Write-Host 'Windows EXE: dist/app/标准辊密封批量生成.exe'
