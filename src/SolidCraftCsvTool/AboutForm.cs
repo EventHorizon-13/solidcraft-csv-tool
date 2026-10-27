@@ -19,8 +19,8 @@ internal sealed class AboutForm : Form
         content.Controls.Add(logo,0,0);content.SetRowSpan(logo,3);FormClosed+=(_,_)=>image.Dispose();
         content.Controls.Add(new Label{Text=AppBuildInfo.ProductName,Font=new Font(Font.FontFamily,13,FontStyle.Bold),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},1,0);
         content.Controls.Add(new Label{Text="版本  "+AppBuildInfo.Version,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},1,1);
-        var author=new LinkLabel{Text="作者  Wei Yunhui",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft};
-        author.Links.Clear();author.Links.Add(4,10,"https://github.com/EventHorizon-13");
+        var author=new LinkLabel{Text="作者  EventHorizon-13",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft};
+        author.Links.Clear();author.Links.Add(4,"EventHorizon-13".Length,"https://github.com/EventHorizon-13");
         author.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13");content.Controls.Add(author,1,2);
         content.Controls.Add(new Label{Text="编译  "+AppBuildInfo.BuildDate,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},1,3);
         FlowLayoutPanel links=new(){Dock=DockStyle.Fill,Padding=new Padding(0,18,0,0),WrapContents=false};
