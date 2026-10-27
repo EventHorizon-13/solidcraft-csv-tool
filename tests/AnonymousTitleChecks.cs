@@ -20,11 +20,11 @@ internal static class AnonymousTitleChecks
         source.Entities.Add(new Insert(title,new Vector3(1550,520,0)));
         source.Entities.Add(new Insert(new Block("UNRELATED_PART",[new Circle(Vector3.Zero,10)]),new Vector3(1300,1000,0)));
         string template=Path.Combine(directory,"anonymous-title-template.dxf");source.Save(template);
-        File.WriteAllText(template,File.ReadAllText(template).Replace("TITLE_TO_ANONYMOUS","*U92"));
+        File.WriteAllText(template,File.ReadAllText(template).Replace("TITLE_TO_ANONYMOUS","*U92").Replace("EDITED_LOGO","*U93"));
         Dxf2010Compatibility.NormalizeRasterOwner(template);
         var options=new DrawingOptions{TemplatePath=template};
         var resources=DrawingResources.Load(options);
-        if(resources.Frame?.Components.Count!=2||!resources.Frame.Components.Any(i=>i.Block.Name=="*U92"))
+        if(resources.Frame?.Components.Count!=2||!resources.Frame.Components.Any(i=>i.Block.Name=="TEMPLATE_U92"))
             throw new Exception("Anonymous title block must be retained inside the title band.");
         Projection2 Rect(string name,double width,double height)=>new(name,[],
             [new([new(0,0),new(width,0),new(width,height),new(0,height)],true,"VISIBLE")],new(0,0,width,height));
@@ -33,7 +33,7 @@ internal static class AnonymousTitleChecks
         string output=Path.Combine(directory,"anonymous-title-result.dxf");
         MachiningDxf.WriteCombined(output,[page,page with{Name="2"}],options);
         var saved=DxfDocument.Load(output)??throw new Exception("Cannot reopen generated drawing.");
-        var titles=saved.Entities.Inserts.Where(i=>i.Block.Entities.OfType<Insert>().Any(n=>n.Block.Name=="EDITED_LOGO")).ToArray();
+        var titles=saved.Entities.Inserts.Where(i=>i.Block.Entities.OfType<Insert>().Any(n=>n.Block.Name=="TEMPLATE_U93")).ToArray();
         if(titles.Length!=2||saved.Entities.Inserts.Count()!=4)
             throw new Exception("Each sheet must keep its frame, title and nested logo; unrelated parts must be excluded.");
         if(!titles.All(i=>i.Attributes.Any(a=>Convert.ToString(a.Value)=="辊密封1"||Convert.ToString(a.Value)=="辊密封2"))||

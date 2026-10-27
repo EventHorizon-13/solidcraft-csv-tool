@@ -41,6 +41,14 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         DxfDocument template = DxfDocument.Load(options.TemplatePath) ?? throw new InvalidDataException("无法读取 DXF 模板。");
         if (!template.DimensionStyles.Contains(options.DimensionStyleName))
             throw new InvalidDataException($"模板不含标注样式“{options.DimensionStyleName}”，请在出图设置中选择。");
+        // netDxf can read anonymous blocks but Clone rejects their reserved * names.
+        // Rename only the in-memory template, including nested logo blocks, before cloning.
+        foreach(var block in template.Blocks.Where(b=>b.Name.StartsWith("*U",StringComparison.OrdinalIgnoreCase)).ToArray())
+        {
+            string stem="TEMPLATE_"+block.Name[1..],name=stem;int suffix=2;
+            while(template.Blocks.Contains(name))name=stem+"_"+suffix++;
+            block.Name=name;
+        }
         var style = (DimensionStyle)template.DimensionStyles[options.DimensionStyleName].Clone();
         FrameSource? frame = options.IncludeFrame ? FindFrame(template) : null;
         if (options.IncludeFrame && frame == null) throw new InvalidDataException("模板中没有找到独立的矩形图框块；请关闭图框或使用含图框块的 DXF。");
