@@ -1,6 +1,6 @@
 # Third-party notices
 
-The Windows application uses the .NET 10 Windows Forms runtime.
+The Windows application uses the .NET 10 Windows Forms runtime. The Linux command-line application uses the self-contained .NET 10 runtime.
 
 DXF 2010 output is written with netDxf 2023.11.10, https://github.com/haplokuon/netDxf .
 Copyright (c) Daniel Carvajal. Licensed under the MIT License:
@@ -13,4 +13,4 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## SolidCraft CLI 0.23.0
 
-Windows release packages bundle the unmodified official SolidCraft CLI from https://github.com/tangency-labs/solidcraft/releases/tag/v0.23.0 . SolidCraft is an independent application by Tangency Labs. Its MIT/Apache-2.0 licenses, NOTICE and THIRD-PARTY-LICENSES.txt accompany the binary under SolidCraft/. Source: https://github.com/tangency-labs/solidcraft/tree/v0.23.0 .
+Windows and Linux release packages bundle the unmodified official SolidCraft CLI from https://github.com/tangency-labs/solidcraft/releases/tag/v0.23.0 . SolidCraft is an independent application by Tangency Labs. Its MIT/Apache-2.0 licenses, NOTICE and THIRD-PARTY-LICENSES.txt accompany the binary under SolidCraft/. Source: https://github.com/tangency-labs/solidcraft/tree/v0.23.0 .

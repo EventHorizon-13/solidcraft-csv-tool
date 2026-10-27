@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace SolidCraftCsvTool;
 
-internal sealed record UpdateTarget(string Os,string Architecture,string PackageName,string PackageExtension,bool CanInstallInPlace)
+internal sealed record UpdateTarget(string Os,string Architecture,IReadOnlyList<string> PackageNames,string PackageExtension,bool CanInstallInPlace)
 {
     public static UpdateTarget Current
     {
@@ -17,11 +17,14 @@ internal sealed record UpdateTarget(string Os,string Architecture,string Package
                 RuntimeInformation.IsOSPlatform(OSPlatform.Linux)?"linux":throw new PlatformNotSupportedException("此操作系统暂不支持软件更新。");
             string architecture=RuntimeInformation.ProcessArchitecture switch
             {
-                Architecture.X64=>"amd64",Architecture.Arm64=>"arm64",
+                System.Runtime.InteropServices.Architecture.X64=>"amd64",System.Runtime.InteropServices.Architecture.Arm64=>"arm64",
                 _=>throw new PlatformNotSupportedException("仅支持 amd64 和 arm64 版本更新。")
             };
             string extension=os switch{"linux"=>".tar.gz",_=>".zip"};
-            return new(os,architecture,$"StandardRollerSeal-{os}-{architecture}{extension}",extension,os=="windows"&&architecture=="amd64");
+            string[] names=os=="macos"
+                ? [$"StandardRollerSeal-macos-universal{extension}",$"StandardRollerSeal-macos-{architecture}{extension}"]
+                : [$"StandardRollerSeal-{os}-{architecture}{extension}"];
+            return new(os,architecture,names,extension,os=="windows");
         }
     }
     public string DisplayName=>$"{Os}-{Architecture}";
@@ -56,7 +59,12 @@ internal static class UpdateService
         if(!tag.StartsWith("win-",StringComparison.OrdinalIgnoreCase)||!Version.TryParse(tag[4..],out var version))
             throw new InvalidDataException("GitHub 最新发布的版本号格式不正确。");
         string page=root.GetProperty("html_url").GetString()??ReleasesPage.ToString();
-        var asset=root.GetProperty("assets").EnumerateArray().FirstOrDefault(a=>string.Equals(a.GetProperty("name").GetString(),target.PackageName,StringComparison.Ordinal));
+            JsonElement asset=default;
+            foreach(string packageName in target.PackageNames)
+            {
+                asset=root.GetProperty("assets").EnumerateArray().FirstOrDefault(a=>string.Equals(a.GetProperty("name").GetString(),packageName,StringComparison.Ordinal));
+                if(asset.ValueKind==JsonValueKind.Object)break;
+            }
         if(asset.ValueKind!=JsonValueKind.Object)throw new InvalidDataException("GitHub 最新发布缺少当前平台安装包。");
         string url=asset.GetProperty("browser_download_url").GetString()??throw new InvalidDataException("当前平台安装包链接为空。");
         long bytes=asset.GetProperty("size").GetInt64();

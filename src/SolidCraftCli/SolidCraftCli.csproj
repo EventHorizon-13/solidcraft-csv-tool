@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>standard-roller-seal</AssemblyName>
+    <RootNamespace>SolidCraftCsvTool</RootNamespace>
+    <Version>1.2</Version>
+    <Product>标准辊密封批量生成 CLI</Product>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../SolidCraftCsvTool/Core.cs" Link="Core.cs" />
+    <Compile Include="../SolidCraftCsvTool/ControlClient.cs" Link="ControlClient.cs" />
+    <Compile Include="../SolidCraftCsvTool/HeadlessSession.cs" Link="HeadlessSession.cs" />
+    <Compile Include="../SolidCraftCsvTool/Exporter.cs" Link="Exporter.cs" />
+    <Compile Include="../SolidCraftCsvTool/OutputNames.cs" Link="OutputNames.cs" />
+    <Compile Include="../SolidCraftCsvTool/StepDrawingExporter.cs" Link="StepDrawingExporter.cs" />
+    <Compile Include="../SolidCraftCsvTool/DrawingOptions.cs" Link="DrawingOptions.cs" />
+    <Compile Include="../SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />
+    <Compile Include="../SolidCraftCsvTool/MachiningDxf.Features.cs" Link="MachiningDxf.Features.cs" />
+    <Compile Include="../SolidCraftCsvTool/MachiningDxf.Layout.cs" Link="MachiningDxf.Layout.cs" />
+    <PackageReference Include="netDxf" Version="2023.11.10" />
+  </ItemGroup>
+</Project>

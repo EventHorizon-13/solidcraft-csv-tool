@@ -1,12 +1,13 @@
 # 标准辊密封批量生成
 
-Windows 10/11 amd64（x64）。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。
-自包含 .NET，附带官方 SolidCraft 0.23 CLI 与许可说明。后台模式无需手动启动 SolidCraft 桌面版；模型生成仍需选择自己的 V13 `.solidcraft` 模板。
+Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。自包含 .NET，并附带对应架构的官方 SolidCraft 0.23 CLI。
+
+另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP 和可选 DXF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：Windows Forms 界面不能直接编译成 macOS universal 应用。
 
 ## 使用
 
 1. 选择 V13 模板与输出文件夹，导入 `辊密封参数模板.csv` 或编辑参数表。
-2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。可在“关于”页面检查并安装新版本。更新按 `Windows/macOS/Linux + amd64/arm64` 匹配安装包；Windows amd64 当前支持自动更新，其他平台有对应发行包时跳转下载页。发行文件采用 `StandardRollerSeal-{windows|macos|linux}-{amd64|arm64}` 平台标识。
+2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。可在“关于”页面检查并自动安装适用于当前 Windows 架构的更新。
 3. 可分别填写 DXF 文件名和组合 STEP 名。留空使用当天 `辊密封_MMDD`，不用填写后缀。
 4. 勾选是否“合并 STEP”“导出当前任务 CSV”“覆盖已有文件”“完成后打开 DXF”（默认不勾选、记住设置，DXF 生成成功后用系统默认软件打开），SolidCraft 固定自动后台运行，无需手动启动。
 5. “生成并导出Step”生成各单件 SolidCraft、STEP，以及选中的组合 STEP/任务 CSV；“一键生成并导出 DXF”再将同目录零件 STEP 汇总出图，排除组合 STEP。
@@ -22,6 +23,16 @@ Windows 10/11 amd64（x64）。完整解压后运行 `标准辊密封批量生�
 | 当前任务 CSV（可关闭） | 辊密封_MMDD.csv |
 
 “当前任务 CSV”保留本次参数与编号。软件记住合并、CSV选项和自定义名称；默认名称每天自动更新日期。
+
+## Linux CLI
+
+解压对应 amd64 或 arm64 安装包，在终端运行 `./standard-roller-seal --help` 查看参数。最少需要一个参数 CSV 和 V13 `.solidcraft` 模板：
+
+```sh
+./standard-roller-seal --csv 辊密封参数模板.csv --template ./模板/V13.solidcraft --output ./输出
+```
+
+常用选项：`--combine-step` 输出组合 STEP，`--export-current-csv` 保存本次实际尺寸，`--export-dxf --drawing-template ./模板/图框.dxf` 生成带图框加工图；`--dimension-style _5` 指定标注样式，`--overwrite` 覆盖同名文件。DXF 模板可不提供，此时按默认样式出图且不带图框。输入与输出路径可使用空格，需用 shell 引号包住。
 
 ## 后台运行与模板
 
@@ -50,7 +61,7 @@ DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION�
 
 ## 构建和检查
 
-`./build.ps1 -Version 1.0.0-dev` 发布自包含程序。GitHub Windows 构建同时附带固定官方 CLI 和 CSV 模板，当前只检查紧凑界面；新增CSV尺寸已通过真实CLI几何专项检查；不运行全量测试或 SHA-256 校验。私人模型及图框不上传仓库。
+`./build.ps1 -Version 1.2` 发布 Windows amd64 程序。GitHub Actions 发布 Windows amd64/arm64 桌面包和 Linux amd64/arm64 CLI 包。Linux CLI 项目位于 `src/SolidCraftCli/`，自包含 .NET，并调用随包的官方 SolidCraft CLI。私人模型及图框不上传仓库。
 
 文件名并排显示，生成与停止按钮放在底部导出选项同一行；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。
 
