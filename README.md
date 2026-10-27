@@ -57,5 +57,3 @@ DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION�
 当前单元格用蓝色外框定位；状态栏说明在进度条左侧。SolidCraft 模板标签、顶部右侧关于按钮及关于界面已加入，程序和窗口使用用户确认的实心浅玻璃辊密封图标。可编辑SVG源见 assets/roller-seal-icon.svg。
 
 项目主页：https://github.com/EventHorizon-13/solidcraft-roller-seal 。程序文件、窗口与关于界面名称统一为“标准辊密封批量生成”。
-
-1.1：底部生成、停止按钮右对齐，操作行自动撑高；标题栏只显示名称和版本。关于界面简化标题，版本下方可点击作者 Wei Yunhui 打开 GitHub 主页。
