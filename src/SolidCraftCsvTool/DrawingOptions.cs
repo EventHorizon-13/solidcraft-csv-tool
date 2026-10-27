@@ -26,7 +26,7 @@ public sealed record DrawingOptions
 }
 
 internal sealed record FrameSource(Box2 Boundary, double TitleTop, IReadOnlyList<Insert> Components);
-internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame, TextStyle? TitleStyle = null)
+internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame)
 {
     public double TextHeight => Style.TextHeight * Math.Max(1, Style.DimScaleOverall);
     public double Scale => Math.Max(1, Style.DimScaleOverall);
@@ -40,11 +40,7 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         var style = (DimensionStyle)template.DimensionStyles[options.DimensionStyleName].Clone();
         FrameSource? frame = options.IncludeFrame ? FindFrame(template) : null;
         if (options.IncludeFrame && frame == null) throw new InvalidDataException("模板中没有找到独立的矩形图框块；请关闭图框或使用含图框块的 DXF。");
-        var titleAttribute = frame?.Components.SelectMany(i=>i.Attributes).FirstOrDefault(a=>
-            a.Tag.Contains("图名",StringComparison.Ordinal) || a.Tag.Equals("TITLE",StringComparison.OrdinalIgnoreCase) ||
-            System.Text.RegularExpressions.Regex.IsMatch(Convert.ToString(a.Value)??"",@"^辊密封\d+$"));
-        TextStyle titleFont = titleAttribute?.Style ?? (template.TextStyles.Contains("工程字") ? template.TextStyles["工程字"] : style.TextStyle);
-        return new(style, frame, (TextStyle)titleFont.Clone("SC_TITLE"));
+        return new(style, frame);
     }
     public static DimensionStyle DefaultStyle() => new("_5")
     {

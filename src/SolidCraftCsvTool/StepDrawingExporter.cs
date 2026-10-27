@@ -438,6 +438,7 @@ internal static partial class MachiningDxf
         readonly netDxf.DxfDocument document = new(netDxf.Header.DxfVersion.AutoCad2010) { BuildDimensionBlocks = true };
         readonly Dictionary<string, netDxf.Tables.Layer> layers = new();
         netDxf.Tables.TextStyle titleStyle = null!;
+        public bool SuppressPlanTongueDetail { get; set; }
         public DrawingOptions Options { get; } = options;
         public DrawingResources Resources { get; } = DrawingResources.Load(options);
         Scene? recording;
@@ -462,7 +463,7 @@ internal static partial class MachiningDxf
         }
         public void Initialize()
         {
-            titleStyle=Resources.TitleStyle??new netDxf.Tables.TextStyle("SC_TITLE","gbenor.shx"){BigFont="gbcbig.shx"};
+            titleStyle=new netDxf.Tables.TextStyle("SC_TITLE","gbenor.shx"){BigFont="gbcbig.shx"};
             document.DrawingVariables.InsUnits=netDxf.Units.DrawingUnits.Millimeters;
             var hiddenType=new netDxf.Tables.Linetype("SC_HIDDEN",new netDxf.Tables.LinetypeSegment[]{new netDxf.Tables.LinetypeSimpleSegment(6),new netDxf.Tables.LinetypeSimpleSegment(-3)});
             foreach(var(name,color)in new[]{("VISIBLE",(short)7),("HIDDEN",(short)7),("DIM",(short)4),("TEXT",(short)3),("TITLE",(short)7),("FRAME",(short)7)})
@@ -487,6 +488,10 @@ internal static partial class MachiningDxf
         }
         public void LinearDimension(Point2 a,Point2 b,Point2 line,Point2 text,double rotation,Action drawGraphics)
         {
+            // Omit only the unwanted 1.11 mm plan detail, without merging
+            // neighboring dimensions or changing the projected geometry.
+            double measured=rotation==0 ? Math.Abs(b.X-a.X) : Math.Abs(b.Y-a.Y);
+            if(SuppressPlanTongueDetail && FormatDimension(measured)=="1.11")return;
             if(recording!=null)
             {
                 Scene parent=recording;Scene graphics=Record(drawGraphics);Box2 box=graphics.Bounds;
@@ -548,7 +553,7 @@ internal static partial class MachiningDxf
                     foreach(var attribute in insert.Attributes)
                     {
                         string tag=attribute.Tag??"",value=Convert.ToString(attribute.Value,CultureInfo.InvariantCulture)??"";
-                        if(tag.Contains("图名",StringComparison.Ordinal)||tag.Equals("TITLE",StringComparison.OrdinalIgnoreCase)||System.Text.RegularExpressions.Regex.IsMatch(value,@"^辊密封\d+$"))attribute.Value=name;
+                        if(tag.Contains("图名",StringComparison.Ordinal)||tag.Equals("TITLE",StringComparison.OrdinalIgnoreCase)||System.Text.RegularExpressions.Regex.IsMatch(value,@"^辊密封\d+$")){attribute.Value=name;attribute.Style=titleStyle;}
                     }
                     document.Entities.Add(insert);
                 }

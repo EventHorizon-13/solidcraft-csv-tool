@@ -22,7 +22,7 @@ internal static partial class MachiningDxf
             double direction=Math.Abs(hole.Center.Y-front.Max.Y)<.1?-1:1;
             Point2 label=hole.Radius>=w.DimensionTextHeight*1.5 ?
                 new(hole.Center.X+hole.Radius*.4,hole.Center.Y+direction*hole.Radius*.3) :
-                new(front.Max.X+w.DimensionRow*3,hole.Center.Y+w.DimensionRow);
+                new(hole.Center.X,front.Max.Y+w.DimensionRow*2);
             w.DiameterDimension(hole.Center,hole.Radius,label);
         }
     }

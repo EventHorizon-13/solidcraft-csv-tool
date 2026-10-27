@@ -14,12 +14,16 @@ internal static partial class MachiningDxf
 
         DrawLowerDimensions(w, front);
         Vertical(w, front.Min.X, front.Min.X - w.DimensionRow, front.Min.Y, front.Max.Y, w.FormatDimension(front.Height));
-        DrawPerimeterHeight(w, front);
         DrawHoleDiameters(w, front, arcs);
 
     }
 
-    static void DrawPlanAnnotations(Writer w,Map top)=>DrawPlanGrooves(w,top);
+    static void DrawPlanAnnotations(Writer w,Map top)
+    {
+        bool previous=w.SuppressPlanTongueDetail;
+        w.SuppressPlanTongueDetail=true;
+        try{DrawPlanGrooves(w,top);}finally{w.SuppressPlanTongueDetail=previous;}
+    }
     static void DrawEndAnnotations(Writer w,Map end)=>DrawEndSizeAndBevel(w,end);
 
     static void DrawLowerDimensions(Writer w, Map map)
@@ -36,25 +40,6 @@ internal static partial class MachiningDxf
         if (body != null)
             Horizontal(w, map.P(body.A).X, map.P(body.B).X, map.Min.Y, map.Min.Y - w.DimensionRow, w.FormatDimension(Math.Abs(body.A.X - body.B.X)));
         Horizontal(w, map.Min.X, map.Max.X, map.Min.Y, map.Min.Y - (body == null ? w.DimensionRow : w.DimensionRow*2), w.FormatDimension(map.Width));
-    }
-
-    static void DrawPerimeterHeight(Writer w, Map map)
-    {
-        Box2 bounds = map.Projection.Bounds;
-        var edges = StraightEdges(map.Projection).ToArray();
-        var horizontalMarks = edges.Where(edge =>
-            Math.Abs(edge.A.Y - edge.B.Y) < 0.01 && Math.Abs(edge.A.X - edge.B.X) >= 2 &&
-            (Math.Abs(edge.A.X - bounds.MinX) < 0.05 || Math.Abs(edge.B.X - bounds.MinX) < 0.05 ||
-             Math.Abs(edge.A.X - bounds.MaxX) < 0.05 || Math.Abs(edge.B.X - bounds.MaxX) < 0.05))
-            .Select(edge => edge.A.Y);
-        // A bevel's vertical leg ends on the outer side, even when no horizontal
-        // edge exists at that height. Include the actual side-edge endpoints.
-        var sideMarks = edges.Where(edge => Math.Abs(edge.A.X - edge.B.X) < 0.01 &&
-            Math.Abs(edge.A.Y - edge.B.Y) >= 2 &&
-            (Math.Abs(edge.A.X - bounds.MinX) < 0.05 || Math.Abs(edge.A.X - bounds.MaxX) < 0.05))
-            .SelectMany(edge => new[] { edge.A.Y, edge.B.Y });
-        double[] marks = IncludeEnds(horizontalMarks.Concat(sideMarks).ToArray(), bounds.MinY, bounds.MaxY);
-        if (marks.Length > 2) DrawVerticalChain(w, map, marks, map.Max.X + w.DimensionRow);
     }
 
     static double[] AxisMarks(Projection2 view, bool axisX)
