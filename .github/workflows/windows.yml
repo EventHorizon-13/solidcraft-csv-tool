@@ -20,7 +20,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=1.1.3" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=1.1.4" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Bundle official SolidCraft 0.23 CLI and notices
@@ -62,7 +62,7 @@ jobs:
           标准辊密封批量生成 $env:BUILD_VERSION，编译于 $env:BUILD_DATE。
           程序文件名：标准辊密封批量生成.exe。
           固定使用随包附带的官方 SolidCraft 0.23 CLI，无窗口自动启动与退出；无需手动启动桌面版。请完整解压全部文件夹。
-          修复修改 Logo 后 CAD 匿名标题栏（*U 块）被过滤的问题，保留标题栏、Logo 和每张图的编号。
+          修复 CAD 匿名标题栏（*U 块）导入；补回实心 HATCH 多段边界的闭合标记，避免 Logo 填充封住开口或遮住红色图形。
           新增可记住的“完成后打开 DXF”选项：生成成功后用默认软件打开，取消或失败不打开。
           生成并导出Step / 一键生成并导出 DXF；支持合并 STEP 和导出当前任务 CSV 开关。
           汇总 DXF、组合 STEP 文件名可独立设置，默认辊密封_MMDD；单件命名辊密封_MMDD_编号。

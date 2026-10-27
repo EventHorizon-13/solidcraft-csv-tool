@@ -42,6 +42,30 @@ internal static class Dxf2010Compatibility
             }
             if (!found) throw new InvalidDataException("DXF 栅格设置对象缺少所属引用。");
         }
+        // netDxf 2023.11.10 writes polyline HATCH paths with group 73 = 0 even
+        // when the source path is closed. CAD then closes the loop with a straight
+        // chord and can fill the logo's open area. Restore the required closed flag.
+        foreach (var record in records.Where(r => r.Type == "HATCH"))
+        {
+            for (int i = record.Start + 2; i < record.End; i += 2)
+            {
+                if (int.Parse(lines[i].Trim(), CultureInfo.InvariantCulture) != 92) continue;
+                int flags = int.Parse(lines[i + 1].Trim(), CultureInfo.InvariantCulture);
+                if ((flags & 2) == 0) continue;
+                int limit = record.End;
+                for (int j = i + 2; j < record.End; j += 2)
+                    if (int.Parse(lines[j].Trim(), CultureInfo.InvariantCulture) == 92) { limit = j; break; }
+                bool foundClosedFlag = false;
+                for (int j = i + 2; j < limit; j += 2)
+                {
+                    if (int.Parse(lines[j].Trim(), CultureInfo.InvariantCulture) != 73) continue;
+                    foundClosedFlag = true;
+                    if (lines[j + 1].Trim() != "1") { lines[j + 1] = "1"; changed = true; }
+                    break;
+                }
+                if (!foundClosedFlag) throw new InvalidDataException("DXF 填充边界缺少闭合标记。");
+            }
+        }
         if (changed) File.WriteAllLines(path, lines, new UTF8Encoding(false));
     }
 }
