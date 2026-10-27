@@ -16,6 +16,7 @@
     <Compile Include="../SolidCraftCsvTool/HeadlessSession.cs" Link="HeadlessSession.cs" />
     <Compile Include="../SolidCraftCsvTool/Exporter.cs" Link="Exporter.cs" />
     <Compile Include="../SolidCraftCsvTool/OutputNames.cs" Link="OutputNames.cs" />
+    <Compile Include="../SolidCraftCsvTool/Dxf2010Compatibility.cs" Link="Dxf2010Compatibility.cs" />
     <Compile Include="../SolidCraftCsvTool/StepDrawingExporter.cs" Link="StepDrawingExporter.cs" />
     <Compile Include="../SolidCraftCsvTool/DrawingOptions.cs" Link="DrawingOptions.cs" />
     <Compile Include="../SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />

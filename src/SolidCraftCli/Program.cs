@@ -46,7 +46,7 @@ internal static class Program
 
             string stamp = options.GetValueOrDefault("--stamp") ?? OutputNames.Stamp;
             if (!Regex.IsMatch(stamp, "^[A-Za-z0-9-]{1,16}$")) throw new ArgumentException("--stamp 仅允许 1 至 16 位英文字母、数字或连字符。");
-            string[] csvRows = CsvFiles.Read(csvPath).Select(ModelRules.ExpandRow).ToArray();
+            string[][] csvRows = CsvFiles.Read(csvPath).Select(ModelRules.ExpandRow).ToArray();
             List<PreparedRow> rows = ModelRules.Validate(csvRows);
             ControlClient.HeadlessExecutable = engine;
 
