@@ -23,11 +23,30 @@ jobs:
           "BUILD_VERSION=1.0.${{ github.run_number }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Check only requested drawing annotation changes
+      - name: Bundle official SolidCraft 0.23 CLI and notices
         shell: pwsh
         run: |
-          dotnet run --project tests/CoreChecks.csproj -c Release "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -- --front-height-check dist/checks
-          if ($LASTEXITCODE -ne 0) { throw 'Drawing annotation check failed' }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Invoke-WebRequest 'https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/solidcraft-0.23.0-windows-x64-portable.zip' -OutFile dist/solidcraft-official.zip
+          Expand-Archive dist/solidcraft-official.zip dist/official
+          $cli = Get-ChildItem dist/official -Recurse -Filter solidcraft-cli.exe | Select-Object -First 1
+          if (-not $cli) { throw 'Official package has no CLI' }
+          New-Item -ItemType Directory -Force dist/app/SolidCraft | Out-Null
+          Copy-Item (Join-Path $cli.DirectoryName '*') dist/app/SolidCraft -Recurse
+          Remove-Item dist/app/SolidCraft/solidcraft.exe -ErrorAction SilentlyContinue
+          foreach ($notice in @('LICENSE-MIT','LICENSE-APACHE','NOTICE','THIRD-PARTY-LICENSES.txt')) {
+            Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" -OutFile "dist/app/SolidCraft/$notice"
+          }
+      - name: Check only naming, CSV and title changes
+        shell: pwsh
+        run: |
+          dotnet run --project tests/CoreChecks.csproj -c Release "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -- --batch-options-check dist/checks
+          if ($LASTEXITCODE -ne 0) { throw 'Batch options check failed' }
+      - name: Check actual CLI background export options
+        shell: pwsh
+        run: |
+          dotnet run --project tests/CoreChecks.csproj -c Release --no-build -- --headless-export-check dist/checks/headless dist/app/SolidCraft/solidcraft-cli.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Headless export check failed' }
       - name: Publish self contained Windows application
         run: dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/app
       - name: Check changed export buttons on Windows
@@ -36,36 +55,23 @@ jobs:
           $process = Start-Process dist/app/SolidCraftCsvTool.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png" -PassThru
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Export button check timed out' }
           if ($process.ExitCode -ne 0) { throw 'Export button check failed' }
-      - name: Build private projection review runner
-        run: dotnet publish tests/CoreChecks.csproj -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/projection-review
-      - uses: actions/upload-artifact@v4
-        with:
-          name: projection-review-linux-arm64
-          path: dist/projection-review/CoreChecks
-          retention-days: 7
       - name: Package release
         shell: pwsh
         run: |
           Copy-Item README.md dist/app/README.md
           Copy-Item THIRD_PARTY_NOTICES.md dist/app/THIRD_PARTY_NOTICES.md
+          Copy-Item examples/辊密封参数模板.csv dist/app/辊密封参数模板.csv
+          Copy-Item examples/辊密封参数模板.csv dist/辊密封参数模板.csv
           Compress-Archive -Path dist/app/* -DestinationPath dist/SolidCraftCsvTool-win-x64.zip
           @"
-          标准辊密封批量生成 $env:BUILD_VERSION，编译日期 $env:BUILD_DATE。
-          Windows 10/11 x64，解压后双击 SolidCraftCsvTool.exe。
-          自包含发布，不需要安装 Python 或 .NET。需要 SolidCraft 桌面版与 V13 模板。
-          STEP 加工图按文件名排序，纵向排入一个汇总 DXF，图名仅显示辊密封和编号。
-          主视图右侧不标注尺寸，左侧仅标注总高度。
-          左端隐藏或拆段母槽也完整标注；首尾尺寸以中间孔边线校准。
-          上视图按辊孔圆弧边缘确定尺寸链；槽深标在槽口附近，取消多余的 1.11/1.26 mm 尺寸。
-          新增一键生成并导出 DXF：自动读取同输出文件夹的零件 STEP，排除组合 STEP；按钮样式统一。
-          孔径使用原生直径尺寸；左视图仅保留宽、高及斜角；俯视图子母槽分端标注。
-          图名简化放大，使用 gbenor.shx 与 gbcbig.shx；图框和标题栏全部文字统一为此字体；编译时间精确到秒。
-          输出可编辑的 CAD DIMENSION 尺寸对象，单位 mm；尺寸由 STEP 投影几何提取，加工前请核对。
-          统一第一角投影，主视图右侧为左视图；支持本地 DXF 模板图框、标题栏及自选标注样式（默认 _5）。
-          隐藏线采用清晰的 6/3 线型并支持比例设置；视图、标注和图框按实际边界留白排版。
-          标题栏显示产品名称、发行版本与编译日期，沿用隐藏圆弧拟合修复。
-          DXF 升级到 AutoCAD 2010（AC1024），由 netDxf 生成完整对象引用和 Unicode 文本，保留可编辑尺寸。
-          本次构建未连接真实 SolidCraft 桌面端，未生成 CAD 模型。
+          标准辊密封批量生成 $env:BUILD_VERSION，编译于 $env:BUILD_DATE。
+          默认使用随包附带的官方 SolidCraft 0.23 CLI，无窗口自动启动与退出；无需手动启动桌面版。请完整解压全部文件夹。
+          生成并导出Step / 一键生成并导出 DXF；支持合并 STEP 和导出当前任务 CSV 开关。
+          汇总 DXF、组合 STEP 文件名可独立设置，默认辊密封_MMDD；单件命名辊密封_MMDD_编号。
+          CSV 同输出文件夹，默认辊密封_MMDD.csv，附带6行参数模板。
+          去掉图框内重复大图名，只在标题栏保留辊密封编号；图框和标题栏字体 gbenor/gbcbig。
+          仍支持桌面版自动启动；后台运行不操作或关闭已打开的桌面窗口。
+          本次仅执行文件命名、CSV、图名、导出选项及真实 CLI 无窗口流程的针对性检查；不运行全量测试或 SHA-256 校验。
           源码提交：$env:GITHUB_SHA
           "@ | Set-Content dist/release-notes.md -Encoding utf8
       - uses: actions/upload-artifact@v4
@@ -73,12 +79,13 @@ jobs:
           name: SolidCraftCsvTool-win-x64
           path: |
             dist/SolidCraftCsvTool-win-x64.zip
+            dist/辊密封参数模板.csv
           retention-days: 30
       - name: Publish downloadable Windows release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "win-1.0.${{ github.run_number }}" dist/SolidCraftCsvTool-win-x64.zip --target "$env:GITHUB_SHA" --title "Windows 1.0.${{ github.run_number }}" --notes-file dist/release-notes.md
+        run: gh release create "win-1.0.${{ github.run_number }}" dist/SolidCraftCsvTool-win-x64.zip dist/辊密封参数模板.csv --target "$env:GITHUB_SHA" --title "Windows 1.0.${{ github.run_number }}" --notes-file dist/release-notes.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:

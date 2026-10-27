@@ -3,20 +3,25 @@ using System.Text.Json;
 
 namespace SolidCraftCsvTool;
 
-public sealed record ExportOptions(List<PreparedRow> Rows, string Template, string Output, int Port, double Gap, bool Combined, bool Overwrite);
+public sealed record ExportOptions(List<PreparedRow> Rows, string Template, string Output, int Port, double Gap, bool Combined, bool Overwrite, string? DateStamp=null, string? CombinedFileName=null, bool ExportCsv=false, IReadOnlyList<string[]>? CsvRows=null);
 public sealed record ExportProgress(string Message, int Completed = 0, bool Log = true);
 
 public static class Exporter
 {
     public static async Task RunAsync(ExportOptions options, IProgress<ExportProgress> progress, CancellationToken cancellation)
     {
+        string stamp=options.DateStamp??OutputNames.Stamp;
+        string combinedName=OutputNames.FileName(options.CombinedFileName,".step",stamp);
+        string csvName=OutputNames.DefaultBase(stamp)+".csv";
+        if(options.Combined&&options.Rows.Any(row=>(OutputNames.Part(row.Name,stamp)+".step").Equals(combinedName,StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException("组合 STEP 名不能与单件 STEP 名相同。");
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "run-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         bool success = false;
         try
         {
-            string[] targets = options.Rows.SelectMany(row => new[] { Path.Combine(options.Output, row.Name + "_辊密封.solidcraft"), Path.Combine(options.Output, row.Name + "_辊密封.step") })
-                .Concat(options.Combined ? [Path.Combine(options.Output, "辊密封_组合.step")] : Array.Empty<string>()).ToArray();
+            string[] targets = options.Rows.SelectMany(row => new[] { Path.Combine(options.Output, OutputNames.Part(row.Name,stamp) + ".solidcraft"), Path.Combine(options.Output, OutputNames.Part(row.Name,stamp) + ".step") })
+                .Concat(options.Combined ? [Path.Combine(options.Output, combinedName)] : Array.Empty<string>()).Concat(options.ExportCsv?[Path.Combine(options.Output,csvName)]:Array.Empty<string>()).ToArray();
             if (!options.Overwrite && targets.Any(File.Exists)) throw new IOException("已有同名输出，请更换输出目录，或勾选“覆盖已有文件”。");
             Directory.CreateDirectory(options.Output);
             string template = Path.Combine(work, "template.solidcraft");
@@ -54,7 +59,7 @@ public static class Exporter
                             throw new IOException($"型号 {row.Name} 重算失败：{error}");
                 Bounds? bounds = options.Combined ? ModelRules.ReadBounds(info) : null;
                 cancellation.ThrowIfCancellationRequested();
-                string native = Path.Combine(work, row.Name + "_辊密封.solidcraft"), step = Path.Combine(work, row.Name + "_辊密封.step");
+                string native = Path.Combine(work, OutputNames.Part(row.Name,stamp) + ".solidcraft"), step = Path.Combine(work, OutputNames.Part(row.Name,stamp) + ".step");
                 await client.ExecuteAsync("file.save_as", new { path = native, format = "container", cache = true, preview = true });
                 await client.ExecuteAsync("file.export", new { path = step, format = "step" });
                 PublishFile(native, Path.Combine(options.Output, Path.GetFileName(native)), options.Overwrite);
@@ -87,10 +92,17 @@ public static class Exporter
                 var interference = await client.ExecuteAsync("inspect.interference", new { budget_s = 240 });
                 ModelRules.RequireClearInterference(interference, expected);
                 cancellation.ThrowIfCancellationRequested();
-                string combined = Path.Combine(work, "辊密封_组合.step");
+                string combined = Path.Combine(work, combinedName);
                 await client.ExecuteAsync("file.export", new { path = combined, format = "step" });
                 PublishFile(combined, Path.Combine(options.Output, Path.GetFileName(combined)), options.Overwrite);
                 progress.Report(new("组合 STEP 已导出，实体数量一致且相交检查通过。", completed));
+            }
+            if(options.ExportCsv)
+            {
+                var csvRows=options.CsvRows??options.Rows.Select(row=>new[]{row.Name}.Concat(ModelRules.ParameterNames.Select(p=>row.Parameters[p])).ToArray()).ToArray();
+                string stagedCsv=Path.Combine(work,csvName);CsvFiles.Write(stagedCsv,csvRows);
+                PublishFile(stagedCsv,Path.Combine(options.Output,csvName),options.Overwrite);
+                progress.Report(new("当前任务 CSV 已保存："+csvName,completed));
             }
             success = true;
         }

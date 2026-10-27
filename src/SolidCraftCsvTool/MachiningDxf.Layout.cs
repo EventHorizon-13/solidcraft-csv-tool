@@ -39,16 +39,13 @@ internal static partial class MachiningDxf
         double sideX=frontScene.Bounds.MaxX+writer.Options.ViewGap-endScene.Bounds.MinX;
         double planY=frontScene.Bounds.MinY-writer.Options.ViewGap-planScene.Bounds.MaxY;
         var result=new Scene();result.Include(frontScene);result.Include(planScene,0,planY);result.Include(endScene,sideX,0);
-        Box2 views=result.Bounds;
-        double titleHeight=Math.Max(12,writer.DimensionTextHeight*1.8);
-        string title=DrawingName(page.Name,sequence??1);
-        double titleY=views.MaxY+writer.DimensionRow+titleHeight/2;
-        var header=writer.Record(()=>writer.Text(title,new((views.MinX+views.MaxX)/2,titleY),titleHeight,"TITLE"));
-        result.Include(header);return result;
+        return result;
     }
 
     internal static string DrawingName(string name,int sequence)
     {
+        var dated=System.Text.RegularExpressions.Regex.Match(name,@"^辊密封_\d{4}_(.+)$");
+        if(dated.Success)return "辊密封"+dated.Groups[1].Value;
         var match=System.Text.RegularExpressions.Regex.Match(name,@"^(?:\d{3}_)?(.+?)_辊密封(?:_|$)");
         string id=match.Success?match.Groups[1].Value:
             System.Text.RegularExpressions.Regex.IsMatch(name,@"^[A-Za-z]*\d+[A-Za-z0-9-]*$")?name:sequence.ToString(System.Globalization.CultureInfo.InvariantCulture);

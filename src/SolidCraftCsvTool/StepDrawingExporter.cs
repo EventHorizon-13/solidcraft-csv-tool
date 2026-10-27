@@ -33,9 +33,9 @@ public static class StepDrawingExporter
         inputFiles = inputFiles.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase).ToArray();
         string destination = Path.GetFullPath(outputFolder);
         Directory.CreateDirectory(destination);
-        const string outputName = "STEP加工图_汇总.dxf";
+        string outputName = drawingOptions.ResolvedFileName;
         string outputPath = Path.Combine(destination, outputName);
-        if (File.Exists(outputPath)) throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
+        if (!drawingOptions.OverwriteOutput&&File.Exists(outputPath)) throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
 
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "step-drawings-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
@@ -47,14 +47,14 @@ public static class StepDrawingExporter
             if (!running.TryGetProperty("running", out var jobs) || jobs.ValueKind != System.Text.Json.JsonValueKind.Array || jobs.GetArrayLength() > 0)
                 throw new IOException("SolidCraft 当前正在执行其他命令，请完成后再批量出图。");
 
-            var originalUi = await client.RequestAsync("ui.inspect", new { });
-            var originalCamera = originalUi.TryGetProperty("camera", out var cam) ? cam.Clone() : default;
-            bool? originalPerspective = originalUi.TryGetProperty("perspective", out var perspective) && perspective.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False
+            var originalUi = client.IsHeadless ? default : await client.RequestAsync("ui.inspect", new { });
+            var originalCamera = originalUi.ValueKind==System.Text.Json.JsonValueKind.Object&&originalUi.TryGetProperty("camera", out var cam) ? cam.Clone() : default;
+            bool? originalPerspective = originalUi.ValueKind==System.Text.Json.JsonValueKind.Object&&originalUi.TryGetProperty("perspective", out var perspective) && perspective.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False
                 ? perspective.GetBoolean() : null;
             bool currentStepOpen = false;
             try
             {
-                await client.RequestAsync("ui.set", new { perspective = false });
+                if(!client.IsHeadless)await client.RequestAsync("ui.set", new { perspective = false });
                 for (int i = 0; i < inputFiles.Count; i++)
                 {
                     cancellation.ThrowIfCancellationRequested();
@@ -68,14 +68,14 @@ public static class StepDrawingExporter
                     Projection2 end = await ExportProjection(client, work, $"{i:D4}-left.dxf", "left", cancellation);
                     pages.Add(new(Path.GetFileNameWithoutExtension(step), front, top, end, DxfFeatureDetector.Analyze(front, top)));
 
-                    await client.RequestAsync("ui.documents", new { action = "close", force = true });
+                    if(!client.IsHeadless)await client.RequestAsync("ui.documents", new { action = "close", force = true });
                     currentStepOpen = false;
                     progress.Report(new($"已读取 {Path.GetFileName(step)}，三视图与几何特征已提取。", i + 1));
                 }
             }
             finally
             {
-                if (currentStepOpen)
+                if (currentStepOpen&&!client.IsHeadless)
                 {
                     try { await client.RequestAsync("ui.documents", new { action = "close", force = true }); } catch (IOException) { }
                 }
@@ -91,8 +91,8 @@ public static class StepDrawingExporter
             progress.Report(new($"正在将 {pages.Count} 张加工图排版到一个 DXF…", pages.Count - 1));
             MachiningDxf.WriteCombined(staged, pages, drawingOptions);
             cancellation.ThrowIfCancellationRequested();
-            if (File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
-            File.Move(staged, outputPath);
+            if (!drawingOptions.OverwriteOutput&&File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
+            File.Move(staged, outputPath,drawingOptions.OverwriteOutput);
             progress.Report(new($"已保存汇总 DXF：{outputName}（含 {pages.Count} 张加工图）", inputFiles.Count));
         }
         finally
@@ -107,10 +107,20 @@ public static class StepDrawingExporter
     static async Task<Projection2> ExportProjection(ControlClient client, string work, string file, string view, CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        await client.RequestAsync("ui.view", new { view, animate = false });
-        var ui = await client.RequestAsync("ui.inspect", new { });
-        if (!ui.TryGetProperty("camera", out var camera) || camera.ValueKind != System.Text.Json.JsonValueKind.Object)
-            throw new IOException($"SolidCraft 没有返回 {view} 视图相机，不能生成精确投影。");
+        System.Text.Json.JsonElement camera;
+        if(client.IsHeadless)
+        {
+            var applied=await client.ExecuteAsync("view.apply",new{view});
+            var node=System.Text.Json.Nodes.JsonNode.Parse(applied.GetProperty("camera").GetRawText())!;
+            node["fov"]=0;camera=System.Text.Json.JsonSerializer.SerializeToElement(node);
+        }
+        else
+        {
+            await client.RequestAsync("ui.view", new { view, animate = false });
+            var ui=await client.RequestAsync("ui.inspect",new{});
+            if(!ui.TryGetProperty("camera",out camera)||camera.ValueKind!=System.Text.Json.JsonValueKind.Object)
+                throw new IOException($"SolidCraft 没有返回 {view} 视图相机，不能生成精确投影。");
+        }
         string path = Path.Combine(work, file);
         await client.ExecuteAsync("file.export_view_dxf", new { camera, hidden = "dashed", tolerance = 0.005, path });
         return DxfProjectionReader.Read(path, view);

@@ -6,6 +6,9 @@ namespace SolidCraftCsvTool;
 
 public sealed record DrawingOptions
 {
+    public bool OverwriteOutput { get; init; }
+    public string OutputFileName { get; init; } = "";
+    public string ResolvedFileName => OutputNames.FileName(OutputFileName,".dxf");
     public string TemplatePath { get; init; } = "";
     public string DimensionStyleName { get; init; } = "_5";
     public double HiddenLineScale { get; init; } = 1;
@@ -15,6 +18,7 @@ public sealed record DrawingOptions
     public bool IncludeFrame { get; init; } = true;
     public void Validate()
     {
+        _=ResolvedFileName;
         if (!double.IsFinite(HiddenLineScale) || HiddenLineScale < 0.05 || HiddenLineScale > 100 ||
             !double.IsFinite(ViewGap) || ViewGap < 10 || ViewGap > 5000 ||
             !double.IsFinite(FrameMargin) || FrameMargin < 10 || FrameMargin > 1000 ||

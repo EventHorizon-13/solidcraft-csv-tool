@@ -8,6 +8,10 @@ namespace SolidCraftCsvTool;
 
 public sealed class ControlClient : IDisposable
 {
+    public static string? HeadlessExecutable { get; set; }
+    readonly HeadlessSession? headless;
+    public bool IsHeadless => headless!=null;
+    public bool HasWindow => headless?.HasWindow??true;
     readonly TcpClient tcp;
     readonly StreamReader reader;
     readonly StreamWriter writer;
@@ -21,8 +25,11 @@ public sealed class ControlClient : IDisposable
         writer = new(tcp.GetStream(), new UTF8Encoding(false), 4096, true) { NewLine = "\n", AutoFlush = true };
     }
 
+    ControlClient(HeadlessSession session){headless=session;tcp=null!;reader=null!;writer=null!;token="";}
+
     public static async Task<ControlClient> ConnectAsync(int port, string? tokenPath = null)
     {
+        if(HeadlessExecutable!=null)return new(await HeadlessSession.StartAsync(HeadlessExecutable));
         string controlDirectory = Environment.GetEnvironmentVariable("SOLIDCRAFT_CONTROL_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "control");
         tokenPath ??= Path.Combine(controlDirectory, $"{port}.token");
         if (!File.Exists(tokenPath)) throw new IOException($"找不到控制令牌。请先保存设计，再用 --control {port} 启动 SolidCraft。\n{tokenPath}");
@@ -55,6 +62,7 @@ public sealed class ControlClient : IDisposable
 
     public async Task<JsonElement> RequestAsync(string method, object parameters)
     {
+        if(headless!=null)return await headless.RequestAsync(method,parameters);
         var response = await ExchangeAsync(method, parameters);
         if (response.TryGetProperty("running", out var running) && running.ValueKind == JsonValueKind.True)
         {
@@ -84,5 +92,5 @@ public sealed class ControlClient : IDisposable
 
     public Task<JsonElement> ExecuteAsync(string command, object parameters) => RequestAsync("engine.execute", new { command, @params = parameters });
     public Task<JsonElement> InspectAsync() => RequestAsync("document.inspect", new { measure = true });
-    public void Dispose() { writer.Dispose(); reader.Dispose(); tcp.Dispose(); }
+    public void Dispose() { if(headless!=null){headless.Dispose();return;}writer.Dispose(); reader.Dispose(); tcp.Dispose(); }
 }
