@@ -55,12 +55,16 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         TextVerticalPlacement = DimensionStyleTextVerticalPlacement.Above
     };
 
+    // CAD assigns *U names to anonymous drawing blocks after some block/logo edits.
+    // Keep these candidates; the geometry and title-band checks still select the frame.
+    static bool IsNonDrawingBlock(string name)=>name.StartsWith('*')&&!name.StartsWith("*U",StringComparison.OrdinalIgnoreCase);
+
     static FrameSource? FindFrame(DxfDocument template)
     {
         var candidates = new List<(Insert Insert, Box2 Bounds)>();
         foreach (Insert insert in template.Entities.Inserts)
         {
-            if (insert.Block.Name.StartsWith('*') || Math.Abs(insert.Rotation) > 0.001 || insert.Scale.X <= 0 || insert.Scale.Y <= 0) continue;
+            if (IsNonDrawingBlock(insert.Block.Name) || Math.Abs(insert.Rotation) > 0.001 || insert.Scale.X <= 0 || insert.Scale.Y <= 0) continue;
             foreach (Polyline2D poly in insert.Block.Entities.OfType<Polyline2D>())
             {
                 if (!poly.IsClosed || poly.Vertexes.Count != 4 || poly.Vertexes.Any(v => Math.Abs(v.Bulge) > 1e-8)) continue;
@@ -83,7 +87,7 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         double titleTop = border.MinY + border.Height*.15;
         foreach (Insert insert in template.Entities.Inserts)
         {
-            if (ReferenceEquals(insert,selected.Insert) || insert.Block.Name.StartsWith('*') || Math.Abs(insert.Rotation) > .001) continue;
+            if (ReferenceEquals(insert,selected.Insert) || IsNonDrawingBlock(insert.Block.Name) || Math.Abs(insert.Rotation) > .001) continue;
             Box2? b = EntityBounds(insert);
             if (b == null || b.Width < border.Width*.2 || b.Height > border.Height*.3) continue;
             if (b.MinX >= border.MinX-1 && b.MaxX <= border.MaxX+1 && b.MinY >= border.MinY-1 && b.MaxY <= border.MinY+border.Height*.3)

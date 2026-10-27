@@ -4,6 +4,11 @@ using System.Text;
 using System.Text.Json;
 using SolidCraftCsvTool;
 
+if(args.Length==2&&args[0]=="--anonymous-title-check")
+{
+    AnonymousTitleChecks.Run(args[1]);return;
+}
+
 if(args.Length==2&&args[0]=="--optional-dimensions-check")
 {
     OptionalDimensionsChecks.Run(args[1]);return;
