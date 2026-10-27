@@ -66,6 +66,22 @@ internal static class PlanAnnotationChecks
         if(!female.Any(d=>Near(Math.Abs(N(d,24)-N(d,23)),80)&&N(d,10)<N(leading,13)))
             throw new Exception("Left female groove opening needs its own height dimension.");
 
+        // End strips at the top/bottom borders are not joint shoulders. In the
+        // user's drawing these were mistaken for a groove and merged 15+90=105.
+        var borders=new List<Line2>{new(new(0,0),new(0,200),"VISIBLE"),new(new(300,0),new(300,200),"VISIBLE")};
+        double[] stations=[0,15,105,135,225,300];
+        foreach(double y in new[]{0.0,200.0})
+            for(int i=1;i<stations.Length;i++)borders.Add(new(new(stations[i-1],y),new(stations[i],y),"VISIBLE"));
+        foreach(double x in stations[1..^1])borders.Add(new(new(x,0),new(x,200),"VISIBLE"));
+        var plain=top with{Lines=borders,Polylines=[]};
+        string borderFile=Path.Combine(directory,"plan-border-strips-sample.dxf");
+        MachiningDxf.Write(borderFile,new("5",front,plain,end,DxfFeatureDetector.Analyze(front,plain)));
+        var borderDimensions=ReadDimensions(borderFile).Where(d=>(int.Parse(d[70],CultureInfo.InvariantCulture)&7)==0&&Near(N(d,50),0)).ToArray();
+        var firstBorder=borderDimensions.Single(d=>Near(Width(d),15));
+        if(!borderDimensions.Any(d=>Near(Width(d),75)&&Near(N(d,23),N(firstBorder,23)))||
+            borderDimensions.Any(d=>Near(Width(d),105)&&Near(N(d,23),N(firstBorder,23))))
+            throw new Exception("Border strips must retain the 15 mm leading and 75 mm trailing bore gaps, never merge into 105.");
+
         string input=Path.Combine(directory,"batch-inputs");Directory.CreateDirectory(input);
         try
         {
@@ -76,7 +92,7 @@ internal static class PlanAnnotationChecks
                 throw new Exception("One-click input must include sorted individual STEP files and exclude the combined STEP.");
         }
         finally{Directory.Delete(input,true);}
-        Console.WriteLine("PASS: arc-based 15/90/30/90/66 plan chain; both groove depths beside shoulders; hidden split female groove retained; first/last calibrated to middle pairs; one-click STEP selection excludes assembly.");
+        Console.WriteLine("PASS: arc-based 15/90/30/90/66 plan chain; both groove depths beside shoulders; hidden split female groove retained; first/last calibrated to middle pairs; border strips do not merge 15+90 into 105; one-click STEP selection excludes assembly.");
     }
 
     static List<Dictionary<int,string>> ReadDimensions(string file)

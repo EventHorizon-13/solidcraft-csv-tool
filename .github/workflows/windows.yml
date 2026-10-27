@@ -36,6 +36,13 @@ jobs:
           $process = Start-Process dist/app/SolidCraftCsvTool.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png" -PassThru
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Export button check timed out' }
           if ($process.ExitCode -ne 0) { throw 'Export button check failed' }
+      - name: Build private projection review runner
+        run: dotnet publish tests/CoreChecks.csproj -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o dist/projection-review
+      - uses: actions/upload-artifact@v4
+        with:
+          name: projection-review-linux-arm64
+          path: dist/projection-review/CoreChecks
+          retention-days: 7
       - name: Package release
         shell: pwsh
         run: |

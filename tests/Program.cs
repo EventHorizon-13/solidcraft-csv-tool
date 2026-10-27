@@ -4,6 +4,16 @@ using System.Text;
 using System.Text.Json;
 using SolidCraftCsvTool;
 
+if(args.Length==4&&args[0]=="--projection-review")
+{
+    var front=DxfProjectionReader.Read(Path.Combine(args[1],"front.dxf"),"front");
+    var top=DxfProjectionReader.Read(Path.Combine(args[1],"top.dxf"),"top");
+    var end=DxfProjectionReader.Read(Path.Combine(args[1],"left.dxf"),"left");
+    MachiningDxf.Write(args[3],new("review",front,top,end,DxfFeatureDetector.Analyze(front,top)),new(){TemplatePath=args[2]});
+    Console.WriteLine("PASS: regenerated only the supplied private projection geometry.");
+    return;
+}
+
 if (args.Length == 3 && args[0] == "--template-preview")
 {
     int passed = DimensionChecks.Run(args[2], args[1]);
