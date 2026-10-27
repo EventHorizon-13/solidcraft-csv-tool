@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
@@ -10,6 +11,7 @@ public sealed class MainForm : Form
     readonly TextBox dxfBase = new(){Text=OutputNames.DefaultBase()}, stepBase = new(){Text=OutputNames.DefaultBase()};
     string displayedStamp=OutputNames.Stamp;
     readonly CheckBox taskCsv = new(){Text="导出当前任务 CSV",Checked=true,AutoSize=true};
+    readonly CheckBox openDxf = new(){Text="完成后打开 DXF",AutoSize=true};
     const int ControlPort=7878;
     const double CombinedGap=10;
     readonly CheckBox combined = new() { Text = "合并 STEP", Checked = true, AutoSize = true };
@@ -110,9 +112,9 @@ public sealed class MainForm : Form
         footer.RowStyles.Add(new(SizeType.AutoSize));
         FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         FlowLayoutPanel actions = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
-        choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);
+        choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);
         actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
-        stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite]);
+        stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite,openDxf]);
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
         footer.Controls.Add(choices,0,0);footer.Controls.Add(actions,1,0);layout.Controls.Add(footer,0,4);
@@ -268,6 +270,7 @@ public sealed class MainForm : Form
             }
             SetStatus($"完成：{rows.Count} 个型号"+(exportDxf?$"，1 个 DXF（{drawingCount} 张图）":"")); Log("输出目录：" + options.Output);
             MessageBox.Show(this, $"已导出 {rows.Count} 个型号。"+(exportDxf?$"\n已生成汇总 DXF，含 {drawingCount} 张图。":"")+$"\n{options.Output}", "导出完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if(exportDxf)OpenCompletedDxf(Path.Combine(options.Output,drawing.ResolvedFileName));
         }
         catch (OperationCanceledException) { SetStatus("已停止，已导出的文件保留。"); Log("已按请求停止。"); }
         catch (Exception ex) { string details = DescribeException(ex); Log("导出中止：" + details); ShowError(details); SetStatus("导出中止"); }
@@ -292,10 +295,26 @@ public sealed class MainForm : Form
             await Task.Run(() => StepDrawingExporter.RunAsync(files, target, ControlPort, progress, cancellation.Token, drawing));
             SetStatus($"加工图完成：1 个 DXF，含 {files.Length} 张图"); Log("汇总 DXF 输出文件夹：" + target);
             MessageBox.Show(this, $"已生成 1 个汇总 DXF，内含 {files.Length} 张带尺寸标注的三视图，按 STEP 文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, drawing.ResolvedFileName)}", "出图完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            OpenCompletedDxf(Path.Combine(target,drawing.ResolvedFileName));
         }
         catch (OperationCanceledException) { SetStatus("已停止；已完成的 DXF 保留。"); Log("STEP 批量出图已停止。"); }
         catch (Exception ex) { string details = DescribeException(ex); Log("STEP 出图中止：" + details); ShowError(details); SetStatus("STEP 出图中止"); }
         finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
+    }
+
+    void OpenCompletedDxf(string file)
+    {
+        if(!openDxf.Checked)return;
+        try
+        {
+            if(!File.Exists(file))throw new FileNotFoundException("未找到生成的 DXF 文件。",file);
+            Process.Start(new ProcessStartInfo(file){UseShellExecute=true});
+        }
+        catch(Exception ex) when(ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Log("DXF 已生成，自动打开失败："+ex.Message);
+            MessageBox.Show(this,"DXF 已生成，但无法自动打开。请检查 DXF 默认打开软件，或手动打开：\n"+file,"打开 DXF",MessageBoxButtons.OK,MessageBoxIcon.Information);
+        }
     }
 
     void SetRunning(bool running) { foreach (var control in editControls) control.Enabled = !running; run.Enabled = !running; runDxf.Enabled = !running; stop.Enabled = running; grid.ReadOnly = running; }
@@ -330,6 +349,7 @@ public sealed class MainForm : Form
             if (root.TryGetProperty("output", out var o)) output.Text = o.GetString() ?? output.Text;
             if(root.TryGetProperty("combined",out var c))combined.Checked=c.GetBoolean();
             if(root.TryGetProperty("taskCsv",out var csv))taskCsv.Checked=csv.GetBoolean();
+            if(root.TryGetProperty("openDxf",out var od))openDxf.Checked=od.GetBoolean();
             if(root.TryGetProperty("dxfBase",out var dn)&&dn.ValueKind==JsonValueKind.String)dxfBase.Text=dn.GetString();
             if(root.TryGetProperty("stepBase",out var sn)&&sn.ValueKind==JsonValueKind.String)stepBase.Text=sn.GetString();
             if (root.TryGetProperty("drawing", out var d))
@@ -347,7 +367,7 @@ public sealed class MainForm : Form
         {
             Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
             string stage = settingsPath + ".tmp";
-            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, combined=combined.Checked, taskCsv=taskCsv.Checked, dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text, stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text, drawing = drawingOptions }));
+            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, combined=combined.Checked, taskCsv=taskCsv.Checked, openDxf=openDxf.Checked, dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text, stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text, drawing = drawingOptions }));
             File.Move(stage, settingsPath, true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log("未能保存设置：" + ex.Message); }
@@ -371,6 +391,8 @@ public sealed class MainForm : Form
             new[]{run,runDxf,stop}.Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds)!=b.Bounds)||
             run.Parent!.Right!=run.Parent.Parent!.ClientSize.Width-run.Parent.Parent.Padding.Right)
             throw new InvalidOperationException("生成与停止按钮必须在底部右对齐并完整显示。");
+        if(!openDxf.Visible||Rectangle.Intersect(openDxf.Parent!.ClientRectangle,openDxf.Bounds)!=openDxf.Bounds)
+            throw new InvalidOperationException("完成后打开 DXF 选项必须完整显示。");
         if(editControls.OfType<Button>().Where(b=>b.Parent==import.Parent).Any(b=>Rectangle.Intersect(b.Parent!.ClientRectangle,b.Bounds).Width<b.Width))
             throw new InvalidOperationException("常用工具按钮必须完整显示。");
         if(help.Owner!=status.Owner || help.Owner!.Items.IndexOf(help)>=help.Owner.Items.IndexOf(progressBar) || editControls.OfType<NumericUpDown>().Any() || editControls.OfType<Button>().Any(b=>b.Text.StartsWith("启动 SolidCraft")))
