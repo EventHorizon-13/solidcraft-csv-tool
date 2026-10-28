@@ -78,6 +78,9 @@ jobs:
           Copy-Item 模板 '${{ matrix.output }}/模板' -Recurse
           Copy-Item tools/pdf-export/fonts.json.example '${{ matrix.output }}/模板/字体/fonts.json.example'
           Copy-Item examples/辊密封参数模板.csv '${{ matrix.output }}/辊密封参数模板.csv'
+          $expandedBytes = (Get-ChildItem '${{ matrix.output }}' -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          Write-Output "UNCOMPRESSED_PACKAGE_BYTES=$expandedBytes"
+          Write-Output "UNCOMPRESSED_PACKAGE_MIB=$([math]::Round($expandedBytes / 1MB, 1))"
           Compress-Archive -Path '${{ matrix.output }}/*' -DestinationPath 'dist/StandardRollerSeal-DevPreview-windows-${{ matrix.arch }}.zip' -Force
       - uses: actions/upload-artifact@v4
         with:
@@ -151,6 +154,9 @@ jobs:
           cp -R 模板 dist/app/模板
           cp tools/pdf-export/fonts.json.example dist/app/模板/字体/fonts.json.example
           cp examples/辊密封参数模板.csv dist/app/辊密封参数模板.csv
+          expanded_bytes=$(du -sb dist/app | cut -f1)
+          echo "UNCOMPRESSED_PACKAGE_BYTES=$expanded_bytes"
+          awk -v bytes="$expanded_bytes" 'BEGIN { printf "UNCOMPRESSED_PACKAGE_MIB=%.1f\n", bytes / 1048576 }'
           tar -czf "dist/StandardRollerSeal-DevPreview-linux-${{ matrix.arch }}.tar.gz" -C dist/app .
       - uses: actions/upload-artifact@v4
         with:
