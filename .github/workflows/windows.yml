@@ -92,7 +92,7 @@ jobs:
           $minimum = Join-Path $env:GITHUB_WORKSPACE 'dist/checks/minimum.png'
           $process = Start-Process $app -ArgumentList '--smoke-test', '--screenshot', $normal, '--minimum-screenshot', $minimum, '--dark-screenshot', (Join-Path $env:GITHUB_WORKSPACE 'dist/checks/dark.png'), '--about-screenshot', (Join-Path $env:GITHUB_WORKSPACE 'dist/checks/about.png'), '--settings-screenshot', (Join-Path $env:GITHUB_WORKSPACE 'dist/checks/drawing-settings.png') -PassThru
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Window layout check timed out' }
-          if ($process.ExitCode -ne 0) { throw 'Window layout check failed' }
+          if ($process.ExitCode -ne 0) { Get-Content (Join-Path (Split-Path $app) 'smoke-error.txt') -ErrorAction SilentlyContinue; throw 'Window layout check failed' }
       - uses: actions/upload-artifact@v4
         with:
           name: StandardRollerSeal-windows-${{ matrix.arch }}

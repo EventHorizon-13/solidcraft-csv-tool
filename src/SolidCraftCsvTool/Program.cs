@@ -70,6 +70,14 @@ internal static class Program
             Application.Run(form);
             return 0;
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
+        catch (Exception ex)
+        {
+            if(args.Contains("--smoke-test"))
+            {
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-error.txt"),ex.ToString());
+                return 1;
+            }
+            MessageBox.Show(ex.Message, "启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1;
+        }
     }
 }
