@@ -2,12 +2,12 @@
 
 Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。自包含 .NET，并附带对应架构的官方 SolidCraft 0.23 CLI。
 
-另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP、DXF 和开发者预览 PDF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：Windows Forms 界面不能直接编译成 macOS universal 应用。
+另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP、DXF 和PDF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：Windows Forms 界面不能直接编译成 macOS universal 应用。
 
 ## 使用
 
 1. 选择 V13 模板与输出文件夹，导入 `辊密封参数模板.csv` 或编辑参数表。
-2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。开发者预览版 PDF 需要外置 `gbenor.shx` 与 `gbcbig.shx`；默认字体目录为软件包 `模板/字体`，也可指定其他目录。字体文件不会随软件分发。
+2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。PDF 需要外置 `gbenor.shx` 与 `gbcbig.shx`；默认字体目录为软件包 `模板/字体`，也可指定其他目录。字体文件不会随软件分发。
 3. 可分别填写 DXF 文件名和组合 STEP 名。留空使用当天 `辊密封_MMDD`，不用填写后缀。
 4. 勾选是否“合并 STEP”“导出当前任务 CSV”“覆盖已有文件”“完成后打开 DXF”或“同时导出 PDF”（默认不勾选、记住设置；SolidCraft 固定自动后台运行，无需手动启动）。选 PDF 时会同时生成 DXF。
 5. “生成并导出Step”生成各单件 SolidCraft、STEP，以及选中的组合 STEP/任务 CSV；“一键生成并导出 DXF”再将同目录零件 STEP 汇总出图，排除组合 STEP。勾选 PDF 后也会生成多页 A4 横向 PDF，每个零件图框一页。
@@ -20,7 +20,7 @@ Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准�
 | 单件 STEP | 辊密封_MMDD_编号.step |
 | 组合 STEP（可关闭、可改名） | 辊密封_MMDD.step |
 | 汇总 DXF（可改名） | 辊密封_MMDD.dxf |
-| 多页加工图 PDF（预览选项） | 辊密封_MMDD.pdf |
+| 多页加工图 PDF | 辊密封_MMDD.pdf |
 | 当前任务 CSV（可关闭） | 辊密封_MMDD.csv |
 
 “当前任务 CSV”保留本次参数与编号。软件记住合并、CSV选项和自定义名称；默认名称每天自动更新日期。
@@ -60,11 +60,11 @@ Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准�
 
 DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION；图框内 Logo 的实心填充会保留闭合边界。数值来自 STEP 几何，制造前请核对实际图纸。
 
-PDF 开发者预览使用 MLightCAD 的开源 MIT DXF 数据模型、SHX/BigFont 字体渲染与矢量 PDF 渲染器。渲染依赖会预先打包成单个 JS 文件，安装包不带完整 `node_modules`。需提供含固定 A4 图框的 DXF 模板。生成时按每个独立加工图框排成一张 A4 横向页面，并将多页合并。PDF 中字体以矢量轮廓绘制；当前预览重点是核对大字体、图框和 Logo 显示，需使用实际图纸验收。可在“出图设置”指定外置字体目录；如果目录中含 `fonts.json`，可为 BigFont 指定编码。无 `fonts.json` 时，`gbcbig.shx` 默认按 GBK 读取。预览包包含依赖锁文件与许可证，便于追溯组件。
+PDF 使用 MLightCAD 的开源 MIT DXF 数据模型、SHX/BigFont 字体渲染与矢量 PDF 渲染器。渲染依赖会预先打包成单个 JS 文件，安装包不带完整 `node_modules`。需提供含固定 A4 图框的 DXF 模板。生成时按每个独立加工图框排成一张 A4 横向页面，并将多页合并。PDF 中字体以矢量轮廓绘制；加工使用前请用实际图纸核对图框、标注和 Logo。可在“出图设置”指定外置字体目录；如果目录中含 `fonts.json`，可为 BigFont 指定编码。无 `fonts.json` 时，`gbcbig.shx` 默认按 GBK 读取。软件包包含依赖锁文件与许可证，便于追溯组件。
 
 ## 构建和检查
 
-`./build.ps1 -Version 1.2` 发布 Windows amd64 程序。GitHub Actions 正式发布 Windows amd64/arm64 桌面包和 Linux amd64/arm64 CLI 包。单独的 Dev Preview 工作流构建含 PDF 导出的四种架构预览包，仅保留 Actions 构建产物，不替换正式发行版。Linux CLI 项目位于 `src/SolidCraftCli/`，自包含 .NET，并调用随包的官方 SolidCraft CLI；PDF 转换随包附带开源 Node.js 运行时及 MLightCAD 渲染器。私人模型、图框及 SHX 字体不上传仓库。
+2.0 正式版由 GitHub Actions 构建并发布 Windows amd64/arm64 桌面包和 Linux amd64/arm64 CLI 包。开发分支仍可单独构建预览包。Linux CLI 项目位于 `src/SolidCraftCli/`，自包含 .NET，并调用随包的官方 SolidCraft CLI；PDF 转换随包附带开源 Node.js 运行时及 MLightCAD 渲染器。私人模型、图框及 SHX 字体不上传仓库。
 
 文件名并排显示，生成与停止按钮放在底部导出选项同一行；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。
 

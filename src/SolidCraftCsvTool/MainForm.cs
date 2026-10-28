@@ -265,7 +265,7 @@ public sealed class MainForm : Form
                 if(createPdf)
                 {
                     if(string.IsNullOrWhiteSpace(drawing.TemplatePath))
-                        throw new IOException("PDF 开发者预览需要在“出图设置”中选择固定 A4 图框 DXF 模板。");
+                        throw new IOException("PDF 导出需要在“出图设置”中选择固定 A4 图框 DXF 模板。");
                     _=DrawingResources.Load(drawing);
                     PdfExportService.ValidateFontDirectory(drawing.FontDirectory);
                 }
@@ -315,7 +315,7 @@ public sealed class MainForm : Form
             if(createPdf)
             {
                 if(string.IsNullOrWhiteSpace(drawing.TemplatePath))
-                    throw new IOException("PDF 开发者预览需要在“出图设置”中选择固定 A4 图框 DXF 模板。");
+                    throw new IOException("PDF 导出需要在“出图设置”中选择固定 A4 图框 DXF 模板。");
                 _=DrawingResources.Load(drawing);
                 PdfExportService.ValidateFontDirectory(drawing.FontDirectory);
             }

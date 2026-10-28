@@ -41,7 +41,7 @@ public static class StepDrawingExporter
         if (exportPdf)
         {
             if (string.IsNullOrWhiteSpace(drawingOptions.TemplatePath))
-                throw new InvalidDataException("PDF 开发者预览需要选择包含固定 A4 图框的 DXF 模板。");
+                throw new InvalidDataException("PDF 导出需要选择包含固定 A4 图框的 DXF 模板。");
             _ = DrawingResources.Load(drawingOptions);
             if (!drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath))
                 throw new IOException("汇总 PDF 已存在，未覆盖原文件：" + pdfOutputPath);

@@ -1,146 +1,138 @@
-name: Build and release
+name: Build and release 2.0
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-    paths: ['src/**', 'tests/**', 'tools/**', 'README.md', 'build.ps1', 'THIRD_PARTY_NOTICES.md', '.github/workflows/windows.yml']
-  workflow_dispatch:
 permissions:
   contents: read
+
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 30
-    permissions:
-      contents: write
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            rid: win-x64
+            solidcraft_arch: x64
+            node_arch: x64
+            output: dist/app
+          - arch: arm64
+            rid: win-arm64
+            solidcraft_arch: arm64
+            node_arch: arm64
+            output: dist/app-arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=1.2" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.0" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Bundle official SolidCraft 0.23 Windows CLI for amd64 and arm64
+      - name: Install open-source PDF renderer
+        shell: pwsh
+        run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
+      - name: Bundle official SolidCraft CLI
         shell: pwsh
         run: |
-          foreach ($arch in @('x64','arm64')) {
-            $url = "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/solidcraft-0.23.0-windows-$arch-portable.zip"
-            $archive = "dist/solidcraft-$arch.zip"
-            $extract = "dist/official-$arch"
-            $destination = "dist/engine/$arch"
-            New-Item -ItemType Directory -Force (Split-Path $archive), $destination | Out-Null
-            Invoke-WebRequest $url -OutFile $archive
-            Expand-Archive $archive $extract
-            $cli = Get-ChildItem $extract -Recurse -Filter solidcraft-cli.exe | Select-Object -First 1
-            if (-not $cli) { throw "Official $arch package has no solidcraft-cli.exe" }
-            Copy-Item (Join-Path $cli.DirectoryName '*') $destination -Recurse
-            Remove-Item "$destination/solidcraft.exe" -ErrorAction SilentlyContinue
-            foreach ($notice in @('LICENSE-MIT','LICENSE-APACHE','NOTICE','THIRD-PARTY-LICENSES.txt')) {
-              Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" -OutFile "$destination/$notice"
-            }
+          $archive = "dist/solidcraft-${{ matrix.solidcraft_arch }}.zip"
+          New-Item -ItemType Directory -Force dist/official, "${{ matrix.output }}/SolidCraft" | Out-Null
+          Invoke-WebRequest "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/solidcraft-0.23.0-windows-${{ matrix.solidcraft_arch }}-portable.zip" -OutFile $archive
+          Expand-Archive $archive dist/official -Force
+          $cli = Get-ChildItem dist/official -Recurse -Filter solidcraft-cli.exe | Select-Object -First 1
+          if (-not $cli) { throw 'Official SolidCraft package has no CLI executable' }
+          Copy-Item (Join-Path $cli.DirectoryName '*') "${{ matrix.output }}/SolidCraft" -Recurse
+          Remove-Item "${{ matrix.output }}/SolidCraft/solidcraft.exe" -ErrorAction SilentlyContinue
+          foreach ($notice in @('LICENSE-MIT','LICENSE-APACHE','NOTICE','THIRD-PARTY-LICENSES.txt')) {
+            Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" -OutFile "${{ matrix.output }}/SolidCraft/$notice"
           }
-      - name: Check anonymous title block and nested logo
-        shell: pwsh
-        run: dotnet run --project tests/CoreChecks.csproj -c Release -- --anonymous-title-check dist/checks/title
-      - name: Publish Windows amd64 and arm64 applications
+      - name: Bundle open-source Node.js runtime and PDF renderer
         shell: pwsh
         run: |
-          foreach ($target in @(@{Rid='win-x64';Arch='x64';Out='dist/app'},@{Rid='win-arm64';Arch='arm64';Out='dist/app-arm64'})) {
-            New-Item -ItemType Directory -Force $target.Out | Out-Null
-            Copy-Item "dist/engine/$($target.Arch)" "$($target.Out)/SolidCraft" -Recurse
-            dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r $target.Rid --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o $target.Out
-            if ($LASTEXITCODE -ne 0) { throw "Publish failed for $($target.Rid)" }
-          }
-      - name: Check compact Windows layout
+          $nodeVersion = (node --version).Trim()
+          $nodeArchive = "node-$nodeVersion-win-${{ matrix.node_arch }}.zip"
+          New-Item -ItemType Directory -Force dist/node, "${{ matrix.output }}/PdfExporter" | Out-Null
+          Invoke-WebRequest "https://nodejs.org/dist/$nodeVersion/$nodeArchive" -OutFile "dist/$nodeArchive"
+          Expand-Archive "dist/$nodeArchive" dist/node -Force
+          $nodeExe = Get-ChildItem dist/node -Recurse -Filter node.exe | Select-Object -First 1
+          $nodeLicense = Get-ChildItem dist/node -Recurse -Filter LICENSE | Select-Object -First 1
+          if (-not $nodeExe -or -not $nodeLicense) { throw 'Node.js runtime archive is incomplete' }
+          Copy-Item $nodeExe.FullName "${{ matrix.output }}/PdfExporter/node.exe"
+          Copy-Item $nodeLicense.FullName "${{ matrix.output }}/PdfExporter/LICENSE-Node.js"
+          node tools/pdf-export/build-bundle.mjs "${{ matrix.output }}/PdfExporter"
+      - name: Publish Windows desktop preview
+        shell: pwsh
+        run: |
+          dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o '${{ matrix.output }}'
+          if ($LASTEXITCODE -ne 0) { throw 'Windows release publish failed' }
+          Copy-Item README.md, THIRD_PARTY_NOTICES.md '${{ matrix.output }}/'
+          Copy-Item 模板 '${{ matrix.output }}/模板' -Recurse
+          Copy-Item tools/pdf-export/fonts.json.example '${{ matrix.output }}/模板/字体/fonts.json.example'
+          Copy-Item examples/辊密封参数模板.csv '${{ matrix.output }}/辊密封参数模板.csv'
+          $expandedBytes = (Get-ChildItem '${{ matrix.output }}' -Recurse -File | Measure-Object -Property Length -Sum).Sum
+          Write-Output "UNCOMPRESSED_PACKAGE_BYTES=$expandedBytes"
+          Write-Output "UNCOMPRESSED_PACKAGE_MIB=$([math]::Round($expandedBytes / 1MB, 1))"
+          Compress-Archive -Path '${{ matrix.output }}/*' -DestinationPath 'dist/StandardRollerSeal-windows-${{ matrix.arch }}.zip' -Force
+      - name: Check Windows layout at normal and minimum size
+        if: matrix.arch == 'amd64'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/checks | Out-Null
-          $process = Start-Process dist/app/标准辊密封批量生成.exe -ArgumentList '--smoke-test', '--screenshot', "$env:GITHUB_WORKSPACE/dist/checks/window.png", '--about-screenshot', "$env:GITHUB_WORKSPACE/dist/checks/about.png", '--minimum-screenshot', "$env:GITHUB_WORKSPACE/dist/checks/minimum.png" -PassThru
-          if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Compact layout check timed out' }
-          if ($process.ExitCode -ne 0) { throw 'Compact layout check failed' }
-      - name: Package Windows release
-        shell: pwsh
-        run: |
-          foreach ($app in @('dist/app','dist/app-arm64')) {
-            Copy-Item README.md "$app/README.md"
-            Copy-Item THIRD_PARTY_NOTICES.md "$app/THIRD_PARTY_NOTICES.md"
-            Copy-Item 模板 "$app/模板" -Recurse
-            Copy-Item examples/辊密封参数模板.csv "$app/辊密封参数模板.csv"
-          }
-          Copy-Item examples/辊密封参数模板.csv dist/roller-seal-template.csv
-          Compress-Archive -Path dist/app/* -DestinationPath dist/StandardRollerSeal-windows-amd64.zip
-          Compress-Archive -Path dist/app-arm64/* -DestinationPath dist/StandardRollerSeal-windows-arm64.zip
-          @"
-          标准辊密封批量生成 $env:BUILD_VERSION，编译于 $env:BUILD_DATE。
-          Windows amd64 与 arm64 自包含版本，固定使用随包附带的官方 SolidCraft 0.23 CLI。
-          新增检查更新；按操作系统和 CPU 架构选择安装包，Windows 支持自动更新。
-          关于页面列出 SolidCraft CLI、netDxf 与 GitHub Releases API 的用途。
-          Linux amd64/arm64 CLI 安装包会在本工作流后续步骤加入本次发布。
-          保留全部图纸、CSV 和界面功能，继续支持 DXF/组合 STEP/当前任务 CSV 输出。
-          源码提交：$env:GITHUB_SHA
-          "@ | Set-Content dist/release-notes.md -Encoding utf8
+          $app = Join-Path (Resolve-Path '${{ matrix.output }}') '标准辊密封批量生成.exe'
+          $normal = Join-Path $env:GITHUB_WORKSPACE 'dist/checks/window.png'
+          $minimum = Join-Path $env:GITHUB_WORKSPACE 'dist/checks/minimum.png'
+          $process = Start-Process $app -ArgumentList '--smoke-test', '--screenshot', $normal, '--minimum-screenshot', $minimum -PassThru
+          if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Window layout check timed out' }
+          if ($process.ExitCode -ne 0) { throw 'Window layout check failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: StandardRollerSeal-windows
-          path: |
-            dist/StandardRollerSeal-windows-amd64.zip
-            dist/StandardRollerSeal-windows-arm64.zip
-            dist/roller-seal-template.csv
+          name: StandardRollerSeal-windows-${{ matrix.arch }}
+          path: dist/StandardRollerSeal-windows-${{ matrix.arch }}.zip
           retention-days: 30
-      - name: Publish Windows release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $tag = "win-$env:BUILD_VERSION"
-          gh release view $tag 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            gh api "repos/$env:GITHUB_REPOSITORY/git/refs/tags/$tag" --method PATCH --field "sha=$env:GITHUB_SHA" --field "force=true"
-            if ($LASTEXITCODE -ne 0) { throw 'Could not update release tag' }
-            gh release upload $tag dist/StandardRollerSeal-windows-amd64.zip dist/StandardRollerSeal-windows-arm64.zip dist/roller-seal-template.csv --clobber
-            if ($LASTEXITCODE -ne 0) { throw 'Could not replace Windows release assets' }
-            gh release edit $tag --title "标准辊密封批量生成 $env:BUILD_VERSION" --notes-file dist/release-notes.md
-          } else {
-            gh release create $tag dist/StandardRollerSeal-windows-amd64.zip dist/StandardRollerSeal-windows-arm64.zip dist/roller-seal-template.csv --target "$env:GITHUB_SHA" --title "标准辊密封批量生成 $env:BUILD_VERSION" --notes-file dist/release-notes.md
-          }
-          if ($LASTEXITCODE -ne 0) { throw 'Could not publish Windows release' }
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dimension-checks
-          path: dist/checks/
-          if-no-files-found: ignore
-          retention-days: 14
 
   linux-cli:
-    needs: windows
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      contents: write
+    timeout-minutes: 40
     strategy:
-      max-parallel: 1
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
             rid: linux-x64
             solidcraft_arch: x86_64
+            node_arch: x64
           - arch: arm64
             rid: linux-arm64
             solidcraft_arch: aarch64
+            node_arch: arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - name: Bundle official SolidCraft Linux CLI
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - name: Set release identity
+        shell: bash
+        run: |
+          echo "BUILD_VERSION=2.0" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
+      - name: Install open-source PDF renderer
+        run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
+      - name: Bundle official SolidCraft CLI
         shell: bash
         run: |
           set -euo pipefail
-          echo 'BUILD_VERSION=1.2' >> "$GITHUB_ENV"
           mkdir -p dist/official dist/app/SolidCraft
           archive="solidcraft-0.23.0-linux-${{ matrix.solidcraft_arch }}.tar.gz"
           curl --fail --location "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/$archive" --output "dist/$archive"
@@ -151,27 +143,77 @@ jobs:
           for notice in LICENSE-MIT LICENSE-APACHE NOTICE THIRD-PARTY-LICENSES.txt; do
             curl --fail --location "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" --output "dist/app/SolidCraft/$notice"
           done
-      - name: Publish self-contained Linux CLI
+      - name: Bundle open-source Node.js runtime and PDF renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_version="$(node --version)"
+          archive="node-${node_version}-linux-${{ matrix.node_arch }}.tar.xz"
+          curl --fail --location "https://nodejs.org/dist/${node_version}/${archive}" --output "dist/${archive}"
+          mkdir -p dist/node dist/app/PdfExporter
+          tar -xJf "dist/${archive}" -C dist/node
+          node_dir="$(find dist/node -mindepth 1 -maxdepth 1 -type d -name 'node-*' -print -quit)"
+          install -m 755 "${node_dir}/bin/node" dist/app/PdfExporter/node
+          cp "${node_dir}/LICENSE" dist/app/PdfExporter/LICENSE-Node.js
+          node tools/pdf-export/build-bundle.mjs dist/app/PdfExporter
+      - name: Publish Linux CLI preview
         shell: bash
         run: |
           set -euo pipefail
           dotnet publish src/SolidCraftCli/SolidCraftCli.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$BUILD_VERSION" -o dist/app
-      - name: Package Linux CLI
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp README.md dist/app/README.md
-          cp THIRD_PARTY_NOTICES.md dist/app/THIRD_PARTY_NOTICES.md
+          cp README.md THIRD_PARTY_NOTICES.md dist/app/
           cp -R 模板 dist/app/模板
+          cp tools/pdf-export/fonts.json.example dist/app/模板/字体/fonts.json.example
           cp examples/辊密封参数模板.csv dist/app/辊密封参数模板.csv
+          expanded_bytes=$(du -sb dist/app | cut -f1)
+          echo "UNCOMPRESSED_PACKAGE_BYTES=$expanded_bytes"
+          awk -v bytes="$expanded_bytes" 'BEGIN { printf "UNCOMPRESSED_PACKAGE_MIB=%.1f\n", bytes / 1048576 }'
           tar -czf "dist/StandardRollerSeal-linux-${{ matrix.arch }}.tar.gz" -C dist/app .
       - uses: actions/upload-artifact@v4
         with:
           name: StandardRollerSeal-linux-${{ matrix.arch }}
           path: dist/StandardRollerSeal-linux-${{ matrix.arch }}.tar.gz
           retention-days: 30
-      - name: Add Linux CLI to release
+
+  publish-release:
+    needs: [windows, linux-cli]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: StandardRollerSeal-*
+          path: dist/release-assets
+          merge-multiple: true
+      - name: Publish GitHub release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "win-$BUILD_VERSION" "dist/StandardRollerSeal-linux-${{ matrix.arch }}.tar.gz" --clobber
+        run: |
+          set -euo pipefail
+          files=(dist/release-assets/StandardRollerSeal-*)
+          if [ "${#files[@]}" -ne 4 ]; then
+            printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
+            exit 1
+          fi
+          tag="win-2.0"
+          title="标准辊密封批量生成 2.0"
+          cat > dist/release-notes.md <<EOF
+          标准辊密封批量生成 2.0 正式版。
+
+          - Windows 桌面版：amd64、arm64
+          - Linux CLI：amd64、arm64
+          - PDF 使用开源 DXF 矢量渲染；不包含 ODA 或专有 SDK。
+          - 请在出图设置中指定固定 A4 DXF 图框，并外挂有使用授权的 gbenor.shx、gbcbig.shx。
+          - PDF 文字按矢量轮廓输出；DXF 仍可编辑。请先用实际图纸核对字体、图框和 Logo。
+
+          源码提交：$GITHUB_SHA
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --title "$title" --notes-file dist/release-notes.md
+          else
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md
+          fi

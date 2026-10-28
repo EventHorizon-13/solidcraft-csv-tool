@@ -25,7 +25,7 @@ await setupTextFonts(fontDirectory)
 const combined = await PDFDocument.create()
 combined.setTitle(basename(output))
 combined.setProducer('MLightCAD pdf-renderer')
-combined.setCreator('标准辊密封批量生成 Dev Preview')
+combined.setCreator('标准辊密封批量生成 2.0')
 const glyphProvider = createPdfGlyphProvider()
 
 for (let index = 0; index < inputs.length; index++) {
