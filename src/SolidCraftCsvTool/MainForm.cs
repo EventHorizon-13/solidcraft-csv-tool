@@ -42,8 +42,14 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new(SizeType.Absolute,48));
         layout.RowStyles.Add(new(SizeType.Percent,100));
         layout.RowStyles.Add(new(SizeType.Absolute,98));
-        layout.RowStyles.Add(new(SizeType.AutoSize));
-        Controls.Add(layout);
+        layout.RowStyles.Add(new(SizeType.Absolute,64));
+        TableLayoutPanel root = new() { Dock=DockStyle.Fill, ColumnCount=1, RowCount=2, Margin=Padding.Empty, Padding=Padding.Empty };
+        root.ColumnStyles.Add(new(SizeType.Percent,100));
+        root.RowStyles.Add(new(SizeType.Percent,100));
+        root.RowStyles.Add(new(SizeType.Absolute,28));
+        root.Controls.Add(layout,0,0); Controls.Add(root);
+        layout.Margin=Padding.Empty;
+        layout.ColumnStyles.Add(new(SizeType.Percent,100));
 
         TableLayoutPanel paths = new() { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3 };
         paths.ColumnStyles.Add(new(SizeType.Absolute,124));paths.ColumnStyles.Add(new(SizeType.Percent,100));paths.ColumnStyles.Add(new(SizeType.Absolute,96));
@@ -108,10 +114,10 @@ public sealed class MainForm : Form
         log.BackColor = Color.White; log.BorderStyle = BorderStyle.FixedSingle;
         layout.Controls.Add(log, 0, 3);
 
-        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,8)};
+        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=false,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,8)};
         footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));
-        footer.RowStyles.Add(new(SizeType.AutoSize));
-        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=true,Margin=Padding.Empty};
+        footer.RowStyles.Add(new(SizeType.Percent,100));
+        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=false,WrapContents=true,Margin=Padding.Empty};
         FlowLayoutPanel actions = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
         choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);choices.Controls.Add(exportPdf);
         actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
@@ -119,9 +125,10 @@ public sealed class MainForm : Form
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
         footer.Controls.Add(choices,0,0);footer.Controls.Add(actions,1,0);layout.Controls.Add(footer,0,4);
-        StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor };
+        StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor, AutoSize=false, Height=28 };
+        progressBar.AutoSize=false; progressBar.Size=new Size(150,16);
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;
-        strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); Controls.Add(strip); strip.Dock = DockStyle.Bottom;
+        strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); root.Controls.Add(strip,0,1); strip.Dock = DockStyle.Fill;
         output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SolidCraft输出");
         LoadSettings(); ResolveLocalTemplates(); AddRow(ModelRules.DefaultRow());
         Shown+=(_,_)=>{help.AutoSize=false;help.Width=TextRenderer.MeasureText(help.Text,help.Font).Width+12;};
@@ -424,3 +431,4 @@ public sealed class MainForm : Form
         if (!run.Enabled || !runDxf.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");
     }
 }
+

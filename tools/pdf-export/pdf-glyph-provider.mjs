@@ -2,12 +2,12 @@ import { MTextColor } from '@mlightcad/mtext-parser'
 import { AcTrMTextRenderer } from '@mlightcad/three-renderer'
 
 // Adapted from MLightCAD's MIT-licensed cad-pdf-plugin glyph provider.
-export function createPdfGlyphProvider() {
-  const empty = {
+const empty = {
     triangles: new Float32Array(0),
     polylines: new Float32Array(0)
   }
-  const emptyBox = { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } }
+const emptyBox = { min: { x: 0, y: 0 }, max: { x: 0, y: 0 } }
+export function createPdfGlyphProvider() {
   return {
     async renderMText(data, style, colorSettings) {
       try {
@@ -136,3 +136,4 @@ function extractGlyphPrimitives(root, originX, originY) {
     : emptyBox
   return { primitives, colorGroups: colorGroups.length > 1 ? colorGroups : undefined, box }
 }
+

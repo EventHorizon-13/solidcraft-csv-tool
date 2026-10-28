@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text;
 
 namespace SolidCraftCsvTool;
 
@@ -45,6 +46,8 @@ internal static class PdfExportService
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
             CreateNoWindow = true
         };
         start.ArgumentList.Add(script);
@@ -65,7 +68,7 @@ internal static class PdfExportService
         }
         string output = await stdout;
         string error = await stderr;
-        foreach (string line in output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             progress.Report(new(line, 0, true));
         if (process.ExitCode != 0)
             throw new IOException("开源 PDF 渲染器执行失败：" + (string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim()));
@@ -78,3 +81,4 @@ internal static class PdfExportService
             throw new InvalidDataException("PDF 渲染器输出内容无效。");
     }
 }
+

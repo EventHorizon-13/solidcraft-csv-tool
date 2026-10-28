@@ -35,7 +35,7 @@ for (let index = 0; index < inputs.length; index++) {
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
   const database = new AcDbDatabase()
   acdbHostApplicationServices().workingDatabase = database
-  await database.read(buffer, { readOnly: true }, AcDbFileType.DXF)
+  await database.read(buffer, { readOnly: true, drawNoPlotLayers: false }, AcDbFileType.DXF)
   const pageBytes = await exportDatabaseToPdf(database, {
     title: basename(input),
     paper: { widthMm: 297, heightMm: 210 },
@@ -155,3 +155,4 @@ async function setupTextFonts(directory) {
   const missing = statuses.filter(status => status.status !== 'Success')
   if (missing.length) throw new Error(`无法加载外置 SHX 字体：${missing.map(item => item.fontName).join('、')}`)
 }
+

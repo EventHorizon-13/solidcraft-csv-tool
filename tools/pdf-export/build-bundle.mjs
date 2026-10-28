@@ -2,6 +2,7 @@ import { build } from 'esbuild'
 import { copyFile, mkdir, readdir, readFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { patchBigFontScale } from './font-scale-compat.mjs'
 
 const projectDirectory = dirname(fileURLToPath(import.meta.url))
 const outputDirectory = resolve(process.argv[2] ?? '')
@@ -13,6 +14,14 @@ await build({
   entryPoints: [join(projectDirectory, 'pdf-exporter.mjs')],
   outfile: join(outputDirectory, 'pdf-exporter.bundle.mjs'),
   bundle: true,
+  plugins: [{
+    name: 'bigfont-own-cap-height',
+    setup(builder) {
+      builder.onLoad({ filter: /[\\/]@mlightcad[\\/]mtext-renderer[\\/]dist[\\/]index\.js$/ }, async ({ path }) => ({
+        contents: patchBigFontScale(await readFile(path, 'utf8')), loader: 'js'
+      }))
+    }
+  }],
   minify: true,
   platform: 'node',
   format: 'esm',
@@ -102,3 +111,4 @@ async function findLegalFiles(directory, relative = '') {
   }
   return result
 }
+
