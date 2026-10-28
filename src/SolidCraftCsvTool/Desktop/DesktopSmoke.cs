@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -46,6 +47,23 @@ internal static class DesktopSmoke
         }
         if(verified==0)throw new InvalidOperationException("未检查到可见文字控件。");
     }
+    static void VerifyGridHeaders(MainWindow window,AppearanceMode mode)
+    {
+        var headers=All(window).OfType<DataGridColumnHeader>().Where(h=>h.IsVisible).ToArray();
+        if(headers.Length==0)throw new InvalidOperationException("未找到可见的参数表列头。");
+        foreach(var header in headers)
+        {
+            if(header.Background is not SolidColorBrush || header.Foreground is not SolidColorBrush foreground)
+                throw new InvalidOperationException("参数表列头未绑定主题背景或文字颜色。");
+            Color background=Background(header),text=Composite(foreground.Color,background,foreground.Opacity);
+            double a=Luminance(text),b=Luminance(background),ratio=(Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);
+            if(ratio<4.5)throw new InvalidOperationException($"参数表列头对比度不足：{header.Content} ratio={ratio:F2}");
+            if(mode==AppearanceMode.Dark&&b>.20)
+                throw new InvalidOperationException($"深色模式列头背景仍过亮：{header.Content} background={background}");
+            if(mode==AppearanceMode.Light&&b<.50)
+                throw new InvalidOperationException($"浅色模式列头背景过暗：{header.Content} background={background}");
+        }
+    }
     static void Capture(Window window,string path)
     {
         var image=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(window.ActualWidth)),Math.Max(1,(int)Math.Ceiling(window.ActualHeight)),96,96,PixelFormats.Pbgra32);image.Render(window);
@@ -57,11 +75,11 @@ internal static class DesktopSmoke
         window.LoadSmokeRows();
         foreach(var mode in new[]{AppearanceMode.Automatic,AppearanceMode.Dark,AppearanceMode.Light})
         {
-            DesktopApp.SetAppearance(mode);await Settle(window);window.VerifyUi();VerifyContrast(window);
+            DesktopApp.SetAppearance(mode);await Settle(window);window.VerifyUi();VerifyContrast(window);VerifyGridHeaders(window,mode);
         }
         DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);
         if(Arg("--screenshot") is string normal)Capture(window,normal);
-        if(Arg("--dark-screenshot") is string dark){DesktopApp.SetAppearance(AppearanceMode.Dark);await Settle(window);VerifyContrast(window);Capture(window,dark);}
+        if(Arg("--dark-screenshot") is string dark){DesktopApp.SetAppearance(AppearanceMode.Dark);await Settle(window);VerifyContrast(window);VerifyGridHeaders(window,AppearanceMode.Dark);Capture(window,dark);}
         if(Arg("--about-screenshot") is string about)
         {
             var dialog=new AboutWindow{Owner=window};dialog.Show();
@@ -87,7 +105,7 @@ internal static class DesktopSmoke
         {
             window.Width=window.MinWidth;window.Height=window.MinHeight;DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);window.VerifyUi();VerifyContrast(window);Capture(window,minimum);
         }
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data, light/dark/system and repeated switches; text contrast; main/settings/about and minimum size.");
+        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data, light/dark/system and repeated switches; text and grid header contrast; main/settings/about and minimum size.");
         window.Close();
     }
 }
