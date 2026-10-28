@@ -1,7 +1,9 @@
 name: Windows Fluent UI verification
 on:
   push:
-    branches: [fix/windows-fluent]
+    branches: [main, fix/windows-fluent]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
