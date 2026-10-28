@@ -6,40 +6,36 @@ internal sealed class AboutForm : Form
 {
     public AboutForm()
     {
-        Text="关于标准辊密封";Icon=AppArtwork.LoadIcon();Font=new Font("Microsoft YaHei UI",10F);
-        AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(500,570);FormBorderStyle=FormBorderStyle.FixedDialog;
+        Text="关于";Icon=AppArtwork.LoadIcon();Font=SystemFonts.MessageBoxFont;
+        AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(470,292);FormBorderStyle=FormBorderStyle.FixedDialog;
         StartPosition=FormStartPosition.CenterParent;MaximizeBox=false;MinimizeBox=false;ShowInTaskbar=false;
-        var root=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(40,24,40,28),ColumnCount=1,RowCount=9};
+        var root=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(24),ColumnCount=1,RowCount=7};
         root.ColumnStyles.Add(new(SizeType.Percent,100));
-        foreach(int height in new[]{140,48,28,30,36,28,44})root.RowStyles.Add(new(SizeType.Absolute,height));
+        foreach(int height in new[]{60,28,28,28,32})root.RowStyles.Add(new(SizeType.Absolute,height));
         root.RowStyles.Add(new(SizeType.Percent,100));root.RowStyles.Add(new(SizeType.AutoSize));Controls.Add(root);
+        var header=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
+        header.ColumnStyles.Add(new(SizeType.Absolute,56));header.ColumnStyles.Add(new(SizeType.Percent,100));
+        header.RowStyles.Add(new(SizeType.Absolute,28));header.RowStyles.Add(new(SizeType.Percent,100));
         var image=AppArtwork.LoadImage();
-        var logo=new PictureBox{Image=image,SizeMode=PictureBoxSizeMode.Zoom,Size=new Size(112,112),Anchor=AnchorStyles.None,Margin=Padding.Empty};
-        root.Controls.Add(logo,0,0);FormClosed+=(_,_)=>image.Dispose();
-        Center(AppBuildInfo.ProductName,1,21,FontStyle.Bold);
-        Center("版本 "+AppBuildInfo.Version,2,10,muted:true);
-        Center("批量建模与加工图导出",3,11,muted:true);
-        var author=new LinkLabel{Text="EventHorizon-13",AutoSize=true,Anchor=AnchorStyles.None,Margin=Padding.Empty};
-        author.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13");root.Controls.Add(author,0,4);
-        Center("构建于 "+AppBuildInfo.BuildDate,5,9,muted:true);
-        var links=new FlowLayoutPanel{AutoSize=true,Anchor=AnchorStyles.None,WrapContents=false,Margin=Padding.Empty};
-        var home=new LinkLabel{Text="项目主页",AutoSize=true,Margin=new Padding(0,0,22,0)};
-        home.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13/solidcraft-roller-seal");
-        var notices=new LinkLabel{Text="组件与许可",AutoSize=true,Margin=Padding.Empty};notices.LinkClicked+=(_,_)=>ShowNotices();
-        links.Controls.Add(home);links.Controls.Add(notices);root.Controls.Add(links,0,6);
-        var footer=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=2,Margin=Padding.Empty};
-        footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.RowStyles.Add(new(SizeType.AutoSize));footer.RowStyles.Add(new(SizeType.AutoSize));
+        var logo=new PictureBox{Image=image,SizeMode=PictureBoxSizeMode.Zoom,Size=new Size(40,40),Anchor=AnchorStyles.Top|AnchorStyles.Left,Margin=new Padding(0,0,16,0)};
+        header.Controls.Add(logo,0,0);header.SetRowSpan(logo,2);FormClosed+=(_,_)=>image.Dispose();
+        header.Controls.Add(new Label{Text=AppBuildInfo.ProductName,Font=new Font(Font,FontStyle.Bold),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},1,0);
+        header.Controls.Add(new Label{Text="版本 "+AppBuildInfo.Version,Dock=DockStyle.Fill,TextAlign=ContentAlignment.TopLeft,Margin=Padding.Empty},1,1);root.Controls.Add(header,0,0);
+        var author=new LinkLabel{Text="EventHorizon-13",AutoSize=true,Anchor=AnchorStyles.Left,Margin=Padding.Empty};
+        author.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13");root.Controls.Add(author,0,1);
+        root.Controls.Add(new Label{Text="构建时间  "+AppBuildInfo.BuildDate,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,2);
+        root.Controls.Add(new Label{Text="参数建模、STEP 与加工图批量导出",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,3);
+        var links=new FlowLayoutPanel{Dock=DockStyle.Fill,WrapContents=false,Margin=Padding.Empty};
+        var home=new LinkLabel{Text="项目主页",AutoSize=true,Margin=new Padding(0,6,18,0)};home.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13/solidcraft-roller-seal");
+        var notices=new LinkLabel{Text="组件与许可",AutoSize=true,Margin=new Padding(0,6,0,0)};notices.LinkClicked+=(_,_)=>ShowNotices();
+        links.Controls.Add(home);links.Controls.Add(notices);root.Controls.Add(links,0,4);
         var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
-        var check=new ModernButton{Text="检查更新",MinimumSize=new Size(110,36),Margin=new Padding(0,0,10,0)};
-        var close=new ModernButton{Text="关闭",MinimumSize=new Size(90,36),DialogResult=DialogResult.OK,Margin=Padding.Empty};
-        var updateStatus=new Label{AutoSize=true,Dock=DockStyle.Fill,Tag="muted",Margin=new Padding(0,8,0,0)};
+        var check=new Button{Text="检查更新",AutoSize=true,MinimumSize=new Size(90,28),Margin=new Padding(0,0,8,0),UseVisualStyleBackColor=true};
+        var close=new Button{Text="关闭",AutoSize=true,MinimumSize=new Size(76,28),DialogResult=DialogResult.OK,Margin=Padding.Empty,UseVisualStyleBackColor=true};
+        var updateStatus=new Label{AutoSize=true,Margin=new Padding(12,6,0,0)};
         check.Click+=async(_,_)=>await CheckUpdateAsync(check,updateStatus);
-        buttons.Controls.Add(check);buttons.Controls.Add(close);footer.Controls.Add(buttons,0,0);footer.Controls.Add(updateStatus,0,1);root.Controls.Add(footer,0,8);
+        buttons.Controls.Add(check);buttons.Controls.Add(close);buttons.Controls.Add(updateStatus);root.Controls.Add(buttons,0,6);
         AcceptButton=close;CancelButton=close;AppTheme.Attach(this);
-        void Center(string text,int row,float size,FontStyle style=FontStyle.Regular,bool muted=false)
-        {
-            root.Controls.Add(new Label{Text=text,Font=new Font(Font.FontFamily,size,style),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Margin=Padding.Empty,Tag=muted?"muted":null},0,row);
-        }
     }
     internal void VerifyUi()
     {

@@ -17,12 +17,13 @@ internal static class Program
         }
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         ApplicationConfiguration.Initialize();
+        AppTheme.Initialize();
         try
         {
             using MainForm form = new();
             if (args.Contains("--smoke-test"))
             {
-                form.Show(); Application.DoEvents(); form.VerifyUi();
+                form.LoadSmokeRows();form.Show(); Application.DoEvents(); form.VerifyUi();
                 var initialTheme=AppTheme.Mode;
                 foreach(var mode in Enum.GetValues<ThemeMode>())
                 {

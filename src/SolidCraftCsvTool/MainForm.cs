@@ -11,18 +11,18 @@ public sealed class MainForm : Form
     string nativeTemplatePath="";
     readonly TextBox dxfBase = new(){Text=OutputNames.DefaultBase()}, stepBase = new(){Text=OutputNames.DefaultBase()};
     string displayedStamp=OutputNames.Stamp;
-    readonly CheckBox taskCsv = new ModernCheckBox(){Text="导出当前任务 CSV",Checked=true,AutoSize=true};
-    readonly CheckBox openDxf = new ModernCheckBox(){Text="完成后打开 DXF",AutoSize=true};
-    readonly CheckBox exportPdf = new ModernCheckBox(){Text="同时导出 PDF",AutoSize=true};
+    readonly CheckBox taskCsv = new CheckBox(){Text="导出当前任务 CSV",Checked=true,AutoSize=true};
+    readonly CheckBox openDxf = new CheckBox(){Text="完成后打开 DXF",AutoSize=true};
+    readonly CheckBox exportPdf = new CheckBox(){Text="同时导出 PDF",AutoSize=true};
     const int ControlPort=7878;
     const double CombinedGap=10;
-    readonly CheckBox combined = new ModernCheckBox() { Text = "合并 STEP", Checked = true, AutoSize = true };
-    readonly CheckBox overwrite = new ModernCheckBox() { Text = "覆盖已有文件", AutoSize = true };
+    readonly CheckBox combined = new CheckBox() { Text = "合并 STEP", Checked = true, AutoSize = true };
+    readonly CheckBox overwrite = new CheckBox() { Text = "覆盖已有文件", AutoSize = true };
     readonly Button run = CreateButton("生成并导出Step");
     readonly Button runDxf = CreateButton("一键生成并导出 DXF");
     readonly Button stop = CreateButton("停止");
     readonly Button about = CreateButton("关于");
-    readonly ComboBox themeMode = new ModernComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    readonly ComboBox themeMode = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     readonly ToolStripStatusLabel status = new("准备就绪");
     readonly ToolStripStatusLabel help = new("x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm") { ForeColor=SystemColors.GrayText };
     readonly ToolStripProgressBar progressBar = new() { Width = 150 };
@@ -34,27 +34,22 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = AppBuildInfo.WindowTitle;Icon=AppArtwork.LoadIcon();
-        Font = new Font("Microsoft YaHei UI", 9.5F);
+        Font = SystemFonts.MessageBoxFont;
         ClientSize = new Size(1360, 880); MinimumSize = new Size(1100, 760);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(247, 248, 250);
         AutoScaleMode = AutoScaleMode.Dpi;
         TableLayoutPanel layout = new() { Dock = DockStyle.Fill, Padding = new Padding(22, 12, 22, 6), ColumnCount = 1, RowCount = 5 };
-        layout.RowStyles.Add(new(SizeType.Absolute,132));
+        layout.RowStyles.Add(new(SizeType.Absolute,96));
         layout.RowStyles.Add(new(SizeType.Absolute,48));
         layout.RowStyles.Add(new(SizeType.Percent,100));
-        layout.RowStyles.Add(new(SizeType.Absolute,72));
         layout.RowStyles.Add(new(SizeType.Absolute,48));
-        TableLayoutPanel root = new() { Dock=DockStyle.Fill, ColumnCount=1, RowCount=3, Margin=Padding.Empty, Padding=Padding.Empty };
+        layout.RowStyles.Add(new(SizeType.Absolute,48));
+        TableLayoutPanel root = new() { Dock=DockStyle.Fill, ColumnCount=1, RowCount=2, Margin=Padding.Empty, Padding=Padding.Empty };
         root.ColumnStyles.Add(new(SizeType.Percent,100));
-        root.RowStyles.Add(new(SizeType.Absolute,64));
         root.RowStyles.Add(new(SizeType.Percent,100));
         root.RowStyles.Add(new(SizeType.Absolute,28));
-        root.Controls.Add(layout,0,1); Controls.Add(root);
-        var heading=new Panel{Dock=DockStyle.Fill,Padding=new Padding(26,12,26,0)};
-        heading.Controls.Add(new Label{Text="参数化建模与加工图导出",Tag="muted",AutoSize=true,Location=new Point(28,42),Font=new Font(Font.FontFamily,9F)});
-        heading.Controls.Add(new Label{Text="标准辊密封",AutoSize=true,Location=new Point(24,8),Font=new Font(Font.FontFamily,20,FontStyle.Bold)});
-        root.Controls.Add(heading,0,0);
+        root.Controls.Add(layout,0,0); Controls.Add(root);
         layout.Margin=Padding.Empty;
         layout.ColumnStyles.Add(new(SizeType.Percent,100));
 
@@ -67,14 +62,14 @@ public sealed class MainForm : Form
         names.ColumnStyles.Add(new(SizeType.Absolute,112));names.ColumnStyles.Add(new(SizeType.Percent,50));
         names.ColumnStyles.Add(new(SizeType.Absolute,86));names.ColumnStyles.Add(new(SizeType.Absolute,106));
         names.Controls.Add(new Label{Text="DXF 文件名",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,0);
-        dxfBase.Margin=new Padding(0,4,8,4);names.Controls.Add(Ui.Field(dxfBase),1,0);
+        dxfBase.Margin=new Padding(0,4,8,4);names.Controls.Add(dxfBase,1,0);dxfBase.Dock=DockStyle.Fill;
         names.Controls.Add(new Label{Text="组合 STEP 名",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(12,0,0,0)},2,0);
-        stepBase.Margin=new Padding(0,4,0,4);names.Controls.Add(Ui.Field(stepBase),3,0);
+        stepBase.Margin=new Padding(0,4,0,4);names.Controls.Add(stepBase,3,0);stepBase.Dock=DockStyle.Fill;
         names.Controls.Add(new Label{Text="深色模式",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(12,0,0,0)},4,0);
         themeMode.Items.AddRange(["自动","开","关"]);themeMode.SelectedIndex=0;
         themeMode.Margin=new Padding(0,8,0,4);names.Controls.Add(themeMode,5,0);
         editControls.AddRange([dxfBase,stepBase]);paths.Controls.Add(names,0,1);paths.SetColumnSpan(names,3);
-        var pathsCard=new SurfacePanel{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,8)};
+        var pathsCard=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=new Padding(0,0,0,4)};
         pathsCard.Controls.Add(paths);layout.Controls.Add(pathsCard,0,0);
 
         FlowLayoutPanel toolbar = new() { Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true, Padding = new Padding(0, 6, 0, 0), Margin=Padding.Empty };
@@ -98,8 +93,8 @@ public sealed class MainForm : Form
         grid.CellBorderStyle=DataGridViewCellBorderStyle.SingleHorizontal;grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.None;grid.RowHeadersBorderStyle=DataGridViewHeaderBorderStyle.None;
         grid.RowHeadersWidth = 42; grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         grid.MultiSelect = true; grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        grid.ColumnHeadersHeight = 42; grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        grid.RowTemplate.Height = 42; grid.EnableHeadersVisualStyles = false;
+        grid.ColumnHeadersHeight = 32; grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+        grid.RowTemplate.Height = 28; grid.EnableHeadersVisualStyles = false;
         grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(235, 238, 243), ForeColor = Color.FromArgb(45, 55, 72), Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font(Font, FontStyle.Bold) };
         grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
@@ -117,16 +112,14 @@ public sealed class MainForm : Form
             grid.Columns.Add(column);
         }
         grid.CurrentCellDirtyStateChanged += (_, _) => { if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewCheckBoxCell) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-        grid.RowPostPaint += (_, e) => TextRenderer.DrawText(e.Graphics, (e.RowIndex + 1).ToString(), Font, new Rectangle(e.RowBounds.Left, e.RowBounds.Top, grid.RowHeadersWidth - 5, e.RowBounds.Height), grid.RowHeadersDefaultCellStyle.ForeColor, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
-        grid.CellPainting+=PaintCurrentCell;
         grid.CurrentCellChanged+=(_,_)=>grid.Invalidate();
         grid.DataError += (_, e) => { e.ThrowException = false; SetStatus("此单元格的值无效，请重新输入。"); };
         editControls.Add(grid);
-        var gridCard=new SurfacePanel{Dock=DockStyle.Fill,Padding=new Padding(1),Margin=new Padding(0,0,0,8)};
+        var gridCard=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=new Padding(0,0,0,6)};
         gridCard.Controls.Add(grid);layout.Controls.Add(gridCard,0,2);
         log.Multiline = true; log.ReadOnly = true; log.ScrollBars = ScrollBars.Vertical; log.Dock = DockStyle.Fill;
         log.BackColor = Color.White; log.BorderStyle = BorderStyle.None;log.PlaceholderText="运行记录  ·  生成进度将在这里显示";
-        var logCard=new SurfacePanel{Dock=DockStyle.Fill,Padding=new Padding(12),Margin=new Padding(0,0,0,6)};logCard.Controls.Add(log);layout.Controls.Add(logCard,0,3);
+        var logCard=new Panel{Dock=DockStyle.Fill,Padding=new Padding(8),Tag="separator",Margin=new Padding(0,0,0,4)};logCard.Controls.Add(log);layout.Controls.Add(logCard,0,3);
 
         TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=false,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,4)};
         footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));
@@ -136,7 +129,6 @@ public sealed class MainForm : Form
         choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);choices.Controls.Add(exportPdf);
         actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
         stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite,openDxf,exportPdf]);
-        ((ModernButton)runDxf).Primary=true;((ModernButton)runDxf).Quiet=false;((ModernButton)run).Quiet=false;
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
         footer.Controls.Add(choices,0,0);footer.Controls.Add(actions,1,0);layout.Controls.Add(footer,0,4);
@@ -167,7 +159,7 @@ public sealed class MainForm : Form
         StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor, AutoSize=false, Height=28 };
         progressBar.AutoSize=false; progressBar.Size=new Size(150,16);
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;
-        strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); root.Controls.Add(strip,0,2); strip.Dock = DockStyle.Fill;
+        strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); root.Controls.Add(strip,0,1); strip.Dock = DockStyle.Fill;
         output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SolidCraft输出");
         LoadSettings(); ResolveLocalTemplates(); AddRow(ModelRules.DefaultRow());
         AppTheme.SetMode((ThemeMode)themeMode.SelectedIndex);AppTheme.Attach(this);
@@ -178,28 +170,6 @@ public sealed class MainForm : Form
             if (cancellation != null) { cancellation.Cancel(); e.Cancel = true; stop.Enabled = false; SetStatus("当前命令完成后停止。停止完成后可以关闭窗口。"); }
             else SaveSettings();
         };
-    }
-
-    void PaintCurrentCell(object? sender,DataGridViewCellPaintingEventArgs e)
-    {
-        if(e.RowIndex>=0&&e.ColumnIndex>=0&&grid.Columns[e.ColumnIndex] is DataGridViewCheckBoxColumn&&e.Graphics!=null)
-        {
-            e.PaintBackground(e.ClipBounds,true);e.Graphics.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            float size=14*grid.DeviceDpi/96f;var checkBox=new RectangleF(e.CellBounds.X+(e.CellBounds.Width-size)/2,e.CellBounds.Y+(e.CellBounds.Height-size)/2,size,size);
-            bool selected=e.Value is true;using var path=Ui.Round(checkBox,3);using var fill=new SolidBrush(selected?AppTheme.Accent:AppTheme.Field);e.Graphics.FillPath(fill,path);
-            if(!selected){using var line=new Pen(AppTheme.Border);e.Graphics.DrawPath(line,path);}
-            else{using var line=new Pen(Color.White,1.8f);e.Graphics.DrawLines(line,[new PointF(checkBox.Left+3,checkBox.Top+size*.5f),new PointF(checkBox.Left+size*.43f,checkBox.Bottom-3),new PointF(checkBox.Right-3,checkBox.Top+3)]);}
-            e.Handled=true;return;
-        }
-        if(e.RowIndex<0||e.ColumnIndex<0||grid.CurrentCell==null||
-            e.RowIndex!=grid.CurrentCell.RowIndex||e.ColumnIndex!=grid.CurrentCell.ColumnIndex||e.Graphics==null)return;
-        e.Paint(e.ClipBounds,e.PaintParts&~DataGridViewPaintParts.Focus);
-        float width=Math.Max(2,grid.DeviceDpi/48F);
-        int inset=(int)Math.Ceiling(width/2);
-        Rectangle box=Rectangle.Inflate(e.CellBounds,-inset,-inset);
-        box.Width--;box.Height--;
-        using var pen=new Pen(Color.FromArgb(37,99,235),width);
-        e.Graphics.DrawRectangle(pen,box);e.Handled=true;
     }
 
     void ResolveLocalTemplates()
@@ -222,11 +192,11 @@ public sealed class MainForm : Form
     {
         panel.RowStyles.Add(new(SizeType.Percent, 50F));
         panel.Controls.Add(new Label { Text = text, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row);
-        box.Dock = DockStyle.Fill; box.Margin = new Padding(0, 8, 8, 4); panel.Controls.Add(Ui.Field(box), 1, row); editControls.Add(box);
+        box.Dock = DockStyle.Fill; box.Margin = new Padding(0, 8, 8, 4); panel.Controls.Add(box, 1, row); editControls.Add(box);
         var button = MakeButton("选择…", choose); button.Dock = DockStyle.Fill; button.Margin = new Padding(0, 5, 0, 5); panel.Controls.Add(button, 2, row);
     }
 
-    static Button CreateButton(string text) => new ModernButton { Text=text,Padding=new Padding(8,7,8,7),Quiet=true };
+    static Button CreateButton(string text) => new Button {Text=text,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,Padding=new Padding(6,3,6,3),Margin=new Padding(0,0,6,0),UseVisualStyleBackColor=true};
 
     Button MakeButton(string text, Action action)
     {
@@ -448,14 +418,21 @@ public sealed class MainForm : Form
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log("未能保存设置：" + ex.Message); }
     }
 
+    internal void LoadSmokeRows()
+    {
+        string csv=Path.Combine(AppContext.BaseDirectory,"辊密封参数模板.csv");
+        if(!File.Exists(csv))return;
+        grid.Rows.Clear();foreach(var row in CsvFiles.Read(csv))AddRow(row);
+    }
+
     public void VerifyUi()
     {
         if (grid.Columns.Count != ModelRules.Columns.Length || grid.Rows.Count == 0 || grid.Columns.Cast<DataGridViewColumn>().Count(c => c is DataGridViewCheckBoxColumn) != 6)
             throw new InvalidOperationException("GUI 参数表初始化失败。");
         ModelRules.Validate(GetRows());
         if(run.Text!="生成并导出Step" || !combined.Visible || !taskCsv.Visible)throw new InvalidOperationException("导出选项或按钮名称不正确。");
-        if(run is not ModernButton||runDxf is not ModernButton{Primary:true}||!runDxf.Visible)
-            throw new InvalidOperationException("主要生成按钮必须使用统一的圆角样式。");
+        if(run.GetType()!=typeof(Button)||runDxf.GetType()!=typeof(Button)||!run.UseVisualStyleBackColor||!runDxf.UseVisualStyleBackColor||!runDxf.Visible)
+            throw new InvalidOperationException("生成按钮必须使用 Windows 原生按钮样式。");
         if(Math.Abs(dxfBase.PointToScreen(Point.Empty).Y-stepBase.PointToScreen(Point.Empty).Y)>1)
             throw new InvalidOperationException("两个文件名必须位于同一行。");
         var import=editControls.OfType<Button>().Single(b=>b.Text=="导入 CSV");
