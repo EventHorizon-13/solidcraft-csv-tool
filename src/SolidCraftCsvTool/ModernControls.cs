@@ -107,8 +107,8 @@ internal sealed class ModernComboBox : ComboBox
     protected override void WndProc(ref Message message)
     {
         base.WndProc(ref message);
-        if(message.Msg!=0xF||Width<24||Height<10)return;
-        using var g=Graphics.FromHwnd(Handle);g.SmoothingMode=SmoothingMode.AntiAlias;
+        if(message.Msg is not (0xF or 0x317 or 0x318)||Width<24||Height<10)return;
+        using var g=message.Msg==0xF?Graphics.FromHwnd(Handle):Graphics.FromHdc(message.WParam);g.SmoothingMode=SmoothingMode.AntiAlias;
         using var fill=new SolidBrush(AppTheme.Field);using var erase=new Pen(AppTheme.Field,4);
         g.DrawRectangle(erase,2,2,Width-4,Height-4);
         g.FillRectangle(fill,Width-24,1,23,Height-2);

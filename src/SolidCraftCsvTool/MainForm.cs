@@ -154,9 +154,16 @@ public sealed class MainForm : Form
             }
             finally{sizingFooter=false;}
         }
-        footer.Layout+=(_,_)=>FitFooter();
-        choices.Layout+=(_,_)=>FitFooter();
-        Shown+=(_,_)=>{FitFooter();grid.Focus();};
+        bool footerQueued=false;
+        void QueueFooter()
+        {
+            if(sizingFooter||footerQueued||!IsHandleCreated||IsDisposed)return;
+            footerQueued=true;
+            BeginInvoke((Action)(()=>{footerQueued=false;if(!IsDisposed)FitFooter();}));
+        }
+        footer.Layout+=(_,_)=>QueueFooter();
+        choices.Layout+=(_,_)=>QueueFooter();
+        Shown+=(_,_)=>{QueueFooter();grid.Focus();};
         StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor, AutoSize=false, Height=28 };
         progressBar.AutoSize=false; progressBar.Size=new Size(150,16);
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;
