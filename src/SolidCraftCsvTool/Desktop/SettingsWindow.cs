@@ -23,6 +23,7 @@ internal sealed class SettingsWindow : Window
     internal SettingsWindow(DrawingOptions initial,AppearanceMode mode)
     {
         this.initial=initial;Value=initial;initialAppearance=mode;titleValues=new(initial.TitleBlockAttributes??[],StringComparer.OrdinalIgnoreCase);
+        SetResourceReference(BackgroundProperty,"WindowBackground");
         Title="设置";Width=760;Height=540;MinWidth=700;MinHeight=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FontFamily=new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;
         var root=new Grid{Margin=new Thickness(16)};root.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});root.RowDefinitions.Add(new(){Height=GridLength.Auto});Content=root;

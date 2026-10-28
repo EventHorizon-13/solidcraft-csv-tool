@@ -11,6 +11,7 @@ internal sealed class AboutWindow : Window
 {
     internal AboutWindow()
     {
+        SetResourceReference(BackgroundProperty,"WindowBackground");
         Title="关于";Width=470;Height=330;ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FontFamily=new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;
         var root=new Grid{Margin=new Thickness(24)};Content=root;
