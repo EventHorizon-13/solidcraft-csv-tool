@@ -43,7 +43,7 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new(SizeType.Absolute,48));
         layout.RowStyles.Add(new(SizeType.Percent,100));
         layout.RowStyles.Add(new(SizeType.Absolute,98));
-        layout.RowStyles.Add(new(SizeType.AutoSize));
+        layout.RowStyles.Add(new(SizeType.Absolute,48));
         TableLayoutPanel root = new() { Dock=DockStyle.Fill, ColumnCount=1, RowCount=2, Margin=Padding.Empty, Padding=Padding.Empty };
         root.ColumnStyles.Add(new(SizeType.Percent,100));
         root.RowStyles.Add(new(SizeType.Percent,100));
@@ -119,10 +119,10 @@ public sealed class MainForm : Form
         log.BackColor = Color.White; log.BorderStyle = BorderStyle.FixedSingle;
         layout.Controls.Add(log, 0, 3);
 
-        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,4)};
+        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=false,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,4)};
         footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));
         footer.RowStyles.Add(new(SizeType.AutoSize));
-        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=true,Margin=Padding.Empty};
+        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=false,WrapContents=true,Margin=Padding.Empty};
         FlowLayoutPanel actions = new(){Anchor=AnchorStyles.Top|AnchorStyles.Right,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=false,Margin=Padding.Empty};
         choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);choices.Controls.Add(exportPdf);
         actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
@@ -130,6 +130,22 @@ public sealed class MainForm : Form
         run.Click += async (_,_)=>await RunExport();runDxf.Click += async (_,_)=>await RunExport(exportDxf:true);
         stop.Click += (_,_)=>{cancellation?.Cancel();stop.Enabled=false;SetStatus("当前命令完成后停止；已导出的文件会保留。");};
         footer.Controls.Add(choices,0,0);footer.Controls.Add(actions,1,0);layout.Controls.Add(footer,0,4);
+        bool sizingFooter=false;
+        void FitFooter()
+        {
+            if(sizingFooter||choices.ClientSize.Width<=0)return;
+            sizingFooter=true;
+            try
+            {
+                choices.PerformLayout();
+                int choicesHeight=choices.Controls.Cast<Control>().Max(c=>c.Bottom+c.Margin.Bottom);
+                int required=footer.Padding.Vertical+Math.Max(actions.PreferredSize.Height,choicesHeight);
+                if(Math.Abs(layout.RowStyles[4].Height-required)>1)layout.RowStyles[4].Height=required;
+            }
+            finally{sizingFooter=false;}
+        }
+        footer.Layout+=(_,_)=>FitFooter();
+        Shown+=(_,_)=>FitFooter();
         StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor, AutoSize=false, Height=28 };
         progressBar.AutoSize=false; progressBar.Size=new Size(150,16);
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;
@@ -440,7 +456,7 @@ public sealed class MainForm : Form
         if (!run.Enabled || !runDxf.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");
         var footer=run.Parent!.Parent!;
         int lastBottom=new Control[]{run,runDxf,stop,combined,taskCsv,overwrite,openDxf,exportPdf}.Max(c=>footer.PointToClient(c.PointToScreen(new Point(0,c.Height))).Y);
-        if(footer.ClientSize.Height-lastBottom>footer.Padding.Bottom+4)throw new InvalidOperationException("底部按钮区必须按内容撑开，不应保留固定空白。");
+        if(footer.ClientSize.Height-lastBottom>footer.Padding.Bottom+4)throw new InvalidOperationException($"底部按钮区必须按内容撑开，不应保留固定空白。height={footer.Height}, last={lastBottom}, padding={footer.Padding}");
     }
 }
 
