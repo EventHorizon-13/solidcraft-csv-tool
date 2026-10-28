@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>standard-roller-seal</AssemblyName>
     <RootNamespace>SolidCraftCsvTool</RootNamespace>
-    <Version>2.2.1</Version>
+    <Version>2.2.2</Version>
     <Product>标准辊密封批量生成 CLI</Product>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
