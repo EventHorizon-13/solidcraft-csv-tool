@@ -93,3 +93,27 @@ internal sealed class ModernCheckBox : CheckBox
         if(Focused&&ShowFocusCues)ControlPaint.DrawFocusRectangle(e.Graphics,ClientRectangle);
     }
 }
+
+internal sealed class ModernComboBox : ComboBox
+{
+    public ModernComboBox(){DrawMode=DrawMode.OwnerDrawFixed;FlatStyle=FlatStyle.Flat;ItemHeight=24;}
+    protected override void OnDrawItem(DrawItemEventArgs e)
+    {
+        if(e.Index<0)return;
+        using var fill=new SolidBrush((e.State&DrawItemState.Selected)!=0?AppTheme.Hover:AppTheme.Field);
+        e.Graphics.FillRectangle(fill,e.Bounds);
+        TextRenderer.DrawText(e.Graphics,GetItemText(Items[e.Index]),Font,Rectangle.Inflate(e.Bounds,-8,0),ForeColor,TextFormatFlags.Left|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);
+    }
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if(message.Msg!=0xF||Width<24||Height<10)return;
+        using var g=Graphics.FromHwnd(Handle);g.SmoothingMode=SmoothingMode.AntiAlias;
+        using var fill=new SolidBrush(AppTheme.Field);using var erase=new Pen(AppTheme.Field,4);
+        g.DrawRectangle(erase,2,2,Width-4,Height-4);
+        g.FillRectangle(fill,Width-24,1,23,Height-2);
+        using var border=new Pen(AppTheme.Border);using var path=Ui.Round(new RectangleF(.5f,.5f,Width-1,Height-1),5);g.DrawPath(border,path);
+        using var arrow=new Pen(AppTheme.Muted,1.5f);float x=Width-14,y=Height/2f;
+        g.DrawLines(arrow,[new PointF(x-3,y-1),new PointF(x,y+2),new PointF(x+3,y-1)]);
+    }
+}

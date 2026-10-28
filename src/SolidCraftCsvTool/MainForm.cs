@@ -22,7 +22,7 @@ public sealed class MainForm : Form
     readonly Button runDxf = CreateButton("一键生成并导出 DXF");
     readonly Button stop = CreateButton("停止");
     readonly Button about = CreateButton("关于");
-    readonly ComboBox themeMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    readonly ComboBox themeMode = new ModernComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     readonly ToolStripStatusLabel status = new("准备就绪");
     readonly ToolStripStatusLabel help = new("x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm") { ForeColor=SystemColors.GrayText };
     readonly ToolStripProgressBar progressBar = new() { Width = 150 };
@@ -155,7 +155,8 @@ public sealed class MainForm : Form
             finally{sizingFooter=false;}
         }
         footer.Layout+=(_,_)=>FitFooter();
-        Shown+=(_,_)=>FitFooter();
+        choices.Layout+=(_,_)=>FitFooter();
+        Shown+=(_,_)=>{FitFooter();grid.Focus();};
         StatusStrip strip = new() { SizingGrip = true, BackColor = BackColor, AutoSize=false, Height=28 };
         progressBar.AutoSize=false; progressBar.Size=new Size(150,16);
         status.Spring = true; status.TextAlign = ContentAlignment.MiddleLeft;

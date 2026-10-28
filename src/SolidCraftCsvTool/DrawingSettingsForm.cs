@@ -4,7 +4,7 @@ internal sealed class DrawingSettingsForm : Form
 {
     readonly TextBox template = new() { ReadOnly = true, Dock = DockStyle.Fill };
     readonly TextBox fonts = new() { ReadOnly = true, Dock = DockStyle.Fill };
-    readonly ComboBox styles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    readonly ComboBox styles = new ModernComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     readonly NumericUpDown hidden = new() { Minimum = .05m, Maximum = 100, DecimalPlaces = 2, Increment = .25m, Dock = DockStyle.Fill };
     readonly NumericUpDown viewGap = new() { Minimum = 10, Maximum = 5000, Dock = DockStyle.Fill };
     readonly NumericUpDown margin = new() { Minimum = 10, Maximum = 1000, Dock = DockStyle.Fill };

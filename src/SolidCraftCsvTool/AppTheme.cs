@@ -101,7 +101,7 @@ internal static class AppTheme
             }
             if (control is StatusStrip strip)
                 foreach (ToolStripItem item in strip.Items) { item.BackColor = background; item.ForeColor = foreground; }
-            if(control.IsHandleCreated&&control is TextBoxBase or DataGridView or ComboBox)
+            if(control.IsHandleCreated&&control is TextBoxBase or DataGridView)
                 _=SetWindowTheme(control.Handle,dark?"DarkMode_Explorer":"Explorer",null);
             foreach (Control child in control.Controls) Paint(child);
         }
