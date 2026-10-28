@@ -122,7 +122,7 @@ public partial class MainWindow : Window
     void ShowError(string text)=>MessageBox.Show(this,text,"请检查",MessageBoxButton.OK,MessageBoxImage.Warning);
     void SetRunning(bool running)
     {
-        Metadata.IsEnabled=!running;Tools.IsEnabled=!running;Choices.IsEnabled=!running;grid.IsReadOnly=running;
+        Metadata.IsEnabled=!running;Tools.IsEnabled=!running;Info.IsEnabled=!running;Choices.IsEnabled=!running;grid.IsReadOnly=running;
         run.IsEnabled=!running;runDxf.IsEnabled=!running;stop.IsEnabled=running;
     }
     static string DescribeException(Exception ex)

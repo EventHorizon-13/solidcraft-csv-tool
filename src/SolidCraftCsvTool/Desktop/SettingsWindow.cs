@@ -29,7 +29,7 @@ internal sealed class SettingsWindow : Window
         root.Children.Add(Tabs);
         appearance.ItemsSource=new[]{"自动（跟随系统）","深色","浅色"};appearance.SelectedIndex=(int)mode;
         var general=Rows();Add(general,"深色模式",appearance);
-        Add(general,"",new TextBlock{Text="外观由微软 Fluent 主题统一管理。",Opacity=.7,Margin=new Thickness(0,8,0,0)});
+        Add(general,"",new TextBlock{Text="自动模式会跟随 Windows 的深浅色设置。",Opacity=.7,Margin=new Thickness(0,8,0,0)});
         Page("常规",general);
         template.IsReadOnly=true;fonts.IsReadOnly=true;template.Text=initial.TemplatePath;fonts.Text=initial.FontDirectory;
         frame.IsChecked=initial.IncludeFrame;

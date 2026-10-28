@@ -15,11 +15,8 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Program.cs;MainForm.cs;DrawingSettingsForm.cs;AboutForm.cs;AppTheme.cs;AppArtwork.cs" />
     <Resource Include="Assets/AppIcon.png" />
     <Content Include="../../模板/标准辊密封.solidcraft" Link="模板/标准辊密封.solidcraft" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <EmbeddedResource Include="Assets/AppIcon.ico" LogicalName="SolidCraftCsvTool.AppIcon.ico" />
-    <EmbeddedResource Include="Assets/AppIcon.png" LogicalName="SolidCraftCsvTool.AppIcon.png" />
     <PackageReference Include="netDxf" Version="2023.11.10" />
     <AssemblyMetadata Include="BuildDate" Value="$(BuildDate)" />
   </ItemGroup>

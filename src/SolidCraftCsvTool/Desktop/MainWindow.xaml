@@ -24,7 +24,7 @@
    </Grid>
   </Grid>
   <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="True">
-   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+   <StackPanel x:Name="Info" DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
     <Button Content="设置" MinWidth="60" Margin="0,0,6,0" Click="ConfigureDrawing"/>
     <Button Content="关于" MinWidth="60" Click="ShowAbout"/>
    </StackPanel>
