@@ -1,4 +1,4 @@
-name: Build and release 2.1
+name: Build and release 2.2
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.2" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install open-source PDF renderer
@@ -94,6 +94,12 @@ jobs:
           if (-not $process.WaitForExit(30000)) { $process.Kill(); throw 'Window layout check timed out' }
           if ($process.ExitCode -ne 0) { Get-Content (Join-Path (Split-Path $app) 'smoke-error.txt') -ErrorAction SilentlyContinue; throw 'Window layout check failed' }
       - uses: actions/upload-artifact@v4
+        if: always() && matrix.arch == 'amd64'
+        with:
+          name: UI-previews
+          path: dist/checks/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
         with:
           name: StandardRollerSeal-windows-${{ matrix.arch }}
           path: dist/StandardRollerSeal-windows-${{ matrix.arch }}.zip
@@ -125,7 +131,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.1" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.2" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -198,16 +204,15 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.1"
-          title="标准辊密封批量生成 2.1"
+          tag="win-2.2"
+          title="标准辊密封批量生成 2.2"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.1 正式版。
+          标准辊密封批量生成 2.2 正式版。
 
-          - 出图设置新增标题栏属性编辑，支持读取 DXF 模板实际字段及嵌套属性；留空保留模板值，图名按零件编号自动填写。
-          - 新增深色模式：自动跟随系统、开、关，并记住选择。
-          - 底部导出选项与生成/停止按钮自适应高度，缩小窗口时选项自动换行。
-          - 关于页优化排版，检查更新和关闭同一行左对齐；出图设置按功能分组并支持滚动。
-          - 内置标准辊密封.solidcraft，首次启动自动选用，仍可手动选择其他模板。
+          - 全面更新界面：低对比配色、圆角控件、统一间距和按钮层级，适配深浅色模式。
+          - 关于页采用 macOS 风格居中排版，大图标、名称、版本、作者信息独立分层。
+          - 移除主界面的 SolidCraft 模板路径和选择入口，直接使用内置标准模型。
+          - 出图设置使用无传统分组框的分区布局，标题栏属性编辑和滚动功能保留。
           - Windows 桌面版：amd64、arm64
           - Linux CLI：amd64、arm64
           - PDF 使用开源 DXF 矢量渲染；不包含 ODA 或专有 SDK。

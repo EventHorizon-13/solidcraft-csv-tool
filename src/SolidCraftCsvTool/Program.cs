@@ -49,14 +49,22 @@ internal static class Program
                     using var about=new AboutForm();about.Show(form);Application.DoEvents();
                     about.VerifyUi();
                     using Bitmap shot=new(about.Width,about.Height);about.DrawToBitmap(shot,new Rectangle(Point.Empty,about.Size));
-                    shot.Save(args[aboutIndex+1],System.Drawing.Imaging.ImageFormat.Png);about.Close();
+                    shot.Save(args[aboutIndex+1],System.Drawing.Imaging.ImageFormat.Png);
+                    AppTheme.SetMode(ThemeMode.Dark);Application.DoEvents();
+                    using Bitmap darkShot=new(about.Width,about.Height);about.DrawToBitmap(darkShot,new Rectangle(Point.Empty,about.Size));
+                    darkShot.Save(Path.ChangeExtension(args[aboutIndex+1],"dark.png"),System.Drawing.Imaging.ImageFormat.Png);
+                    about.Close();AppTheme.SetMode(initialTheme);
                 }
                 int settingsIndex=Array.IndexOf(args,"--settings-screenshot");
                 if(settingsIndex>=0&&settingsIndex+1<args.Length)
                 {
                     using var drawing=new DrawingSettingsForm(new());drawing.Show(form);Application.DoEvents();
                     using Bitmap shot=new(drawing.Width,drawing.Height);drawing.DrawToBitmap(shot,new Rectangle(Point.Empty,drawing.Size));
-                    shot.Save(args[settingsIndex+1],System.Drawing.Imaging.ImageFormat.Png);drawing.Close();
+                    shot.Save(args[settingsIndex+1],System.Drawing.Imaging.ImageFormat.Png);
+                    AppTheme.SetMode(ThemeMode.Dark);Application.DoEvents();
+                    using Bitmap darkShot=new(drawing.Width,drawing.Height);drawing.DrawToBitmap(darkShot,new Rectangle(Point.Empty,drawing.Size));
+                    darkShot.Save(Path.ChangeExtension(args[settingsIndex+1],"dark.png"),System.Drawing.Imaging.ImageFormat.Png);
+                    drawing.Close();AppTheme.SetMode(initialTheme);
                 }
                 int minimumIndex=Array.IndexOf(args,"--minimum-screenshot");
                 if(minimumIndex>=0&&minimumIndex+1<args.Length)

@@ -9,7 +9,7 @@ internal sealed class DrawingSettingsForm : Form
     readonly NumericUpDown viewGap = new() { Minimum = 10, Maximum = 5000, Dock = DockStyle.Fill };
     readonly NumericUpDown margin = new() { Minimum = 10, Maximum = 1000, Dock = DockStyle.Fill };
     readonly NumericUpDown sheetGap = new() { Minimum = 10, Maximum = 5000, Dock = DockStyle.Fill };
-    readonly CheckBox frame = new() { Text = "添加图框与标题栏", AutoSize = true };
+    readonly CheckBox frame = new ModernCheckBox() { Text = "添加图框与标题栏", AutoSize = true };
     readonly TableLayoutPanel titleFields = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 0, Padding = new Padding(10) };
     readonly Dictionary<string, TextBox> titleEditors = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string, string> titleValues;
@@ -20,7 +20,7 @@ internal sealed class DrawingSettingsForm : Form
         Value = initial;
         titleValues = new(initial.TitleBlockAttributes ?? [], StringComparer.OrdinalIgnoreCase);
         Text = "出图设置"; Icon = AppArtwork.LoadIcon(); Font = new Font("Microsoft YaHei UI", 9.5f);
-        AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(780, 700); MinimumSize = new Size(700, 540);
+        AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(820, 740); MinimumSize = new Size(740, 580);
         MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false; StartPosition = FormStartPosition.CenterParent;
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(20) };
         root.ColumnStyles.Add(new(SizeType.Percent, 100));
@@ -80,15 +80,18 @@ internal sealed class DrawingSettingsForm : Form
         void AddSetting(string label,Control control,int column,int row)
         {
             dimensions.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,Margin=new Padding(column==0?0:14,8,8,8)},column,row);
-            control.Margin=new Padding(0,5,0,5);dimensions.Controls.Add(control,column+1,row);
+            control.Margin=new Padding(0,5,0,5);dimensions.Controls.Add(control is NumericUpDown?Ui.Field(control):control,column+1,row);
         }
-        GroupBox AddSection(string text, Control body)
+        SurfacePanel AddSection(string text, Control body)
         {
-            var group = new GroupBox { Text = text, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10, 22, 10, 10), Margin = new Padding(0, 0, 0, 14) };
-            group.Controls.Add(body); sections.RowStyles.Add(new(SizeType.AutoSize)); sections.Controls.Add(group, 0, sections.RowCount++); return group;
+            var group=new SurfacePanel{Dock=DockStyle.Top,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,Padding=new Padding(16),Margin=new Padding(0,0,0,16)};
+            var content=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=1,RowCount=2,Margin=Padding.Empty};
+            content.ColumnStyles.Add(new(SizeType.Percent,100));content.RowStyles.Add(new(SizeType.AutoSize));content.RowStyles.Add(new(SizeType.AutoSize));
+            content.Controls.Add(new Label{Text=text,Font=new Font(Font,FontStyle.Bold),AutoSize=true,Margin=new Padding(8,2,8,12)},0,0);
+            content.Controls.Add(body,0,1);group.Controls.Add(content);sections.RowStyles.Add(new(SizeType.AutoSize));sections.Controls.Add(group,0,sections.RowCount++);return group;
         }
     }
-    static Button MakeButton(string text) => new() { Text = text, AutoSize = true, MinimumSize = new Size(76, 30), Margin = new Padding(6, 0, 0, 0), UseVisualStyleBackColor = true };
+    static Button MakeButton(string text) => new ModernButton { Text=text,MinimumSize=new Size(76,36),Margin=new Padding(6,0,0,0),Primary=text=="保存" };
     static TableLayoutPanel FormGrid()
     {
         var grid = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 0, Padding = new Padding(10) };
@@ -98,12 +101,12 @@ internal sealed class DrawingSettingsForm : Form
     {
         int row = layout.RowCount++; layout.RowStyles.Add(new(SizeType.AutoSize));
         layout.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 8, 12, 8) }, 0, row);
-        control.Margin = new Padding(0, 5, 0, 5); control.Anchor = AnchorStyles.Left | AnchorStyles.Right; layout.Controls.Add(control, 1, row);
+        control.Margin = new Padding(0, 5, 0, 5); control.Anchor = AnchorStyles.Left | AnchorStyles.Right; layout.Controls.Add(control is TextBoxBase?Ui.Field(control):control, 1, row);
     }
     static Control PathPicker(TextBox box, params Button[] buttons)
     {
         var picker = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = buttons.Length + 1, RowCount = 1, Margin = Padding.Empty };
-        picker.ColumnStyles.Add(new(SizeType.Percent, 100)); box.Anchor = AnchorStyles.Left | AnchorStyles.Right; box.Margin = new Padding(0, 3, 0, 0); picker.Controls.Add(box, 0, 0);
+        picker.ColumnStyles.Add(new(SizeType.Percent, 100)); box.Anchor = AnchorStyles.Left | AnchorStyles.Right; box.Margin = new Padding(0, 3, 0, 0); picker.Controls.Add(Ui.Field(box), 0, 0);
         for (int i = 0; i < buttons.Length; i++) { picker.ColumnStyles.Add(new(SizeType.AutoSize)); picker.Controls.Add(buttons[i], i + 1, 0); }
         return picker;
     }
@@ -121,7 +124,7 @@ internal sealed class DrawingSettingsForm : Form
         titleFields.SuspendLayout();
         foreach (Control control in titleFields.Controls.Cast<Control>().ToArray()) control.Dispose();
         titleFields.Controls.Clear(); titleFields.RowStyles.Clear(); titleFields.RowCount = 0; titleEditors.Clear();
-        var hint = new Label { Text = fields.Count == 0 ? "选择含标题栏属性的 DXF 模板后，可在此编辑图号、材料、设计、审核、日期等实际字段。" : "留空保留模板原值；图名留空时，按每个零件的编号自动填写。下方灰字为模板原值。", AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10) };
+        var hint = new Label { Text = fields.Count == 0 ? "选择含标题栏属性的 DXF 模板后，可在此编辑图号、材料、设计、审核、日期等实际字段。" : "留空保留模板原值；图名留空时，按每个零件的编号自动填写。下方灰字为模板原值。", AutoSize = true, Dock = DockStyle.Fill, Tag="muted", Margin = new Padding(0, 0, 0, 10) };
         titleFields.RowStyles.Add(new(SizeType.AutoSize)); titleFields.Controls.Add(hint, 0, titleFields.RowCount++); titleFields.SetColumnSpan(hint, 2);
         foreach (var field in fields)
         {

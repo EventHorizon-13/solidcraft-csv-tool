@@ -23,6 +23,15 @@ internal static class AppTheme
         }
     }
 
+    public static Color Background=>IsDark?Color.FromArgb(27,28,31):Color.FromArgb(244,245,247);
+    public static Color Surface=>IsDark?Color.FromArgb(35,37,41):Color.White;
+    public static Color Field=>IsDark?Color.FromArgb(43,45,50):Color.FromArgb(248,249,251);
+    public static Color Border=>IsDark?Color.FromArgb(57,60,66):Color.FromArgb(224,227,232);
+    public static Color Accent=>Color.FromArgb(36,119,235);
+    public static Color Muted=>IsDark?Color.FromArgb(153,159,170):Color.FromArgb(119,125,137);
+    public static Color Button=>IsDark?Color.FromArgb(48,51,57):Color.White;
+    public static Color Hover=>IsDark?Color.FromArgb(57,61,69):Color.FromArgb(232,236,242);
+
     public static void SetMode(ThemeMode mode)
     {
         Mode = mode;
@@ -46,22 +55,28 @@ internal static class AppTheme
     public static void Apply(Form form)
     {
         bool dark = IsDark;
-        Color background = dark ? Color.FromArgb(28, 30, 34) : Color.FromArgb(247, 248, 250);
-        Color surface = dark ? Color.FromArgb(37, 40, 45) : Color.White;
+        Color background = Background;
+        Color surface = Surface;
         Color foreground = dark ? Color.FromArgb(230, 233, 239) : Color.FromArgb(35, 43, 56);
-        Color header = dark ? Color.FromArgb(47, 51, 59) : Color.FromArgb(235, 238, 243);
-        Color selection = dark ? Color.FromArgb(44, 68, 101) : Color.FromArgb(219, 234, 254);
+        Color header = dark ? Color.FromArgb(40,43,48) : Color.FromArgb(248,249,251);
+        Color selection = dark ? Color.FromArgb(39,55,76) : Color.FromArgb(235,243,255);
         void Paint(Control control)
         {
-            control.BackColor = control is TextBoxBase or ComboBox or NumericUpDown or DataGridView ? surface : background;
+            bool inCard=control is SurfacePanel||Ancestors(control).Any(c=>c is SurfacePanel);
+            control.BackColor = control is FieldPanel||control.Parent is FieldPanel ? Field : control is TextBoxBase or ComboBox or NumericUpDown or DataGridView ? surface : inCard?surface:background;
             control.ForeColor = foreground;
             if (control is Button button)
             {
-                button.FlatStyle = dark ? FlatStyle.Flat : FlatStyle.Standard;
-                button.UseVisualStyleBackColor = !dark;
-                if (dark) button.BackColor = header;
-                button.FlatAppearance.BorderColor = dark ? Color.FromArgb(78, 85, 97) : SystemColors.ControlDark;
+                button.FlatStyle = FlatStyle.Flat;
+                button.UseVisualStyleBackColor = false;
+                button.BackColor = Button;
+                button.FlatAppearance.BorderColor = Border;
+                if(button is not ModernButton)button.FlatAppearance.BorderSize=0;
             }
+            if(control.Tag is string role&&role=="muted")control.ForeColor=Muted;
+            if(control is ComboBox combo){combo.FlatStyle=FlatStyle.Flat;combo.BackColor=Field;}
+            if(control is TextBoxBase text)text.BorderStyle=BorderStyle.None;
+            if(control is NumericUpDown number)number.BorderStyle=BorderStyle.None;
             if (control is LinkLabel link)
             {
                 link.LinkColor = dark ? Color.FromArgb(123, 184, 255) : Color.FromArgb(37, 99, 235);
@@ -82,10 +97,12 @@ internal static class AppTheme
                 grid.RowHeadersDefaultCellStyle.ForeColor = foreground;
                 grid.RowHeadersDefaultCellStyle.SelectionBackColor = selection;
                 grid.RowHeadersDefaultCellStyle.SelectionForeColor = foreground;
-                grid.GridColor = dark ? Color.FromArgb(62, 67, 76) : Color.FromArgb(228, 232, 238);
+                grid.GridColor = Border;
             }
             if (control is StatusStrip strip)
                 foreach (ToolStripItem item in strip.Items) { item.BackColor = background; item.ForeColor = foreground; }
+            if(control.IsHandleCreated&&control is TextBoxBase or DataGridView or ComboBox)
+                _=SetWindowTheme(control.Handle,dark?"DarkMode_Explorer":"Explorer",null);
             foreach (Control child in control.Controls) Paint(child);
         }
         form.SuspendLayout();
@@ -100,6 +117,13 @@ internal static class AppTheme
         form.ResumeLayout(true);
         form.Invalidate(true);
     }
+
+    static IEnumerable<Control> Ancestors(Control control)
+    {
+        for(Control? parent=control.Parent;parent!=null;parent=parent.Parent)yield return parent;
+    }
+    [DllImport("uxtheme.dll",CharSet=CharSet.Unicode)]
+    static extern int SetWindowTheme(IntPtr window,string theme,string? subId);
 
     [DllImport("dwmapi.dll")]
     static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);

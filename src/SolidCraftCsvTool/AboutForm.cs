@@ -6,47 +6,39 @@ internal sealed class AboutForm : Form
 {
     public AboutForm()
     {
-        Text = "关于"; Icon = AppArtwork.LoadIcon(); Font = new Font("Microsoft YaHei UI", 9.5f);
-        AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(620, 490); MinimumSize = new Size(560, 450);
-        StartPosition = FormStartPosition.CenterParent; MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false;
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24), ColumnCount = 1, RowCount = 3 };
-        root.ColumnStyles.Add(new(SizeType.Percent, 100)); root.RowStyles.Add(new(SizeType.Percent, 100));
-        root.RowStyles.Add(new(SizeType.AutoSize)); root.RowStyles.Add(new(SizeType.AutoSize)); Controls.Add(root);
-        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
-        var content = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 3, Padding = new Padding(0, 0, 16, 0) };
-        content.ColumnStyles.Add(new(SizeType.Absolute, 96)); content.ColumnStyles.Add(new(SizeType.Percent, 100)); scroll.Controls.Add(content); root.Controls.Add(scroll, 0, 0);
-        var image = AppArtwork.LoadImage();
-        var logo = new PictureBox { Image = image, SizeMode = PictureBoxSizeMode.Zoom, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 20, 12) };
-        content.Controls.Add(logo, 0, 0); content.SetRowSpan(logo, 3); FormClosed += (_, _) => image.Dispose();
-        for (int i = 0; i < 3; i++) content.RowStyles.Add(new(SizeType.AutoSize));
-        content.Controls.Add(new Label { Text = AppBuildInfo.ProductName, Font = new Font(Font.FontFamily, 14, FontStyle.Bold), AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 8) }, 1, 0);
-        content.Controls.Add(new Label { Text = "版本  " + AppBuildInfo.Version, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 8) }, 1, 1);
-        var author = new LinkLabel { Text = "作者  EventHorizon-13", AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 12) };
-        author.Links.Clear(); author.Links.Add(4, "EventHorizon-13".Length, "https://github.com/EventHorizon-13");
-        author.LinkClicked += (_, _) => OpenLink("https://github.com/EventHorizon-13");
-        content.Controls.Add(author, 1, 2);
-        AddRow("编译  " + AppBuildInfo.BuildDate, span: true);
-        AddRow("调用工具", new Font(Font, FontStyle.Bold), true);
-        AddRow("SolidCraft CLI 0.23.0 · 参数建模与 STEP\nnetDxf 2023.11.10 · DXF 写入\nMLightCAD 1.7.8-preview.1 · SHX 与矢量 PDF\nNode.js 24 · PDF 渲染运行时\nGitHub Releases API · 版本更新", span: true);
-        var links = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty, Padding = new Padding(0, 12, 0, 16) };
-        var home = new LinkLabel { Text = "项目主页", AutoSize = true, Margin = new Padding(0, 0, 24, 0) };
-        home.LinkClicked += (_, _) => OpenLink("https://github.com/EventHorizon-13/solidcraft-roller-seal");
-        var notices = new LinkLabel { Text = "第三方许可", AutoSize = true, Margin = Padding.Empty }; notices.LinkClicked += (_, _) => ShowNotices();
-        links.Controls.Add(home); links.Controls.Add(notices); root.Controls.Add(links, 0, 1);
-        var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
-        footer.ColumnStyles.Add(new(SizeType.Percent, 100)); footer.RowStyles.Add(new(SizeType.AutoSize)); footer.RowStyles.Add(new(SizeType.AutoSize));
-        var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty };
-        var checkUpdate = new Button { Text = "检查更新", AutoSize = true, MinimumSize = new Size(100, 32), UseVisualStyleBackColor = true, Margin = new Padding(0, 0, 12, 0) };
-        var close = new Button { Text = "关闭", AutoSize = true, MinimumSize = new Size(100, 32), DialogResult = DialogResult.OK, UseVisualStyleBackColor = true, Margin = Padding.Empty };
-        var updateStatus = new Label { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
-        checkUpdate.Click += async (_, _) => await CheckUpdateAsync(checkUpdate, updateStatus);
-        buttons.Controls.Add(checkUpdate); buttons.Controls.Add(close); footer.Controls.Add(buttons, 0, 0); footer.Controls.Add(updateStatus, 0, 1); root.Controls.Add(footer, 0, 2);
-        AcceptButton = close; CancelButton = close; AppTheme.Attach(this);
-        void AddRow(string text, Font? font = null, bool span = false)
+        Text="关于标准辊密封";Icon=AppArtwork.LoadIcon();Font=new Font("Microsoft YaHei UI",10F);
+        AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(500,570);FormBorderStyle=FormBorderStyle.FixedDialog;
+        StartPosition=FormStartPosition.CenterParent;MaximizeBox=false;MinimizeBox=false;ShowInTaskbar=false;
+        var root=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(40,24,40,28),ColumnCount=1,RowCount=9};
+        root.ColumnStyles.Add(new(SizeType.Percent,100));
+        foreach(int height in new[]{140,48,28,30,36,28,44})root.RowStyles.Add(new(SizeType.Absolute,height));
+        root.RowStyles.Add(new(SizeType.Percent,100));root.RowStyles.Add(new(SizeType.AutoSize));Controls.Add(root);
+        var image=AppArtwork.LoadImage();
+        var logo=new PictureBox{Image=image,SizeMode=PictureBoxSizeMode.Zoom,Size=new Size(112,112),Anchor=AnchorStyles.None,Margin=Padding.Empty};
+        root.Controls.Add(logo,0,0);FormClosed+=(_,_)=>image.Dispose();
+        Center(AppBuildInfo.ProductName,1,21,FontStyle.Bold);
+        Center("版本 "+AppBuildInfo.Version,2,10,muted:true);
+        Center("批量建模与加工图导出",3,11,muted:true);
+        var author=new LinkLabel{Text="EventHorizon-13",AutoSize=true,Anchor=AnchorStyles.None,Margin=Padding.Empty};
+        author.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13");root.Controls.Add(author,0,4);
+        Center("构建于 "+AppBuildInfo.BuildDate,5,9,muted:true);
+        var links=new FlowLayoutPanel{AutoSize=true,Anchor=AnchorStyles.None,WrapContents=false,Margin=Padding.Empty};
+        var home=new LinkLabel{Text="项目主页",AutoSize=true,Margin=new Padding(0,0,22,0)};
+        home.LinkClicked+=(_,_)=>OpenLink("https://github.com/EventHorizon-13/solidcraft-roller-seal");
+        var notices=new LinkLabel{Text="组件与许可",AutoSize=true,Margin=Padding.Empty};notices.LinkClicked+=(_,_)=>ShowNotices();
+        links.Controls.Add(home);links.Controls.Add(notices);root.Controls.Add(links,0,6);
+        var footer=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=2,Margin=Padding.Empty};
+        footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.RowStyles.Add(new(SizeType.AutoSize));footer.RowStyles.Add(new(SizeType.AutoSize));
+        var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
+        var check=new ModernButton{Text="检查更新",MinimumSize=new Size(110,36),Margin=new Padding(0,0,10,0)};
+        var close=new ModernButton{Text="关闭",MinimumSize=new Size(90,36),DialogResult=DialogResult.OK,Margin=Padding.Empty};
+        var updateStatus=new Label{AutoSize=true,Dock=DockStyle.Fill,Tag="muted",Margin=new Padding(0,8,0,0)};
+        check.Click+=async(_,_)=>await CheckUpdateAsync(check,updateStatus);
+        buttons.Controls.Add(check);buttons.Controls.Add(close);footer.Controls.Add(buttons,0,0);footer.Controls.Add(updateStatus,0,1);root.Controls.Add(footer,0,8);
+        AcceptButton=close;CancelButton=close;AppTheme.Attach(this);
+        void Center(string text,int row,float size,FontStyle style=FontStyle.Regular,bool muted=false)
         {
-            int row = content.RowCount++; content.RowStyles.Add(new(SizeType.AutoSize));
-            var label = new Label { Text = text, Font = font ?? Font, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 8) };
-            content.Controls.Add(label, span ? 0 : 1, row); if (span) content.SetColumnSpan(label, 2);
+            root.Controls.Add(new Label{Text=text,Font=new Font(Font.FontFamily,size,style),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Margin=Padding.Empty,Tag=muted?"muted":null},0,row);
         }
     }
     internal void VerifyUi()
@@ -107,8 +99,8 @@ internal sealed class AboutForm : Form
     {
         string file=Path.Combine(AppContext.BaseDirectory,"THIRD_PARTY_NOTICES.md");
         string text=File.Exists(file)?File.ReadAllText(file):"第三方组件：SolidCraft CLI 0.23.0、netDxf 2023.11.10、.NET 10。详细许可见软件包 THIRD_PARTY_NOTICES.md 与 SolidCraft 文件夹。";
-        using Form dialog=new(){Text="第三方许可",Size=new Size(660,460),StartPosition=FormStartPosition.CenterParent,Icon=AppArtwork.LoadIcon()};
-        dialog.Controls.Add(new TextBox{Text=text,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Font=new Font("Microsoft YaHei UI",9F)});
+        using Form dialog=new(){Text="组件与许可",Size=new Size(660,460),StartPosition=FormStartPosition.CenterParent,Icon=AppArtwork.LoadIcon()};
+        dialog.Controls.Add(new TextBox{Text="SolidCraft CLI · 参数建模与 STEP\r\nnetDxf · DXF 写入\r\nMLightCAD · SHX 与矢量 PDF\r\nNode.js · PDF 渲染运行时\r\n\r\n"+text,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Font=new Font("Microsoft YaHei UI",9F)});
         AppTheme.Attach(dialog);dialog.ShowDialog(this);
     }
 }
