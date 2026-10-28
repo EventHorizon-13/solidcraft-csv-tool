@@ -8,7 +8,7 @@
     <ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
     <AssemblyName>标准辊密封批量生成</AssemblyName>
     <RootNamespace>SolidCraftCsvTool</RootNamespace>
-    <Version>2.2.1</Version>
+    <Version>2.2.2</Version>
     <Product>标准辊密封批量生成</Product>
     <BuildDate Condition="'$(BuildDate)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd HH:mm:ss'))</BuildDate>
     <Description>Windows CSV/STEP batch tool for SolidCraft and dimensioned DXF machining drawings</Description>

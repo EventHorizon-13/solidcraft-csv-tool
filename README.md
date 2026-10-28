@@ -2,7 +2,7 @@
 
 Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。自包含 .NET，并附带对应架构的官方 SolidCraft 0.23 CLI。
 
-另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP、DXF 和PDF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：Windows Forms 界面不能直接编译成 macOS universal 应用。
+另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP、DXF 和PDF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：WPF 桌面界面不能直接编译成 macOS universal 应用。
 
 ## 使用
 
@@ -69,7 +69,7 @@ PDF 使用 MLightCAD 的开源 MIT DXF 数据模型、SHX/BigFont 字体渲染�
 
 ## 构建和检查
 
-2.2.1 正式版由 GitHub Actions 构建并发布 Windows amd64/arm64 桌面包和 Linux amd64/arm64 CLI 包。开发分支仍可单独构建预览包。Linux CLI 项目位于 `src/SolidCraftCli/`，自包含 .NET，并调用随包的官方 SolidCraft CLI；PDF 转换随包附带开源 Node.js 运行时及 MLightCAD 渲染器。仅将用户指定的标准辊密封模型作为内置模板；其他私人模型、图框及 SHX 字体不上传仓库。
+2.2.2 正式版由 GitHub Actions 构建并发布 Windows amd64/arm64 桌面包和 Linux amd64/arm64 CLI 包。开发分支仍可单独构建预览包。Linux CLI 项目位于 `src/SolidCraftCli/`，自包含 .NET，并调用随包的官方 SolidCraft CLI；PDF 转换随包附带开源 Node.js 运行时及 MLightCAD 渲染器。仅将用户指定的标准辊密封模型作为内置模板；其他私人模型、图框及 SHX 字体不上传仓库。
 
 文件名并排显示，生成与停止按钮放在底部导出选项同一行；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。
 
