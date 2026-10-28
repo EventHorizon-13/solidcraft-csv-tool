@@ -4,6 +4,25 @@ Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准�
 
 另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP、DXF 和PDF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：WPF 桌面界面不能直接编译成 macOS universal 应用。
 
+## 界面截图（2.2.2）
+
+以下截图由 GitHub Actions 在真实 Windows 环境中自动生成，包含已修复参数表表头白条问题的深色模式。点击对应平台的截图附件，下载 ZIP 后即可查看原始 PNG。
+
+| 界面 | 截图文件 |
+| --- | --- |
+| 主窗口（浅色模式） | `window.png` |
+| 主窗口（深色模式） | `dark.png` |
+| 主窗口（最小窗口尺寸） | `minimum.png` |
+| 关于窗口（浅色 / 深色） | `about.png` / `about.dark.png` |
+| 出图设置（浅色 / 深色） | `settings.png` / `settings.dark.png` |
+| 出图设置的其他选项卡 | `settings.tab1.png` 等对应文件 |
+
+- [Windows 2022 界面截图（13 张 PNG）](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions/runs/40668150074/artifacts/12806249616)
+- [Windows 2025 界面截图（13 张 PNG）](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions/runs/40668150074/artifacts/12806528644)
+- [查看截图生成工作流和后续运行记录](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions/workflows/ui-preview.yml)
+
+> 注：GitHub Actions 截图附件保留 14 天。上述附件将在 2026-11-11 左右过期，过期后可从工作流中查看新的运行结果。要在 README 内长期直接显示截图，需要另行托管 PNG 图片。
+
 ## 使用
 
 1. 首次启动自动选择内置的 `模板/标准辊密封.solidcraft`（用户提供的标准模板），主界面不再显示模板路径和选择按钮。选择输出文件夹，导入 `辊密封参数模板.csv` 或编辑参数表。
