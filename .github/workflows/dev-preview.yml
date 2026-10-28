@@ -161,3 +161,47 @@ jobs:
           name: StandardRollerSeal-DevPreview-linux-${{ matrix.arch }}
           path: dist/StandardRollerSeal-DevPreview-linux-${{ matrix.arch }}.tar.gz
           retention-days: 30
+
+  publish-dev-preview:
+    if: contains(github.event.head_commit.message || '', '[publish-dev-preview]')
+    needs: [windows, linux-cli]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: StandardRollerSeal-DevPreview-*
+          path: dist/release-assets
+          merge-multiple: true
+      - name: Publish GitHub pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          files=(dist/release-assets/StandardRollerSeal-DevPreview-*)
+          if [ "${#files[@]}" -ne 4 ]; then
+            printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
+            exit 1
+          fi
+          tag="v1.3.0-dev.${GITHUB_RUN_NUMBER}"
+          title="标准辊密封批量生成 1.3.0-dev.${GITHUB_RUN_NUMBER}"
+          cat > dist/release-notes.md <<EOF
+          开发者预览版，不是稳定正式版。
+
+          - Windows 桌面版：amd64、arm64
+          - Linux CLI：amd64、arm64
+          - PDF 使用开源 DXF 矢量渲染；不包含 ODA 或专有 SDK。
+          - 请在出图设置中指定固定 A4 DXF 图框，并外挂有使用授权的 gbenor.shx、gbcbig.shx。
+          - PDF 文字按矢量轮廓输出；DXF 仍可编辑。请先用实际图纸核对字体、图框和 Logo。
+
+          源码提交：$GITHUB_SHA
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --title "$title" --notes-file dist/release-notes.md --prerelease
+          else
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease
+          fi
