@@ -1,0 +1,45 @@
+name: Windows Fluent UI verification
+on:
+  push:
+    branches: [fix/windows-fluent]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile Fluent desktop and run core checks
+        shell: pwsh
+        run: |
+          dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.2.2
+          if ($LASTEXITCODE -ne 0) { throw 'Fluent desktop build failed' }
+          dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
+          if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }
+      - name: Run Fluent appearance checks
+        shell: pwsh
+        run: |
+          $appDir = Resolve-Path 'src/SolidCraftCsvTool/bin/Release/net10.0-windows'
+          Copy-Item examples/辊密封参数模板.csv (Join-Path $appDir '辊密封参数模板.csv')
+          New-Item -ItemType Directory -Force work/ui-previews | Out-Null
+          $app = Join-Path $appDir '标准辊密封批量生成.exe'
+          $shots = Join-Path $env:GITHUB_WORKSPACE 'work/ui-previews'
+          $process = Start-Process $app -ArgumentList '--smoke-test', '--screenshot', (Join-Path $shots 'window.png'), '--minimum-screenshot', (Join-Path $shots 'minimum.png'), '--dark-screenshot', (Join-Path $shots 'dark.png'), '--about-screenshot', (Join-Path $shots 'about.png'), '--settings-screenshot', (Join-Path $shots 'settings.png') -PassThru
+          if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Fluent appearance check timed out' }
+          if ($process.ExitCode -ne 0) {
+            $errorFile = Join-Path $appDir 'smoke-error.txt'
+            if (Test-Path $errorFile) { throw (Get-Content $errorFile -Raw) }
+            throw 'Fluent appearance check failed'
+          }
+          Get-Content (Join-Path $appDir 'smoke-success.txt')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Fluent-UI-previews
+          path: work/ui-previews/
+          retention-days: 14

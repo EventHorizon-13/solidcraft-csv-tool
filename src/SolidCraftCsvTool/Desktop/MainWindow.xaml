@@ -1,0 +1,66 @@
+<Window x:Class="SolidCraftCsvTool.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Width="1360" Height="860" MinWidth="1080" MinHeight="700"
+ WindowStartupLocation="CenterScreen" FontFamily="Segoe UI, Microsoft YaHei UI" FontSize="13"
+ Icon="/Assets/AppIcon.png">
+ <Grid Margin="16,12,16,8">
+  <Grid.RowDefinitions>
+   <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+   <RowDefinition Height="64"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+  </Grid.RowDefinitions>
+  <Grid x:Name="Metadata" Grid.Row="0" Margin="0,0,0,10">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <TextBlock Text="输出文件夹" VerticalAlignment="Center"/>
+   <TextBox x:Name="output" Grid.Column="1" MinHeight="32" VerticalContentAlignment="Center" Margin="0,0,8,8"/>
+   <Button x:Name="chooseOutput" Grid.Column="2" Content="选择…" MinWidth="80" MinHeight="32" Margin="0,0,0,8" Click="ChooseOutput"/>
+   <Grid Grid.Row="1" Grid.ColumnSpan="3">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/><ColumnDefinition Width="112"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <TextBlock Text="DXF 文件名" VerticalAlignment="Center"/>
+    <TextBox x:Name="dxfBase" Grid.Column="1" MinHeight="32" VerticalContentAlignment="Center"/>
+    <TextBlock Grid.Column="2" Text="组合 STEP 名" VerticalAlignment="Center" Margin="16,0,0,0"/>
+    <TextBox x:Name="stepBase" Grid.Column="3" MinHeight="32" VerticalContentAlignment="Center"/>
+   </Grid>
+  </Grid>
+  <DockPanel Grid.Row="1" Margin="0,0,0,10" LastChildFill="True">
+   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="8,0,0,0">
+    <Button Content="设置" MinWidth="60" Margin="0,0,6,0" Click="ConfigureDrawing"/>
+    <Button Content="关于" MinWidth="60" Click="ShowAbout"/>
+   </StackPanel>
+   <WrapPanel x:Name="Tools">
+    <Button Content="导入 CSV" Click="ImportCsv" Padding="10,5" Margin="0,0,6,0"/>
+    <Button Content="导出 CSV" Click="ExportCsv" Padding="10,5" Margin="0,0,6,0"/>
+    <Button Content="新增" Click="AddRowClick" Padding="10,5" Margin="0,0,6,0"/>
+    <Button Content="复制选中" Click="DuplicateSelected" Padding="10,5" Margin="0,0,6,0"/>
+    <Button Content="删除选中" Click="DeleteSelected" Padding="10,5" Margin="0,0,6,0"/>
+    <Button Content="检查参数" Click="CheckRows" Padding="10,5" Margin="0,0,6,0"/>
+    <Button Content="STEP 合并出图 DXF" Click="StepDrawingClick" Padding="10,5" Margin="0,0,6,0"/>
+   </WrapPanel>
+  </DockPanel>
+  <DataGrid x:Name="grid" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+   HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" RowHeight="32" ColumnHeaderHeight="34"
+   GridLinesVisibility="Horizontal" EnableRowVirtualization="True" EnableColumnVirtualization="True"/>
+  <TextBox x:Name="log" Grid.Row="3" IsReadOnly="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" Margin="0,8,0,4" Padding="6"/>
+  <DockPanel Grid.Row="4" Margin="0,8,0,8" LastChildFill="True">
+   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+    <Button x:Name="run" Content="生成并导出 STEP" Padding="12,6" Margin="0,0,6,0" Click="RunExportClick"/>
+    <Button x:Name="runDxf" Content="一键生成并导出 DXF" Padding="12,6" Margin="0,0,6,0" Click="RunDxfClick"/>
+    <Button x:Name="stop" Content="停止" Padding="12,6" IsEnabled="False" Click="StopClick"/>
+   </StackPanel>
+   <WrapPanel x:Name="Choices" VerticalAlignment="Center">
+    <CheckBox x:Name="combined" Content="合并 STEP" IsChecked="True" Margin="0,5,12,5"/>
+    <CheckBox x:Name="taskCsv" Content="导出当前任务 CSV" IsChecked="True" Margin="0,5,12,5"/>
+    <CheckBox x:Name="overwrite" Content="覆盖已有文件" Margin="0,5,12,5"/>
+    <CheckBox x:Name="openDxf" Content="完成后打开 DXF" Margin="0,5,12,5"/>
+    <CheckBox x:Name="exportPdf" Content="同时导出 PDF" Margin="0,5,0,5"/>
+   </WrapPanel>
+  </DockPanel>
+  <Grid Grid.Row="5">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
+   <TextBlock x:Name="status" Text="准备就绪" VerticalAlignment="Center"/>
+   <TextBlock Grid.Column="1" Text="x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm" Opacity="0.7" FontSize="11" VerticalAlignment="Center" Margin="12,0"/>
+   <ProgressBar x:Name="progressBar" Grid.Column="2" Height="8" VerticalAlignment="Center"/>
+  </Grid>
+ </Grid>
+</Window>

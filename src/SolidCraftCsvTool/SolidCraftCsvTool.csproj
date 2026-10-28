@@ -2,10 +2,9 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
     <AssemblyName>标准辊密封批量生成</AssemblyName>
     <RootNamespace>SolidCraftCsvTool</RootNamespace>
@@ -16,6 +15,8 @@
     <DebugType>embedded</DebugType>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Program.cs;MainForm.cs;DrawingSettingsForm.cs;AboutForm.cs;AppTheme.cs;AppArtwork.cs" />
+    <Resource Include="Assets/AppIcon.png" />
     <Content Include="../../模板/标准辊密封.solidcraft" Link="模板/标准辊密封.solidcraft" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Assets/AppIcon.ico" LogicalName="SolidCraftCsvTool.AppIcon.ico" />
     <EmbeddedResource Include="Assets/AppIcon.png" LogicalName="SolidCraftCsvTool.AppIcon.png" />
