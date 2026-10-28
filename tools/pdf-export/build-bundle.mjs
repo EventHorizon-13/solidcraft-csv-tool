@@ -9,6 +9,7 @@ if (!process.argv[2]) throw new Error('Usage: node build-bundle.mjs <output-dire
 await mkdir(outputDirectory, { recursive: true })
 
 await build({
+  absWorkingDir: projectDirectory,
   entryPoints: [join(projectDirectory, 'pdf-exporter.mjs')],
   outfile: join(outputDirectory, 'pdf-exporter.bundle.mjs'),
   bundle: true,
