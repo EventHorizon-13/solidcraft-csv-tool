@@ -32,10 +32,27 @@ public partial class MainWindow : Window
         {
             bool flag=ModelRules.Flags.Contains(name);table.Columns.Add(name,flag?typeof(bool):typeof(string));
             var binding=new Binding($"[{name}]"){Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged};
-            DataGridColumn column=flag?new DataGridCheckBoxColumn{Binding=binding}:new DataGridTextColumn{Binding=binding};
+            DataGridColumn column;
+            if(flag)column=new DataGridCheckBoxColumn{Binding=binding};
+            else
+            {
+                var display=new Style(typeof(TextBlock));
+                display.Setters.Add(new Setter(TextBlock.TextAlignmentProperty,TextAlignment.Center));
+                display.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Stretch));
+                display.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center));
+                display.Setters.Add(new Setter(TextBlock.TextTrimmingProperty,TextTrimming.CharacterEllipsis));
+                var edit=new Style(typeof(TextBox));
+                edit.Setters.Add(new Setter(TextBox.TextAlignmentProperty,TextAlignment.Center));
+                edit.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty,VerticalAlignment.Center));
+                column=new DataGridTextColumn{Binding=binding,ElementStyle=display,EditingElementStyle=edit};
+            }
             column.Header=name.Replace("半圆","半孔");column.MinWidth=64;column.Width=new DataGridLength(1,DataGridLengthUnitType.Star);column.CanUserSort=false;
             grid.Columns.Add(column);
         }
+        var headerStyle=new Style(typeof(System.Windows.Controls.Primitives.DataGridColumnHeader));
+        headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Center));
+        headerStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty,VerticalAlignment.Center));
+        grid.ColumnHeaderStyle=headerStyle;
         grid.ItemsSource=table.DefaultView;ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());
         Closing+=OnClosing;
     }
