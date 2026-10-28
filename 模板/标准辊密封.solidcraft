@@ -1,0 +1,533 @@
+{
+  "format": "solidcraft/31",
+  "name": "Untitled",
+  "units": "mm",
+  "metadata": {
+    "description": "半孔由整排圆孔平移后被端面截出；孔数含半孔时校验指定唯一侧，整数孔数左右边缘半孔可单独组合。",
+    "part_number": "RDS-L-90-P120-V13",
+    "project": "陶瓷纤维辊密封",
+    "revision": "M"
+  },
+  "params": [
+    {
+      "name": "辊距",
+      "expr": "120",
+      "unit": "mm",
+      "comment": "辊轴中心距。",
+      "model": false
+    },
+    {
+      "name": "孔数",
+      "expr": "5",
+      "unit": "",
+      "comment": "孔数可填整数或x.5；小数部分为.5时需恰好开启左/右半孔之一。",
+      "model": false
+    },
+    {
+      "name": "母槽开关",
+      "expr": "1",
+      "unit": "",
+      "comment": "0关闭、1启用左端母槽。",
+      "model": false
+    },
+    {
+      "name": "子头开关",
+      "expr": "1",
+      "unit": "",
+      "comment": "0关闭、1启用右端子头。",
+      "model": false
+    },
+    {
+      "name": "左半孔开关",
+      "expr": "0",
+      "unit": "",
+      "comment": "0关闭、1启用左端半孔。",
+      "model": false
+    },
+    {
+      "name": "右半孔开关",
+      "expr": "0",
+      "unit": "",
+      "comment": "0关闭、1启用右端半孔。",
+      "model": false
+    },
+    {
+      "name": "半孔校验",
+      "expr": "abs(mod(孔数,1)*(mod(孔数,1)-0.5))+abs(4*mod(孔数,1)*(1-mod(孔数,1)))*abs(左半孔开关+右半孔开关-1)",
+      "unit": "",
+      "comment": "必须为0。整数孔数任意半孔组合有效；孔数为x.5时须恰好启用左/右半孔之一。",
+      "model": false
+    },
+    {
+      "name": "左斜边开关",
+      "expr": "0",
+      "unit": "",
+      "comment": "0关闭、1启用左侧斜边。",
+      "model": false
+    },
+    {
+      "name": "右斜边开关",
+      "expr": "0",
+      "unit": "",
+      "comment": "0关闭、1启用右侧斜边。",
+      "model": false
+    },
+    {
+      "name": "辊径",
+      "expr": "90",
+      "unit": "mm",
+      "comment": "半圆辊槽直径。",
+      "model": false
+    },
+    {
+      "name": "实体高度",
+      "expr": "105",
+      "unit": "mm",
+      "comment": "唯一实体的高度。",
+      "model": false
+    },
+    {
+      "name": "密封宽度",
+      "expr": "200",
+      "unit": "mm",
+      "comment": "沿辊轴方向的密封宽度。",
+      "model": false
+    },
+    {
+      "name": "基体长度",
+      "expr": "辊距*(floor(孔数)+0.5*abs(左半孔开关-右半孔开关))",
+      "unit": "mm",
+      "comment": "半孔通过整排圆孔平移并由端面截出；单侧半孔长度加半个辊距，两侧半孔长度不变。",
+      "model": false
+    },
+    {
+      "name": "子头宽",
+      "expr": "82",
+      "unit": "mm",
+      "comment": "端部子头宽度，沿密封宽度居中。",
+      "model": false
+    },
+    {
+      "name": "配合间隙",
+      "expr": "1.5",
+      "unit": "mm",
+      "comment": "子头与母槽每侧的间隙。",
+      "model": false
+    },
+    {
+      "name": "母槽宽",
+      "expr": "子头宽+2*配合间隙",
+      "unit": "mm",
+      "comment": "母槽宽度，由子头宽加两侧间隙联动计算。",
+      "model": false
+    },
+    {
+      "name": "子头突出",
+      "expr": "9",
+      "unit": "mm",
+      "comment": "子头超出基体端面的长度。",
+      "model": false
+    },
+    {
+      "name": "母槽深",
+      "expr": "10",
+      "unit": "mm",
+      "comment": "端部母槽切入深度。",
+      "model": false
+    },
+    {
+      "name": "搭接量",
+      "expr": "0.1",
+      "unit": "mm",
+      "comment": "布尔合并使用的小搭接量。",
+      "model": false
+    },
+    {
+      "name": "斜边Y",
+      "expr": "30",
+      "unit": "mm",
+      "comment": "背面长边斜切沿密封宽度方向的尺寸；取消对应斜边特征抑制后生效。",
+      "model": false
+    },
+    {
+      "name": "斜边Z",
+      "expr": "30",
+      "unit": "mm",
+      "comment": "背面长边斜切沿实体高度方向的尺寸；取消对应斜边特征抑制后生效。",
+      "model": false
+    }
+  ],
+  "features": [
+    {
+      "id": 1,
+      "name": "下半件 blank",
+      "suppressed": false,
+      "body_names": [
+        "下半件"
+      ],
+      "param_names": [
+        "d1",
+        "d2",
+        "d3"
+      ],
+      "type": "box",
+      "corner": [
+        0.0,
+        "-密封宽度/2",
+        "-实体高度"
+      ],
+      "length": "基体长度",
+      "width": "密封宽度",
+      "height": "实体高度",
+      "operation": "new_body"
+    },
+    {
+      "id": 2,
+      "name": "右端子头（下半）",
+      "suppressed": false,
+      "body_names": [
+        "下半件"
+      ],
+      "param_names": [
+        "d4",
+        "d5",
+        "d6"
+      ],
+      "participants": [
+        "下半件"
+      ],
+      "type": "box",
+      "corner": [
+        "(基体长度-搭接量)*子头开关+(基体长度/2-0.5)*(1-子头开关)",
+        "-子头宽/2*子头开关-0.5*(1-子头开关)",
+        "-实体高度*子头开关+(-实体高度/2-0.5)*(1-子头开关)"
+      ],
+      "length": "(子头突出+搭接量)*子头开关+1*(1-子头开关)",
+      "width": "子头宽*子头开关+1*(1-子头开关)",
+      "height": "实体高度*子头开关+1*(1-子头开关)",
+      "operation": "join"
+    },
+    {
+      "id": 3,
+      "name": "下半件整孔种子",
+      "suppressed": false,
+      "param_names": [
+        "d7",
+        "d8"
+      ],
+      "participants": [
+        "下半件"
+      ],
+      "type": "cylinder",
+      "base": [
+        "(辊距/2)*(1-左半孔开关)",
+        "-密封宽度/2-1",
+        0.0
+      ],
+      "axis": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "radius": "(辊径) / 2",
+      "height": "密封宽度+2",
+      "operation": "cut"
+    },
+    {
+      "id": 4,
+      "name": "下半件整孔阵列",
+      "suppressed": false,
+      "param_names": [
+        "d9",
+        "d10"
+      ],
+      "type": "pattern",
+      "features": [
+        "下半件整孔种子"
+      ],
+      "pattern": {
+        "type": "rectangular",
+        "dir1": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "count1": "floor(孔数)+左半孔开关+右半孔开关-左半孔开关*右半孔开关",
+        "spacing1": "辊距"
+      }
+    },
+    {
+      "id": 5,
+      "name": "左端母槽（下半）",
+      "suppressed": false,
+      "param_names": [
+        "d11",
+        "d12",
+        "d13"
+      ],
+      "participants": [
+        "下半件"
+      ],
+      "type": "box",
+      "corner": [
+        "-1-(母槽深+辊径+1)*(1-母槽开关)",
+        "-母槽宽/2",
+        "-实体高度-1"
+      ],
+      "length": "母槽深+1",
+      "width": "母槽宽",
+      "height": "实体高度+2",
+      "operation": "cut"
+    },
+    {
+      "id": 6,
+      "name": "左侧斜边草图",
+      "suppressed": false,
+      "param_names": [
+        "d14"
+      ],
+      "type": "sketch",
+      "plane": {
+        "type": "offset",
+        "base": {
+          "type": "origin",
+          "name": "YZ"
+        },
+        "distance": "(1-左斜边开关)*(基体长度+辊径+1)"
+      },
+      "sketch": {
+        "points": [
+          {
+            "id": "origin",
+            "pos": [
+              0.0,
+              0.0
+            ],
+            "fixed": true
+          },
+          {
+            "id": "p1",
+            "pos": [
+              -100.0,
+              -105.0
+            ],
+            "fixed": true,
+            "exprs": {
+              "x": "-密封宽度/2",
+              "y": "-实体高度"
+            }
+          },
+          {
+            "id": "p2",
+            "pos": [
+              -70.0,
+              -105.0
+            ],
+            "fixed": true,
+            "exprs": {
+              "x": "-密封宽度/2+斜边Y",
+              "y": "-实体高度"
+            }
+          },
+          {
+            "id": "p3",
+            "pos": [
+              -100.0,
+              -75.0
+            ],
+            "fixed": true,
+            "exprs": {
+              "x": "-密封宽度/2",
+              "y": "-实体高度+斜边Z"
+            }
+          }
+        ],
+        "curves": [
+          {
+            "id": "l1",
+            "type": "line",
+            "a": 1,
+            "b": 2,
+            "construction": false
+          },
+          {
+            "id": "l2",
+            "type": "line",
+            "a": 2,
+            "b": 3,
+            "construction": false
+          },
+          {
+            "id": "l3",
+            "type": "line",
+            "a": 3,
+            "b": 1,
+            "construction": false
+          }
+        ],
+        "constraints": [],
+        "counters": {
+          "l": 3,
+          "p": 3
+        }
+      }
+    },
+    {
+      "id": 7,
+      "name": "左侧斜边切除",
+      "suppressed": false,
+      "param_names": [
+        "d15"
+      ],
+      "type": "extrude",
+      "sketch": 6,
+      "profiles": {
+        "type": "all"
+      },
+      "extent": {
+        "distance": "基体长度",
+        "convention": "total_distance",
+        "direction": "positive"
+      },
+      "operation": "cut",
+      "targets": [
+        "下半件"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "右侧斜边草图",
+      "suppressed": false,
+      "param_names": [
+        "d16"
+      ],
+      "type": "sketch",
+      "plane": {
+        "type": "offset",
+        "base": {
+          "type": "origin",
+          "name": "YZ"
+        },
+        "distance": "(1-右斜边开关)*(基体长度+辊径+1)"
+      },
+      "sketch": {
+        "points": [
+          {
+            "id": "origin",
+            "pos": [
+              0.0,
+              0.0
+            ],
+            "fixed": true
+          },
+          {
+            "id": "p1",
+            "pos": [
+              100.0,
+              -105.0
+            ],
+            "fixed": true,
+            "exprs": {
+              "x": "密封宽度/2",
+              "y": "-实体高度"
+            }
+          },
+          {
+            "id": "p2",
+            "pos": [
+              70.0,
+              -105.0
+            ],
+            "fixed": true,
+            "exprs": {
+              "x": "密封宽度/2-斜边Y",
+              "y": "-实体高度"
+            }
+          },
+          {
+            "id": "p3",
+            "pos": [
+              100.0,
+              -75.0
+            ],
+            "fixed": true,
+            "exprs": {
+              "x": "密封宽度/2",
+              "y": "-实体高度+斜边Z"
+            }
+          }
+        ],
+        "curves": [
+          {
+            "id": "l1",
+            "type": "line",
+            "a": 1,
+            "b": 2,
+            "construction": false
+          },
+          {
+            "id": "l2",
+            "type": "line",
+            "a": 2,
+            "b": 3,
+            "construction": false
+          },
+          {
+            "id": "l3",
+            "type": "line",
+            "a": 3,
+            "b": 1,
+            "construction": false
+          }
+        ],
+        "constraints": [],
+        "counters": {
+          "l": 3,
+          "p": 3
+        }
+      }
+    },
+    {
+      "id": 9,
+      "name": "右侧斜边切除",
+      "suppressed": false,
+      "param_names": [
+        "d17"
+      ],
+      "type": "extrude",
+      "sketch": 8,
+      "profiles": {
+        "type": "all"
+      },
+      "extent": {
+        "distance": "基体长度",
+        "convention": "total_distance",
+        "direction": "positive"
+      },
+      "operation": "cut",
+      "targets": [
+        "下半件"
+      ]
+    }
+  ],
+  "next_id": 10,
+  "favorites": [
+    "右半孔开关",
+    "右斜边开关",
+    "子头开关",
+    "孔数",
+    "左半孔开关",
+    "左斜边开关",
+    "母槽开关"
+  ],
+  "visibility": {
+    "hidden_bodies": [],
+    "hidden_occurrences": [],
+    "hidden_origin": [],
+    "hidden_sketches": [
+      6,
+      8
+    ],
+    "shown_sketches": []
+  }
+}

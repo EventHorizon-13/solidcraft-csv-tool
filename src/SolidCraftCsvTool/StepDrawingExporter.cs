@@ -611,13 +611,9 @@ internal static partial class MachiningDxf
                 {
                     var insert=(netDxf.Entities.Insert)reference.Clone();
                     ApplyFrameFonts(insert,new HashSet<netDxf.Blocks.Block>());
+                    ApplyTitleAttributes(insert,name,sequence,new HashSet<netDxf.Blocks.Block>());
                     insert.TransformBy(netDxf.Matrix3.Scale(new netDxf.Vector3(factor,factor,factor)),
                         new netDxf.Vector3(-frame.Boundary.MinX*factor,-frame.Boundary.MinY*factor+sheetY,0));
-                    foreach(var attribute in insert.Attributes)
-                    {
-                        string tag=attribute.Tag??"",value=Convert.ToString(attribute.Value,CultureInfo.InvariantCulture)??"";
-                        if(tag.Contains("图名",StringComparison.Ordinal)||tag.Equals("TITLE",StringComparison.OrdinalIgnoreCase)||System.Text.RegularExpressions.Regex.IsMatch(value,@"^辊密封\d+$")){attribute.Value=name;attribute.Style=titleStyle;}
-                    }
                     document.Entities.Add(insert);
                 }
                 return;
@@ -627,6 +623,29 @@ internal static partial class MachiningDxf
             Polyline([new(m,m),new(width-m,m),new(width-m,height-m),new(m,height-m)],true,"FRAME");
             Line(new(m,band),new(width-m,band),"FRAME");
             Text(name,new(width*.5,band*.6),DimensionTextHeight,"TITLE");
+        }
+
+        bool ApplyTitleAttributes(netDxf.Entities.Insert insert,string name,int sequence,HashSet<netDxf.Blocks.Block> visited)
+        {
+            bool perPart=false;
+            string? Replacement(string tag,object? original)
+            {
+                var configured=Options.TitleBlockAttributes?.FirstOrDefault(p=>p.Key.Equals(tag,StringComparison.OrdinalIgnoreCase)).Value;
+                if(!string.IsNullOrWhiteSpace(configured))return configured;
+                string value=Convert.ToString(original,CultureInfo.InvariantCulture)??"";
+                bool automatic=tag.Contains("图名",StringComparison.Ordinal)||tag.Equals("TITLE",StringComparison.OrdinalIgnoreCase)||
+                    System.Text.RegularExpressions.Regex.IsMatch(value,@"^辊密封\d+$");
+                perPart|=automatic;return automatic?name:null;
+            }
+            foreach(var attribute in insert.Attributes)
+                if(Replacement(attribute.Tag,attribute.Value) is string value)attribute.Value=value;
+            if(!visited.Add(insert.Block))return perPart;
+            foreach(var definition in insert.Block.AttributeDefinitions.Values)
+                if(Replacement(definition.Tag,definition.Value) is string value)definition.Value=value;
+            foreach(var child in insert.Block.Entities.OfType<netDxf.Entities.Insert>())perPart|=ApplyTitleAttributes(child,name,sequence,visited);
+            // DXF shares blocks by name. Per-sheet names keep nested/constant titles from reusing the first part's text.
+            if(perPart)insert.Block.Name+="_SHEET_"+sequence;
+            return perPart;
         }
     }
 

@@ -2,67 +2,132 @@ namespace SolidCraftCsvTool;
 
 internal sealed class DrawingSettingsForm : Form
 {
-    readonly TextBox template=new(){ReadOnly=true,Dock=DockStyle.Fill};
-    readonly TextBox fonts=new(){ReadOnly=true,Dock=DockStyle.Fill};
-    readonly ComboBox styles=new(){DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Left,Width=260};
-    readonly NumericUpDown hidden=new(){Minimum=.05m,Maximum=100,DecimalPlaces=2,Increment=.25m,Width=120};
-    readonly NumericUpDown viewGap=new(){Minimum=10,Maximum=5000,Width=120};
-    readonly NumericUpDown margin=new(){Minimum=10,Maximum=1000,Width=120};
-    readonly NumericUpDown sheetGap=new(){Minimum=10,Maximum=5000,Width=120};
-    readonly CheckBox frame=new(){Text="添加图框",AutoSize=true};
-    public DrawingOptions Value {get;private set;}
+    readonly TextBox template = new() { ReadOnly = true, Dock = DockStyle.Fill };
+    readonly TextBox fonts = new() { ReadOnly = true, Dock = DockStyle.Fill };
+    readonly ComboBox styles = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+    readonly NumericUpDown hidden = new() { Minimum = .05m, Maximum = 100, DecimalPlaces = 2, Increment = .25m, Dock = DockStyle.Fill };
+    readonly NumericUpDown viewGap = new() { Minimum = 10, Maximum = 5000, Dock = DockStyle.Fill };
+    readonly NumericUpDown margin = new() { Minimum = 10, Maximum = 1000, Dock = DockStyle.Fill };
+    readonly NumericUpDown sheetGap = new() { Minimum = 10, Maximum = 5000, Dock = DockStyle.Fill };
+    readonly CheckBox frame = new() { Text = "添加图框与标题栏", AutoSize = true };
+    readonly TableLayoutPanel titleFields = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 0, Padding = new Padding(10) };
+    readonly Dictionary<string, TextBox> titleEditors = new(StringComparer.OrdinalIgnoreCase);
+    readonly Dictionary<string, string> titleValues;
+    public DrawingOptions Value { get; private set; }
+
     public DrawingSettingsForm(DrawingOptions initial)
     {
-        Value=initial;Text="出图设置";Font=new Font("Microsoft YaHei UI",9.5f);
-        ClientSize=new Size(680,430);FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;StartPosition=FormStartPosition.CenterParent;
-        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(22),ColumnCount=2,RowCount=9};
-        layout.ColumnStyles.Add(new(SizeType.Absolute,130));layout.ColumnStyles.Add(new(SizeType.Percent,100));Controls.Add(layout);
-        var file=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3};
-        file.ColumnStyles.Add(new(SizeType.Percent,100));file.ColumnStyles.Add(new(SizeType.Absolute,76));file.ColumnStyles.Add(new(SizeType.Absolute,60));
-        file.Controls.Add(template,0,0);
-        var browse=new Button{Text="选择…",Dock=DockStyle.Fill};var clear=new Button{Text="清除",Dock=DockStyle.Fill};file.Controls.Add(browse,1,0);file.Controls.Add(clear,2,0);
-        AddRow(0,"DXF 模板",file);AddRow(1,"标注样式",styles);AddRow(2,"隐藏线比例",hidden);AddRow(3,"视图净间距 / mm",viewGap);AddRow(4,"图框留白 / mm",margin);AddRow(5,"图纸间距 / mm",sheetGap);AddRow(6,"图框",frame);
-        var fontFile=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};fontFile.ColumnStyles.Add(new(SizeType.Percent,100));fontFile.ColumnStyles.Add(new(SizeType.Absolute,76));
-        fontFile.Controls.Add(fonts,0,0);var chooseFonts=new Button{Text="选择…",Dock=DockStyle.Fill};fontFile.Controls.Add(chooseFonts,1,0);AddRow(7,"SHX 字体目录",fontFile);
-        template.Text=initial.TemplatePath;hidden.Value=(decimal)initial.HiddenLineScale;viewGap.Value=(decimal)initial.ViewGap;margin.Value=(decimal)initial.FrameMargin;sheetGap.Value=(decimal)initial.SheetGap;frame.Checked=initial.IncludeFrame;
-        fonts.Text=initial.FontDirectory;
-        LoadStyles(initial.DimensionStyleName);
-        browse.Click+=(_,_)=>
+        Value = initial;
+        titleValues = new(initial.TitleBlockAttributes ?? [], StringComparer.OrdinalIgnoreCase);
+        Text = "出图设置"; Icon = AppArtwork.LoadIcon(); Font = new Font("Microsoft YaHei UI", 9.5f);
+        AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(780, 700); MinimumSize = new Size(700, 540);
+        MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false; StartPosition = FormStartPosition.CenterParent;
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(20) };
+        root.ColumnStyles.Add(new(SizeType.Percent, 100));
+        root.RowStyles.Add(new(SizeType.Percent, 100)); root.RowStyles.Add(new(SizeType.AutoSize)); Controls.Add(root);
+        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
+        var sections = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 1, RowCount = 0, AutoSize = true, Padding = new Padding(0, 0, 18, 0) };
+        sections.ColumnStyles.Add(new(SizeType.Percent, 100)); scroll.Controls.Add(sections); root.Controls.Add(scroll, 0, 0);
+        var paths = FormGrid();
+        var browse = MakeButton("选择…"); var clear = MakeButton("清除"); var chooseFonts = MakeButton("选择…");
+        AddRow(paths, "DXF 图框模板", PathPicker(template, browse, clear));
+        AddRow(paths, "SHX 字体目录", PathPicker(fonts, chooseFonts)); AddRow(paths, "图框", frame);
+        AddSection("图框与字体", paths);
+        var dimensions = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4, RowCount = 3, Padding = new Padding(10) };
+        dimensions.ColumnStyles.Add(new(SizeType.Absolute, 144)); dimensions.ColumnStyles.Add(new(SizeType.Percent, 50));
+        dimensions.ColumnStyles.Add(new(SizeType.Absolute, 156)); dimensions.ColumnStyles.Add(new(SizeType.Percent, 50));
+        for(int row=0;row<3;row++)dimensions.RowStyles.Add(new(SizeType.AutoSize));
+        AddSetting("标注样式", styles, 0, 0); dimensions.SetColumnSpan(styles, 3);
+        AddSetting("隐藏线比例", hidden, 0, 1); AddSetting("视图净间距 / mm", viewGap, 2, 1);
+        AddSetting("图框留白 / mm", margin, 0, 2); AddSetting("图纸间距 / mm", sheetGap, 2, 2);
+        AddSection("标注与排布", dimensions);
+        titleFields.ColumnStyles.Add(new(SizeType.Absolute, 156)); titleFields.ColumnStyles.Add(new(SizeType.Percent, 100));
+        var titleGroup = AddSection("标题栏属性", titleFields);
+        frame.CheckedChanged += (_, _) => titleGroup.Enabled = frame.Checked;
+        template.Text = initial.TemplatePath; fonts.Text = initial.FontDirectory;
+        hidden.Value = (decimal)initial.HiddenLineScale; viewGap.Value = (decimal)initial.ViewGap;
+        margin.Value = (decimal)initial.FrameMargin; sheetGap.Value = (decimal)initial.SheetGap; frame.Checked = initial.IncludeFrame;
+        titleGroup.Enabled = frame.Checked; LoadTemplate(initial.DimensionStyleName);
+        browse.Click += (_, _) =>
         {
-            using var dialog=new OpenFileDialog{Filter="DXF 图框与标注模板 (*.dxf)|*.dxf",Title="选择图框和标注样式模板"};
-            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-            string previous=template.Text;template.Text=dialog.FileName;
-            try{LoadStyles("_5");}catch(Exception ex){template.Text=previous;MessageBox.Show(this,ex.Message,"模板读取失败",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            using var dialog = new OpenFileDialog { Filter = "DXF 图框与标注模板 (*.dxf)|*.dxf", Title = "选择图框和标注样式模板" };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            RememberTitles(); string previous = template.Text, selected = Convert.ToString(styles.SelectedItem) ?? "_5";
+            template.Text = dialog.FileName;
+            try { LoadTemplate(selected); }
+            catch (Exception ex) { template.Text = previous; MessageBox.Show(this, ex.Message, "模板读取失败", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         };
-        clear.Click+=(_,_)=>{template.Text="";LoadStyles("_5");};
-        chooseFonts.Click+=(_,_)=>
+        clear.Click += (_, _) => { RememberTitles(); template.Text = ""; LoadTemplate("_5"); };
+        chooseFonts.Click += (_, _) =>
         {
-            using var dialog=new FolderBrowserDialog{Description="选择包含 gbenor.shx 和 gbcbig.shx 的外置字体文件夹",UseDescriptionForTitle=true,SelectedPath=fonts.Text};
-            if(dialog.ShowDialog(this)==DialogResult.OK)fonts.Text=dialog.SelectedPath;
+            using var dialog = new FolderBrowserDialog { Description = "选择包含 gbenor.shx 和 gbcbig.shx 的外置字体文件夹", UseDescriptionForTitle = true, SelectedPath = fonts.Text };
+            if (dialog.ShowDialog(this) == DialogResult.OK) fonts.Text = dialog.SelectedPath;
         };
-        var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft};
-        layout.RowStyles.Add(new(SizeType.Absolute,44));
-        var ok=new Button{Text="保存",AutoSize=true};var cancel=new Button{Text="取消",DialogResult=DialogResult.Cancel,AutoSize=true};buttons.Controls.Add(ok);buttons.Controls.Add(cancel);layout.Controls.Add(buttons,1,8);CancelButton=cancel;AcceptButton=ok;
-        ok.Click+=(_,_)=>
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Padding = new Padding(0, 14, 0, 0), Margin = Padding.Empty };
+        var ok = MakeButton("保存"); var cancel = MakeButton("取消"); cancel.DialogResult = DialogResult.Cancel;
+        buttons.Controls.Add(ok); buttons.Controls.Add(cancel); root.Controls.Add(buttons, 0, 1); CancelButton = cancel; AcceptButton = ok;
+        ok.Click += (_, _) =>
         {
             try
             {
-                var value=new DrawingOptions{TemplatePath=template.Text,FontDirectory=fonts.Text,DimensionStyleName=Convert.ToString(styles.SelectedItem)??"_5",HiddenLineScale=(double)hidden.Value,ViewGap=(double)viewGap.Value,FrameMargin=(double)margin.Value,SheetGap=(double)sheetGap.Value,IncludeFrame=frame.Checked};
-                _=DrawingResources.Load(value);Value=value;DialogResult=DialogResult.OK;Close();
+                RememberTitles();
+                var value = initial with { TemplatePath = template.Text, FontDirectory = fonts.Text, DimensionStyleName = Convert.ToString(styles.SelectedItem) ?? "_5", HiddenLineScale = (double)hidden.Value, ViewGap = (double)viewGap.Value, FrameMargin = (double)margin.Value, SheetGap = (double)sheetGap.Value, IncludeFrame = frame.Checked, TitleBlockAttributes = new(titleValues, StringComparer.OrdinalIgnoreCase) };
+                _ = DrawingResources.Load(value); Value = value; DialogResult = DialogResult.OK; Close();
             }
-            catch(Exception ex){MessageBox.Show(this,ex.Message,"请检查出图设置",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "请检查出图设置", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         };
-        void AddRow(int row,string label,Control control)
+        AppTheme.Attach(this);
+        void AddSetting(string label,Control control,int column,int row)
         {
-            layout.RowStyles.Add(new(SizeType.Absolute,row==0?44:38));
-            layout.Controls.Add(new Label{Text=label,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,row);layout.Controls.Add(control,1,row);control.Margin=new Padding(3,6,3,3);
+            dimensions.Controls.Add(new Label{Text=label,AutoSize=true,Anchor=AnchorStyles.Left,Margin=new Padding(column==0?0:14,8,8,8)},column,row);
+            control.Margin=new Padding(0,5,0,5);dimensions.Controls.Add(control,column+1,row);
+        }
+        GroupBox AddSection(string text, Control body)
+        {
+            var group = new GroupBox { Text = text, Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10, 22, 10, 10), Margin = new Padding(0, 0, 0, 14) };
+            group.Controls.Add(body); sections.RowStyles.Add(new(SizeType.AutoSize)); sections.Controls.Add(group, 0, sections.RowCount++); return group;
         }
     }
-    void LoadStyles(string selected)
+    static Button MakeButton(string text) => new() { Text = text, AutoSize = true, MinimumSize = new Size(76, 30), Margin = new Padding(6, 0, 0, 0), UseVisualStyleBackColor = true };
+    static TableLayoutPanel FormGrid()
     {
-        string[] names=string.IsNullOrWhiteSpace(template.Text)?["_5"]:
-            (netDxf.DxfDocument.Load(template.Text)??throw new InvalidDataException("无法读取 DXF 模板。")).DimensionStyles.Select(s=>s.Name).Order(StringComparer.OrdinalIgnoreCase).ToArray();
-        styles.Items.Clear();styles.Items.AddRange(names);
-        styles.SelectedItem=names.FirstOrDefault(n=>n.Equals(selected,StringComparison.OrdinalIgnoreCase))??names.FirstOrDefault();
+        var grid = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 0, Padding = new Padding(10) };
+        grid.ColumnStyles.Add(new(SizeType.Absolute, 156)); grid.ColumnStyles.Add(new(SizeType.Percent, 100)); return grid;
+    }
+    static void AddRow(TableLayoutPanel layout, string label, Control control)
+    {
+        int row = layout.RowCount++; layout.RowStyles.Add(new(SizeType.AutoSize));
+        layout.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 8, 12, 8) }, 0, row);
+        control.Margin = new Padding(0, 5, 0, 5); control.Anchor = AnchorStyles.Left | AnchorStyles.Right; layout.Controls.Add(control, 1, row);
+    }
+    static Control PathPicker(TextBox box, params Button[] buttons)
+    {
+        var picker = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = buttons.Length + 1, RowCount = 1, Margin = Padding.Empty };
+        picker.ColumnStyles.Add(new(SizeType.Percent, 100)); box.Anchor = AnchorStyles.Left | AnchorStyles.Right; box.Margin = new Padding(0, 3, 0, 0); picker.Controls.Add(box, 0, 0);
+        for (int i = 0; i < buttons.Length; i++) { picker.ColumnStyles.Add(new(SizeType.AutoSize)); picker.Controls.Add(buttons[i], i + 1, 0); }
+        return picker;
+    }
+    void RememberTitles()
+    {
+        foreach (var pair in titleEditors) titleValues[pair.Key] = pair.Value.Text.Trim();
+    }
+    void LoadTemplate(string selected)
+    {
+        string[] names = string.IsNullOrWhiteSpace(template.Text) ? ["_5"] :
+            (netDxf.DxfDocument.Load(template.Text) ?? throw new InvalidDataException("无法读取 DXF 模板。")).DimensionStyles.Select(s => s.Name).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        string style = names.FirstOrDefault(n => n.Equals(selected, StringComparison.OrdinalIgnoreCase)) ?? names.FirstOrDefault() ?? "_5";
+        var fields = DrawingResources.TitleFields(new() { TemplatePath = template.Text, DimensionStyleName = style });
+        styles.Items.Clear(); styles.Items.AddRange(names); styles.SelectedItem = style;
+        titleFields.SuspendLayout();
+        foreach (Control control in titleFields.Controls.Cast<Control>().ToArray()) control.Dispose();
+        titleFields.Controls.Clear(); titleFields.RowStyles.Clear(); titleFields.RowCount = 0; titleEditors.Clear();
+        var hint = new Label { Text = fields.Count == 0 ? "选择含标题栏属性的 DXF 模板后，可在此编辑图号、材料、设计、审核、日期等实际字段。" : "留空保留模板原值；图名留空时，按每个零件的编号自动填写。下方灰字为模板原值。", AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10) };
+        titleFields.RowStyles.Add(new(SizeType.AutoSize)); titleFields.Controls.Add(hint, 0, titleFields.RowCount++); titleFields.SetColumnSpan(hint, 2);
+        foreach (var field in fields)
+        {
+            var editor = new TextBox { Dock = DockStyle.Fill, Text = titleValues.GetValueOrDefault(field.Key) ?? "", PlaceholderText = field.Value };
+            titleEditors.Add(field.Key, editor); AddRow(titleFields, field.Key, editor);
+        }
+        titleFields.ResumeLayout(true); AppTheme.Apply(this);
     }
 }

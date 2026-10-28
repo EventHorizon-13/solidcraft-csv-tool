@@ -21,6 +21,7 @@ public sealed class MainForm : Form
     readonly Button runDxf = CreateButton("一键生成并导出 DXF");
     readonly Button stop = CreateButton("停止");
     readonly Button about = CreateButton("关于");
+    readonly ComboBox themeMode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     readonly ToolStripStatusLabel status = new("准备就绪");
     readonly ToolStripStatusLabel help = new("x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm") { ForeColor=SystemColors.GrayText };
     readonly ToolStripProgressBar progressBar = new() { Width = 150 };
@@ -42,7 +43,7 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new(SizeType.Absolute,48));
         layout.RowStyles.Add(new(SizeType.Percent,100));
         layout.RowStyles.Add(new(SizeType.Absolute,98));
-        layout.RowStyles.Add(new(SizeType.Absolute,64));
+        layout.RowStyles.Add(new(SizeType.AutoSize));
         TableLayoutPanel root = new() { Dock=DockStyle.Fill, ColumnCount=1, RowCount=2, Margin=Padding.Empty, Padding=Padding.Empty };
         root.ColumnStyles.Add(new(SizeType.Percent,100));
         root.RowStyles.Add(new(SizeType.Percent,100));
@@ -56,13 +57,17 @@ public sealed class MainForm : Form
         PathRow(paths,0,"SolidCraft 模板",template,ChooseTemplate);
         PathRow(paths,1,"输出文件夹",output,ChooseOutput);
         paths.RowStyles.Add(new(SizeType.Percent,33.3333F));
-        TableLayoutPanel names = new(){Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
+        TableLayoutPanel names = new(){Dock=DockStyle.Fill,ColumnCount=6,RowCount=1,Margin=Padding.Empty};
         names.ColumnStyles.Add(new(SizeType.Absolute,124));names.ColumnStyles.Add(new(SizeType.Percent,50));
         names.ColumnStyles.Add(new(SizeType.Absolute,112));names.ColumnStyles.Add(new(SizeType.Percent,50));
+        names.ColumnStyles.Add(new(SizeType.Absolute,86));names.ColumnStyles.Add(new(SizeType.Absolute,106));
         names.Controls.Add(new Label{Text="DXF 文件名",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,0);
         names.Controls.Add(dxfBase,1,0);dxfBase.Dock=DockStyle.Fill;dxfBase.Margin=new Padding(0,8,8,4);
         names.Controls.Add(new Label{Text="组合 STEP 名",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(12,0,0,0)},2,0);
         names.Controls.Add(stepBase,3,0);stepBase.Dock=DockStyle.Fill;stepBase.Margin=new Padding(0,8,0,4);
+        names.Controls.Add(new Label{Text="深色模式",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Padding=new Padding(12,0,0,0)},4,0);
+        themeMode.Items.AddRange(["自动","开","关"]);themeMode.SelectedIndex=0;
+        themeMode.Margin=new Padding(0,8,0,4);names.Controls.Add(themeMode,5,0);
         editControls.AddRange([dxfBase,stepBase]);paths.Controls.Add(names,0,2);paths.SetColumnSpan(names,3);
         layout.Controls.Add(paths,0,0);
 
@@ -105,7 +110,7 @@ public sealed class MainForm : Form
             grid.Columns.Add(column);
         }
         grid.CurrentCellDirtyStateChanged += (_, _) => { if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewCheckBoxCell) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-        grid.RowPostPaint += (_, e) => TextRenderer.DrawText(e.Graphics, (e.RowIndex + 1).ToString(), Font, new Rectangle(e.RowBounds.Left, e.RowBounds.Top, grid.RowHeadersWidth - 5, e.RowBounds.Height), Color.DimGray, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+        grid.RowPostPaint += (_, e) => TextRenderer.DrawText(e.Graphics, (e.RowIndex + 1).ToString(), Font, new Rectangle(e.RowBounds.Left, e.RowBounds.Top, grid.RowHeadersWidth - 5, e.RowBounds.Height), grid.RowHeadersDefaultCellStyle.ForeColor, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
         grid.CellPainting+=PaintCurrentCell;
         grid.CurrentCellChanged+=(_,_)=>grid.Invalidate();
         grid.DataError += (_, e) => { e.ThrowException = false; SetStatus("此单元格的值无效，请重新输入。"); };
@@ -114,11 +119,11 @@ public sealed class MainForm : Form
         log.BackColor = Color.White; log.BorderStyle = BorderStyle.FixedSingle;
         layout.Controls.Add(log, 0, 3);
 
-        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=false,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,8)};
+        TableLayoutPanel footer=new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,4)};
         footer.ColumnStyles.Add(new(SizeType.Percent,100));footer.ColumnStyles.Add(new(SizeType.AutoSize));
-        footer.RowStyles.Add(new(SizeType.Percent,100));
-        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=false,WrapContents=true,Margin=Padding.Empty};
-        FlowLayoutPanel actions = new(){Dock=DockStyle.Fill,AutoSize=true,WrapContents=false,Margin=Padding.Empty};
+        footer.RowStyles.Add(new(SizeType.AutoSize));
+        FlowLayoutPanel choices = new(){Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=true,Margin=Padding.Empty};
+        FlowLayoutPanel actions = new(){Anchor=AnchorStyles.Top|AnchorStyles.Right,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,WrapContents=false,Margin=Padding.Empty};
         choices.Controls.Add(combined);choices.Controls.Add(taskCsv);choices.Controls.Add(overwrite);choices.Controls.Add(openDxf);choices.Controls.Add(exportPdf);
         actions.Controls.Add(run);actions.Controls.Add(runDxf);actions.Controls.Add(stop);stop.Margin=Padding.Empty;
         stop.Enabled=false;editControls.AddRange([combined,taskCsv,overwrite,openDxf,exportPdf]);
@@ -131,6 +136,8 @@ public sealed class MainForm : Form
         strip.Items.Add(status); strip.Items.Add(help); strip.Items.Add(progressBar); root.Controls.Add(strip,0,1); strip.Dock = DockStyle.Fill;
         output.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "SolidCraft输出");
         LoadSettings(); ResolveLocalTemplates(); AddRow(ModelRules.DefaultRow());
+        AppTheme.SetMode((ThemeMode)themeMode.SelectedIndex);AppTheme.Attach(this);
+        themeMode.SelectedIndexChanged+=(_,_)=>{AppTheme.SetMode((ThemeMode)themeMode.SelectedIndex);SaveSettings();};
         Shown+=(_,_)=>{help.AutoSize=false;help.Width=TextRenderer.MeasureText(help.Text,help.Font).Width+12;};
         FormClosing += (_, e) =>
         {
@@ -156,9 +163,9 @@ public sealed class MainForm : Form
     {
         var found=LocalTemplates.Find(AppContext.BaseDirectory,Environment.CurrentDirectory);
         if(!File.Exists(template.Text)&&found.Native!=null)template.Text=found.Native;
-        if(!File.Exists(drawingOptions.TemplatePath)&&found.Dxf!=null)drawingOptions=drawingOptions with{TemplatePath=found.Dxf};
+        if(!File.Exists(drawingOptions.TemplatePath))drawingOptions=drawingOptions with{TemplatePath=found.Dxf??""};
         string bundledFonts=Path.Combine(AppContext.BaseDirectory,"模板","字体");
-        if(!Directory.Exists(drawingOptions.FontDirectory)&&Directory.Exists(bundledFonts))drawingOptions=drawingOptions with{FontDirectory=bundledFonts};
+        if(!Directory.Exists(drawingOptions.FontDirectory))drawingOptions=drawingOptions with{FontDirectory=Directory.Exists(bundledFonts)?bundledFonts:""};
     }
     void RefreshDefaultNames()
     {
@@ -379,12 +386,14 @@ public sealed class MainForm : Form
             if(root.TryGetProperty("taskCsv",out var csv))taskCsv.Checked=csv.GetBoolean();
             if(root.TryGetProperty("openDxf",out var od))openDxf.Checked=od.GetBoolean();
             if(root.TryGetProperty("exportPdf",out var ep))exportPdf.Checked=ep.GetBoolean();
+            if(root.TryGetProperty("themeMode",out var tm)&&Enum.TryParse<ThemeMode>(tm.GetString(),out var mode)&&Enum.IsDefined(mode))themeMode.SelectedIndex=(int)mode;
             if(root.TryGetProperty("dxfBase",out var dn)&&dn.ValueKind==JsonValueKind.String)dxfBase.Text=dn.GetString();
             if(root.TryGetProperty("stepBase",out var sn)&&sn.ValueKind==JsonValueKind.String)stepBase.Text=sn.GetString();
             if (root.TryGetProperty("drawing", out var d))
             {
                 var drawing = JsonSerializer.Deserialize<DrawingOptions>(d.GetRawText()) ?? new DrawingOptions();
-                drawing.Validate(); drawingOptions = drawing;
+                // Resolve moved external files separately, preserving saved title fields and layout values.
+                (drawing with { TemplatePath="", FontDirectory="" }).Validate(); drawingOptions = drawing;
             }
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException or InvalidDataException) { Log("未能读取上次设置：" + ex.Message); }
@@ -396,7 +405,7 @@ public sealed class MainForm : Form
         {
             Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
             string stage = settingsPath + ".tmp";
-            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, combined=combined.Checked, taskCsv=taskCsv.Checked, openDxf=openDxf.Checked, exportPdf=exportPdf.Checked, dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text, stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text, drawing = drawingOptions }));
+            File.WriteAllText(stage, JsonSerializer.Serialize(new { template = template.Text, output = output.Text, combined=combined.Checked, taskCsv=taskCsv.Checked, openDxf=openDxf.Checked, exportPdf=exportPdf.Checked, themeMode=((ThemeMode)themeMode.SelectedIndex).ToString(), dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text, stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text, drawing = drawingOptions }));
             File.Move(stage, settingsPath, true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log("未能保存设置：" + ex.Message); }
@@ -408,8 +417,8 @@ public sealed class MainForm : Form
             throw new InvalidOperationException("GUI 参数表初始化失败。");
         ModelRules.Validate(GetRows());
         if(run.Text!="生成并导出Step" || !combined.Visible || !taskCsv.Visible)throw new InvalidOperationException("导出选项或按钮名称不正确。");
-        if(!run.UseVisualStyleBackColor || !runDxf.UseVisualStyleBackColor ||
-            run.FlatStyle!=FlatStyle.Standard || runDxf.FlatStyle!=run.FlatStyle ||
+        if(run.UseVisualStyleBackColor==AppTheme.IsDark || runDxf.UseVisualStyleBackColor==AppTheme.IsDark ||
+            run.FlatStyle!=(AppTheme.IsDark?FlatStyle.Flat:FlatStyle.Standard) || runDxf.FlatStyle!=run.FlatStyle ||
             run.Padding!=runDxf.Padding || !runDxf.Visible)
             throw new InvalidOperationException("生成按钮样式或一键出图按钮不正确。");
         if(Math.Abs(dxfBase.PointToScreen(Point.Empty).Y-stepBase.PointToScreen(Point.Empty).Y)>1)
@@ -429,6 +438,9 @@ public sealed class MainForm : Form
         if(!about.Visible || about.PointToScreen(Point.Empty).X<=import.PointToScreen(Point.Empty).X || Icon==null)
             throw new InvalidOperationException("关于按钮或软件图标不正确。");
         if (!run.Enabled || !runDxf.Enabled || stop.Enabled) throw new InvalidOperationException("GUI 初始按钮状态不正确。");
+        var footer=run.Parent!.Parent!;
+        int lastBottom=new Control[]{run,runDxf,stop,combined,taskCsv,overwrite,openDxf,exportPdf}.Max(c=>footer.PointToClient(c.PointToScreen(new Point(0,c.Height))).Y);
+        if(footer.ClientSize.Height-lastBottom>footer.Padding.Bottom+4)throw new InvalidOperationException("底部按钮区必须按内容撑开，不应保留固定空白。");
     }
 }
 

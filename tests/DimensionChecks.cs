@@ -83,14 +83,14 @@ internal static class DimensionChecks
             Check(AppBuildInfo.WindowTitle.StartsWith(AppBuildInfo.ProductName+" · v", StringComparison.Ordinal) &&
                 !AppBuildInfo.WindowTitle.Contains("未知", StringComparison.Ordinal), "Title must contain product name, version and embedded build date");
             string? expectedVersion = Environment.GetEnvironmentVariable("BUILD_VERSION");
-            if (expectedVersion != null) Check(AppBuildInfo.WindowTitle.Contains("v" + expectedVersion + " ·", StringComparison.Ordinal), "Title version must match release version");
+            if (expectedVersion != null) Check(AppBuildInfo.WindowTitle.EndsWith("v" + expectedVersion, StringComparison.Ordinal), "Title version must match release version");
             Check(reopened.Entities.Polylines2D.Any(p => p.Layer.Name == "HIDDEN" && p.LinetypeGeneration && p.Vertexes.Count >= 3), "Connected hidden fragments need continuous polyline pattern generation");
             Check(reopened.DimensionStyles.Contains("_5") && Math.Abs(reopened.DimensionStyles["_5"].TextHeight-0.6)<1e-8 && Math.Abs(reopened.DimensionStyles["_5"].DimScaleOverall-20)<1e-8,"Default _5 dimensions must use the requested 0.6 x 20 text scale");
             Check(reopened.Entities.Dimensions.OfType<netDxf.Entities.DiametricDimension>().Count()==2 && reopened.Entities.Dimensions.OfType<netDxf.Entities.DiametricDimension>().All(d=>Math.Abs(d.Measurement-60)<.01),"Hole diameter needs a native diameter dimension on each sheet");
             Check(reopened.Entities.Texts.All(t=>t.Value.StartsWith("辊密封",StringComparison.Ordinal)),"Added drawing titles must contain only roller-seal name and number");
             Check(dimensions.Count(d=>Math.Abs(Measurement(d)-9)<.001)==4,"Tongue and groove depth dimensions must be separate at both ends of both sheets");
             Check(dimensions.Any(d=>N(d,50)==90&&Math.Abs(Measurement(d)-40)<.001)&&dimensions.Any(d=>N(d,50)==90&&Math.Abs(Measurement(d)-50)<.001),"Each end needs its own groove height chain");
-            Check(System.Text.RegularExpressions.Regex.IsMatch(AppBuildInfo.WindowTitle,@"编译于 \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"),"Build identity needs hours, minutes and seconds");
+            Check(System.Text.RegularExpressions.Regex.IsMatch(AppBuildInfo.BuildDate,@"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$"),"About-page build metadata needs hours, minutes and seconds");
             count += TemplateChecks.Run(directory,page);
             if (externalTemplate != null)
             {

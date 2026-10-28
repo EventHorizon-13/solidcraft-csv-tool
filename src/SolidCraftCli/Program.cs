@@ -31,7 +31,8 @@ internal static class Program
             bool exportPdf = options.ContainsKey("--export-pdf");
             bool exportDxf = options.ContainsKey("--export-dxf") || exportPdf;
             string csvPath = RequiredPath(options, "--csv");
-            string templatePath = RequiredPath(options, "--template");
+            string templatePath = options.ContainsKey("--template") ? RequiredPath(options, "--template") :
+                LocalTemplates.Find(AppContext.BaseDirectory, Environment.CurrentDirectory).Native ?? throw new FileNotFoundException("找不到内置标准辊密封模板，请完整解压软件包，或用 --template 指定模板。");
             string outputPath = Path.GetFullPath(options.GetValueOrDefault("--output") ?? Path.GetDirectoryName(csvPath)!);
             string engine = Path.GetFullPath(options.GetValueOrDefault("--engine") ?? Path.Combine(AppContext.BaseDirectory, "SolidCraft", "solidcraft-cli"));
             if (!File.Exists(engine)) throw new FileNotFoundException("找不到 SolidCraft CLI。请保留软件包中的 SolidCraft 文件夹，或用 --engine 指定路径。", engine);
@@ -143,13 +144,13 @@ internal static class Program
     static void PrintHelp()
     {
         Console.WriteLine($"标准辊密封批量生成 CLI {typeof(Program).Assembly.GetName().Version?.ToString(2)}");
-        Console.WriteLine("用法：standard-roller-seal --csv 参数.csv --template 模板.solidcraft [选项]");
+        Console.WriteLine("用法：standard-roller-seal --csv 参数.csv [--template 模板.solidcraft] [选项]");
         Console.WriteLine();
         Console.WriteLine("必需参数：");
         Console.WriteLine("  --csv PATH                 输入参数 CSV");
-        Console.WriteLine("  --template PATH            V13 SolidCraft 模板");
         Console.WriteLine();
         Console.WriteLine("选项：");
+        Console.WriteLine("  --template PATH            自选 V13 SolidCraft 模板；默认内置标准辊密封模板");
         Console.WriteLine("  --output DIR               输出目录，默认与 CSV 相同");
         Console.WriteLine("  --combine-step             另行导出合并 STEP");
         Console.WriteLine("  --step-name NAME           合并 STEP 文件名，需同时启用 --combine-step");

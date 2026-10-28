@@ -10,7 +10,8 @@ internal static class LocalTemplates
             string folder=Path.Combine(root,"模板");if(!Directory.Exists(folder))continue;
             string[] files=Directory.GetFiles(folder);
             native??=files.Where(p=>Path.GetExtension(p).Equals(".solidcraft",StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(p=>Path.GetFileName(p).Contains("V13",StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(p=>Path.GetFileName(p).Equals("标准辊密封.solidcraft",StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(p=>Path.GetFileName(p).Contains("V13",StringComparison.OrdinalIgnoreCase))
                 .ThenBy(p=>Path.GetFileName(p),StringComparer.OrdinalIgnoreCase).FirstOrDefault();
             dxf??=files.Where(p=>Path.GetExtension(p).Equals(".dxf",StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(p=>Path.GetFileName(p).Contains("模板")||Path.GetFileName(p).Contains("图框"))

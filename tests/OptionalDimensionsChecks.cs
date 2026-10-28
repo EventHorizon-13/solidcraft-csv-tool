@@ -25,10 +25,16 @@ internal static class OptionalDimensionsChecks
         if(!rejected)throw new Exception("Negative groove depth must be rejected.");
         var templateRows=CsvFiles.Read("examples/辊密封参数模板.csv");
         if(templateRows.Count!=6||templateRows.Any(r=>r.Length!=19)||ModelRules.Validate(templateRows).Count!=6)throw new Exception("Updated template must contain 19 columns and six valid rows.");
-        string app=Path.Combine(directory,"app"),work=Path.Combine(directory,"working");Directory.CreateDirectory(Path.Combine(app,"模板"));Directory.CreateDirectory(Path.Combine(work,"模板"));
+        string fixture=Path.Combine(directory,"discovery-"+Guid.NewGuid().ToString("N"));
+        string app=Path.Combine(fixture,"app"),work=Path.Combine(fixture,"working");Directory.CreateDirectory(Path.Combine(app,"模板"));Directory.CreateDirectory(Path.Combine(work,"模板"));
         File.WriteAllText(Path.Combine(app,"模板","V13.solidcraft"),"");File.WriteAllText(Path.Combine(app,"模板","图框.dxf"),"");File.WriteAllText(Path.Combine(work,"模板","old.solidcraft"),"");
         var found=LocalTemplates.Find(app,work);
         if(found.Native!=Path.Combine(app,"模板","V13.solidcraft")||found.Dxf!=Path.Combine(app,"模板","图框.dxf"))throw new Exception("Application-local template folder must take priority.");
+        File.Copy(Path.Combine("模板","标准辊密封.solidcraft"),Path.Combine(app,"模板","标准辊密封.solidcraft"),true);
+        if(LocalTemplates.Find(app,work).Native!=Path.Combine(app,"模板","标准辊密封.solidcraft"))throw new Exception("The supplied built-in model must be the first-run default.");
+        using var model=System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(app,"模板","标准辊密封.solidcraft")));
+        var parameterNames=model.RootElement.GetProperty("params").EnumerateArray().Select(p=>p.GetProperty("name").GetString()).ToHashSet();
+        if(ModelRules.RequiredParameterNames.Concat(ModelRules.OptionalParameterNames).Append("半孔校验").Any(n=>!parameterNames.Contains(n)))throw new Exception("Built-in template must support every batch parameter.");
         Console.WriteLine("PASS: old CSV compatibility, five optional dimensions, blank defaults and formula preservation, local 模板 folder detection.");
     }
     public static async Task HeadlessAsync(string directory,string executable)

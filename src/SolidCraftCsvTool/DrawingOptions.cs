@@ -17,6 +17,8 @@ public sealed record DrawingOptions
     public double FrameMargin { get; init; } = 35;
     public double SheetGap { get; init; } = 100;
     public bool IncludeFrame { get; init; } = true;
+    // Empty values keep the template's text; absent/empty TITLE keeps the per-part automatic name.
+    public Dictionary<string, string> TitleBlockAttributes { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public void Validate()
     {
         _=ResolvedFileName;
@@ -35,6 +37,24 @@ public sealed record DrawingOptions
 internal sealed record FrameSource(Box2 Boundary, double TitleTop, IReadOnlyList<Insert> Components);
 internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame)
 {
+    public static IReadOnlyList<KeyValuePair<string, string>> TitleFields(DrawingOptions options)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var visited = new HashSet<netDxf.Blocks.Block>();
+        void Read(Insert insert)
+        {
+            foreach (var attribute in insert.Attributes) fields.TryAdd(attribute.Tag, Convert.ToString(attribute.Value) ?? "");
+            if (!visited.Add(insert.Block)) return;
+            foreach (var definition in insert.Block.AttributeDefinitions.Values) fields.TryAdd(definition.Tag, Convert.ToString(definition.Value) ?? "");
+            foreach (var child in insert.Block.Entities.OfType<Insert>()) Read(child);
+        }
+        if (string.IsNullOrWhiteSpace(options.TemplatePath)) return fields.ToArray();
+        var document = DxfDocument.Load(options.TemplatePath) ?? throw new InvalidDataException("无法读取 DXF 模板。");
+        var frame = FindFrame(document);
+        if (frame != null) foreach (var insert in frame.Components) Read(insert);
+        return fields.ToArray();
+    }
+
     public double TextHeight => Style.TextHeight * Math.Max(1, Style.DimScaleOverall);
     public double Scale => Math.Max(1, Style.DimScaleOverall);
     public static DrawingResources Load(DrawingOptions options)

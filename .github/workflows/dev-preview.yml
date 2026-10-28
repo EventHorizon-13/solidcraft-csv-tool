@@ -75,7 +75,7 @@ jobs:
           dotnet publish src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$env:BUILD_VERSION" "-p:BuildDate=$env:BUILD_DATE" -o '${{ matrix.output }}'
           if ($LASTEXITCODE -ne 0) { throw 'Windows developer preview publish failed' }
           Copy-Item README.md, THIRD_PARTY_NOTICES.md '${{ matrix.output }}/'
-          Copy-Item 模板 '${{ matrix.output }}/模板' -Recurse
+          Copy-Item '模板/*' '${{ matrix.output }}/模板/' -Recurse -Force
           Copy-Item tools/pdf-export/fonts.json.example '${{ matrix.output }}/模板/字体/fonts.json.example'
           Copy-Item examples/辊密封参数模板.csv '${{ matrix.output }}/辊密封参数模板.csv'
           $expandedBytes = (Get-ChildItem '${{ matrix.output }}' -Recurse -File | Measure-Object -Property Length -Sum).Sum
@@ -151,7 +151,7 @@ jobs:
           set -euo pipefail
           dotnet publish src/SolidCraftCli/SolidCraftCli.csproj -c Release -r '${{ matrix.rid }}' --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false "-p:Version=$BUILD_VERSION" -o dist/app
           cp README.md THIRD_PARTY_NOTICES.md dist/app/
-          cp -R 模板 dist/app/模板
+          cp -R 模板/. dist/app/模板/
           cp tools/pdf-export/fonts.json.example dist/app/模板/字体/fonts.json.example
           cp examples/辊密封参数模板.csv dist/app/辊密封参数模板.csv
           expanded_bytes=$(du -sb dist/app | cut -f1)
