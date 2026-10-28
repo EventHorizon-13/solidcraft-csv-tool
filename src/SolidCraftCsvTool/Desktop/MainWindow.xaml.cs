@@ -52,6 +52,12 @@ public partial class MainWindow : Window
         var headerStyle=new Style(typeof(System.Windows.Controls.Primitives.DataGridColumnHeader));
         headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty,HorizontalAlignment.Center));
         headerStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty,VerticalAlignment.Center));
+        // Fluent's default column header can retain a light surface after switching to dark mode.
+        // Bind to the DataGrid's theme-aware brushes so Light, Dark and System stay in sync.
+        headerStyle.Setters.Add(new Setter(Control.BackgroundProperty,new Binding(nameof(Control.Background)){Source=grid,Mode=BindingMode.OneWay}));
+        headerStyle.Setters.Add(new Setter(Control.ForegroundProperty,new Binding(nameof(Control.Foreground)){Source=grid,Mode=BindingMode.OneWay}));
+        headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty,new Binding(nameof(Control.BorderBrush)){Source=grid,Mode=BindingMode.OneWay}));
+        headerStyle.Setters.Add(new Setter(System.Windows.Controls.Primitives.DataGridColumnHeader.SeparatorBrushProperty,new Binding(nameof(Control.BorderBrush)){Source=grid,Mode=BindingMode.OneWay}));
         grid.ColumnHeaderStyle=headerStyle;
         grid.ItemsSource=table.DefaultView;ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());
         Closing+=OnClosing;
