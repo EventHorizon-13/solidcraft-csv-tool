@@ -27,7 +27,7 @@ internal static class PdfExportService
 
         string runtime = Path.Combine(AppContext.BaseDirectory, "PdfExporter");
         string node = Path.Combine(runtime, OperatingSystem.IsWindows() ? "node.exe" : "node");
-        string script = Path.Combine(runtime, "pdf-exporter.mjs");
+        string script = Path.Combine(runtime, "pdf-exporter.bundle.mjs");
         if (!File.Exists(node)) throw new FileNotFoundException("找不到随开发预览包附带的开源 Node.js 运行时。", node);
         if (!File.Exists(script)) throw new FileNotFoundException("找不到 MLightCAD PDF 渲染器。请完整解压开发预览包。", script);
 

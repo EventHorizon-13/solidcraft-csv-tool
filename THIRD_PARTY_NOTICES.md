@@ -12,7 +12,7 @@ The PDF developer preview bundles the open-source Node.js 24 runtime and these o
 - @velipso/polybool 1.1.1 — 0BSD, https://github.com/velipso/polybool
 - `pdf-glyph-provider.mjs` adapts MLightCAD's MIT-licensed SHX/BigFont glyph-provider implementation. Copyright (c) 2026 mlightcad. The applicable MIT notice is reproduced below.
 
-Package license texts are included with the corresponding packages under `PdfExporter/node_modules`. Node.js license files are included under `PdfExporter`. The PDF engine is DXF-only and does not include LibreDWG or other GPL conversion packages. SHX font files are not bundled; users supply fonts they are licensed to use.
+The PDF renderer is bundled into `PdfExporter/pdf-exporter.bundle.mjs` to avoid shipping the entire npm package tree. The resolved dependency list and applicable license files are included under `PdfExporter/licenses`. Node.js license files are included under `PdfExporter`. esbuild 0.28.2 is an MIT-licensed build-time tool and is not included in the application runtime. The PDF engine is DXF-only and does not include LibreDWG or other GPL conversion packages. SHX font files are not bundled; users supply fonts they are licensed to use.
 
 MIT License (MLightCAD glyph-provider adaptation)
 

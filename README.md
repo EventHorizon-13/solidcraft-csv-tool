@@ -60,7 +60,7 @@ Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准�
 
 DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION；图框内 Logo 的实心填充会保留闭合边界。数值来自 STEP 几何，制造前请核对实际图纸。
 
-PDF 开发者预览使用 MLightCAD 的开源 MIT DXF 数据模型、SHX/BigFont 字体渲染与矢量 PDF 渲染器。需提供含固定 A4 图框的 DXF 模板。生成时按每个独立加工图框排成一张 A4 横向页面，并将多页合并。PDF 中字体以矢量轮廓绘制；当前预览重点是核对大字体、图框和 Logo 显示，需使用实际图纸验收。可在“出图设置”指定外置字体目录；如果目录中含 `fonts.json`，可为 BigFont 指定编码。无 `fonts.json` 时，`gbcbig.shx` 默认按 GBK 读取。预览包会附带本次构建生成的 npm 锁定文件，便于追溯渲染依赖版本。
+PDF 开发者预览使用 MLightCAD 的开源 MIT DXF 数据模型、SHX/BigFont 字体渲染与矢量 PDF 渲染器。渲染依赖会预先打包成单个 JS 文件，安装包不带完整 `node_modules`。需提供含固定 A4 图框的 DXF 模板。生成时按每个独立加工图框排成一张 A4 横向页面，并将多页合并。PDF 中字体以矢量轮廓绘制；当前预览重点是核对大字体、图框和 Logo 显示，需使用实际图纸验收。可在“出图设置”指定外置字体目录；如果目录中含 `fonts.json`，可为 BigFont 指定编码。无 `fonts.json` 时，`gbcbig.shx` 默认按 GBK 读取。预览包包含依赖锁文件与许可证，便于追溯组件。
 
 ## 构建和检查
 

@@ -11,5 +11,8 @@
     "@velipso/polybool": "1.1.1",
     "pdf-lib": "1.17.1",
     "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }
