@@ -9,12 +9,15 @@ internal enum AppearanceMode { Automatic, Dark, Light }
 
 public partial class DesktopApp : Application
 {
+    // Microsoft documents ThemeMode as the Fluent theme entry point; .NET 10 still marks the API as evaluation.
+#pragma warning disable WPF0001
     internal static void SetAppearance(AppearanceMode mode)=>Current.ThemeMode=mode switch
     {
         AppearanceMode.Dark=>System.Windows.ThemeMode.Dark,
         AppearanceMode.Light=>System.Windows.ThemeMode.Light,
         _=>System.Windows.ThemeMode.System
     };
+#pragma warning restore WPF0001
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);

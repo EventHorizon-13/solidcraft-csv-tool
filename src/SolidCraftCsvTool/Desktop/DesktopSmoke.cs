@@ -48,7 +48,7 @@ internal static class DesktopSmoke
     }
     static void Capture(Window window,string path)
     {
-        var root=(FrameworkElement)window.Content;var image=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(root.ActualWidth)),Math.Max(1,(int)Math.Ceiling(root.ActualHeight)),96,96,PixelFormats.Pbgra32);image.Render(root);
+        var image=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(window.ActualWidth)),Math.Max(1,(int)Math.Ceiling(window.ActualHeight)),96,96,PixelFormats.Pbgra32);image.Render(window);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(image));using var file=File.Create(path);encoder.Save(file);
     }
     internal static async Task Run(MainWindow window,string[] args)
