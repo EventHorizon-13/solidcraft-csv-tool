@@ -16,6 +16,10 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node24',
+  // @mlightcad/three-renderer imports this ESM file without its required .js suffix.
+  alias: {
+    'three/examples/jsm/controls/OrbitControls': 'three/examples/jsm/controls/OrbitControls.js'
+  },
   sourcemap: false,
   legalComments: 'none'
 })
