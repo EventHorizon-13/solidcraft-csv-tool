@@ -705,7 +705,7 @@ internal static partial class MachiningDxf
         public double Width => Projection.Bounds.Width;
         public double Height => Projection.Bounds.Height;
     }
-    sealed record ArcPath(Point2 Center, double Radius, double StartDegrees, double SweepDegrees, string Layer);
+    internal sealed record ArcPath(Point2 Center, double Radius, double StartDegrees, double SweepDegrees, string Layer);
 
     public static void Write(string path,StepDrawingPage page,DrawingOptions? options=null)=>WriteCombined(path,[page],options);
     public static void WriteCombined(string path,IReadOnlyList<StepDrawingPage> pages,DrawingOptions? options=null)
@@ -734,6 +734,9 @@ internal static partial class MachiningDxf
             string renderedLayer = IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE";
             linework.Add(new(map.P(line.A), map.P(line.B), renderedLayer));
         }
+        fittedArcs = MergeCircularFragments(fittedArcs, linework);
+        foreach (var arc in fittedArcs)
+            w.Arc(arc.Center, arc.Radius, arc.StartDegrees, arc.StartDegrees + arc.SweepDegrees, arc.Layer);
         var reconstructed = ReconstructHiddenArcs(linework, fittedArcs);
         foreach (ArcPath arc in reconstructed.Arcs)
         {
@@ -899,8 +902,6 @@ internal static partial class MachiningDxf
             if (i + 2 < points.Count && TryFitArc(points, i, out int end, out Point2 center, out double radius, out bool counterClockwise))
             {
                 double a = Angle(center, points[i]), b = Angle(center, points[end]);
-                if (counterClockwise) w.Arc(center, radius, a, b, layer);
-                else w.Arc(center, radius, b, a, layer);
                 double start = counterClockwise ? a : b, finish = counterClockwise ? b : a;
                 double sweep = (finish - start + 360) % 360;
                 fitted.Add(new(center, radius, start, sweep, layer));
@@ -915,10 +916,84 @@ internal static partial class MachiningDxf
         return (fitted, lines);
     }
 
-    // Suppress tessellated chords only when the ENTIRE chord is covered by an arc.
-    // Earlier logic allowed a 1.5°+ endpoint margin. For R45 that removes up to
-    // 1.18 mm of valid circular geometry on each side of a fitted arc.
-    static bool IsCoveredByArc(Line2 line, IReadOnlyList<ArcPath> arcs)
+    internal static List<ArcPath> MergeCircularFragments(List<ArcPath> arcs, List<Line2> lines)
+    {
+        const double circleTolerance = .002;
+        var result = new List<ArcPath>();
+        var remaining = new List<ArcPath>(arcs);
+        var consumed = new HashSet<int>();
+        while (remaining.Count > 0)
+        {
+            var reference = remaining.OrderByDescending(a => a.SweepDegrees).First();
+            var group = remaining.Where(a => a.Layer == reference.Layer &&
+                Distance(a.Center, reference.Center) + Math.Abs(a.Radius - reference.Radius) <= circleTolerance).ToArray();
+            foreach (var arc in group) remaining.Remove(arc);
+            var intervals = new List<(double Start, double End)>();
+            void Add(double start, double sweep)
+            {
+                start = (start % 360 + 360) % 360;
+                intervals.Add((start, Math.Min(360, start + sweep)));
+                if (start + sweep > 360) intervals.Add((0, start + sweep - 360));
+            }
+            foreach (var arc in group) Add(arc.StartDegrees, arc.SweepDegrees);
+            var candidates = new List<(int Index, double Start, double Sweep)>();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                if (consumed.Contains(i) || line.Layer != reference.Layer) continue;
+                if (Math.Abs(Distance(line.A, reference.Center) - reference.Radius) > circleTolerance ||
+                    Math.Abs(Distance(line.B, reference.Center) - reference.Radius) > circleTolerance) continue;
+                double step = SignedAngle(line.A, line.B, reference.Center);
+                double sweep = Math.Abs(step);
+                // Only finely tessellated chords qualify; long straight edges remain straight.
+                if (sweep < 1e-7 || sweep > 5 || reference.Radius * (1 - Math.Cos(sweep * Math.PI / 360)) > .025) continue;
+                candidates.Add((i, Angle(reference.Center, step > 0 ? line.A : line.B), sweep));
+            }
+            // Grow only through connected chords, so a separate nearby feature cannot become an arc.
+            double joinAngle = circleTolerance / reference.Radius * 180 / Math.PI;
+            bool grew;
+            do
+            {
+                grew = false;
+                for (int i = candidates.Count - 1; i >= 0; i--)
+                {
+                    var c = candidates[i];
+                    bool touches = intervals.Any(v =>
+                        Enumerable.Range(-1, 3).Any(k => c.Start + 360*k <= v.End + joinAngle &&
+                            c.Start + c.Sweep + 360*k >= v.Start - joinAngle));
+                    if (!touches) continue;
+                    Add(c.Start, c.Sweep); consumed.Add(c.Index); candidates.RemoveAt(i); grew = true;
+                }
+            } while (grew);
+            var merged = new List<(double Start, double End)>();
+            foreach (var interval in intervals.OrderBy(v => v.Start))
+            {
+                if (merged.Count > 0 && interval.Start <= merged[^1].End + joinAngle)
+                    merged[^1] = (merged[^1].Start, Math.Max(merged[^1].End, interval.End));
+                else merged.Add(interval);
+            }
+            if (merged.Count > 1 && merged[0].Start <= joinAngle && merged[^1].End >= 360 - joinAngle)
+            {
+                var wrap = (Start: merged[^1].Start, End: merged[0].End + 360);
+                merged.RemoveAt(merged.Count - 1); merged.RemoveAt(0); merged.Add(wrap);
+            }
+            foreach (var interval in merged)
+            {
+                double sweep = interval.End - interval.Start;
+                // Writer emits ARC; represent a complete circle as two semicircles.
+                if (sweep >= 359.9999)
+                {
+                    result.Add(reference with { StartDegrees = 0, SweepDegrees = 180 });
+                    result.Add(reference with { StartDegrees = 180, SweepDegrees = 180 });
+                }
+                else result.Add(reference with { StartDegrees = interval.Start, SweepDegrees = sweep });
+            }
+        }
+        for (int i = lines.Count - 1; i >= 0; i--) if (consumed.Contains(i)) lines.RemoveAt(i);
+        return result;
+    }
+
+    internal static bool IsCoveredByArc(Line2 line, IReadOnlyList<ArcPath> arcs)
     {
         foreach (ArcPath arc in arcs)
         {
@@ -960,16 +1035,18 @@ internal static partial class MachiningDxf
         return true;
     }
 
-    static bool TryFitArc(IReadOnlyList<Point2> points, int start, out int end, out Point2 center, out double radius, out bool counterClockwise)
+    internal static bool TryFitArc(IReadOnlyList<Point2> points, int start, out int end, out Point2 center, out double radius, out bool counterClockwise)
     {
         end = start; center = new(0, 0); radius = 0; counterClockwise = true;
         Point2 a = points[start], b = points[start + 1], c = points[start + 2];
-        double determinant = 2 * (a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y));
-        double scale = Math.Max(1, Math.Max(Math.Abs(a.X) + Math.Abs(a.Y), Math.Max(Math.Abs(b.X) + Math.Abs(b.Y), Math.Abs(c.X) + Math.Abs(c.Y))));
-        if (Math.Abs(determinant) < scale * scale * 1e-9) return false;
-        double aa = a.X * a.X + a.Y * a.Y, bb = b.X * b.X + b.Y * b.Y, cc = c.X * c.X + c.Y * c.Y;
-        center = new((aa * (b.Y - c.Y) + bb * (c.Y - a.Y) + cc * (a.Y - b.Y)) / determinant,
-            (aa * (c.X - b.X) + bb * (a.X - c.X) + cc * (b.X - a.X)) / determinant);
+        // Translate to the first vertex: circle fitting must not depend on sheet position.
+        double bx = b.X - a.X, by = b.Y - a.Y, cx = c.X - a.X, cy = c.Y - a.Y;
+        double determinant = 2 * (bx * cy - by * cx);
+        double scale = Math.Max(bx * bx + by * by, cx * cx + cy * cy);
+        if (scale == 0 || Math.Abs(determinant) < scale * 1e-10) return false;
+        double bb = bx * bx + by * by, cc = cx * cx + cy * cy;
+        center = new(a.X + (bb * cy - cc * by) / determinant,
+            a.Y + (bx * cc - cx * bb) / determinant);
         radius = Distance(center, a);
         if (!double.IsFinite(radius) || radius < 1 || radius > 100000) return false;
         double cross = Cross(a, b, c);
@@ -985,7 +1062,7 @@ internal static partial class MachiningDxf
             if (Math.Abs(Distance(center, points[k]) - radius) > tolerance) break;
             double step = SignedAngle(points[k - 1], points[k], center);
             if ((counterClockwise && step <= 0) || (!counterClockwise && step >= 0) || Math.Abs(step) > 30) break;
-            if (Math.Abs(sweep + step) > 170) break;
+            if (Math.Abs(sweep + step) > 359.9999) break;
             sweep += step;
             end = k;
         }

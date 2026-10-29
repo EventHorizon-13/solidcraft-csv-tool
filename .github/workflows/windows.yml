@@ -1,4 +1,4 @@
-name: Build and release 2.4.1
+name: Build and release 2.4.2
 on:
   workflow_dispatch:
   push:
@@ -35,9 +35,15 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.4.1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.4.2" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Verify semicircle and core regression checks
+        if: matrix.arch == 'amd64'
+        shell: pwsh
+        run: |
+          dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
+          if ($LASTEXITCODE -ne 0) { throw 'Core and semicircle regression checks failed' }
       - name: Install open-source PDF renderer
         shell: pwsh
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -131,7 +137,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.4.1" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.4.2" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -204,25 +210,15 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.4.1"
-          title="标准辊密封批量生成 2.4.1"
+          tag="win-2.4.2"
+          title="标准辊密封批量生成 2.4.2"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.4.1 正式版。
+          标准辊密封批量生成 2.4.2 正式版。
 
-          - 修复三视图圆弧出现局部缺口：严格判断折线段是否完全被圆弧覆盖，避免误删圆弧端点之外的短线段。
-          - 补充 R45 圆弧断口、端点跨越及跨 360° 边界的回归测试。
-          - 新增生成 .solidcraft 模型时在同一后台会话直接提取前视、俯视、左视，无需关闭并重新打开模型。
-          - DXF-only 模式跳过单件 STEP 中间文件，减少重复导出和模型加载；保留组合 STEP 与独立模型出图。
-          - 参数表支持 WPS 风格填充柄，单个单元格与连续矩形选区均可填充；支持上下左右及二维拖动。
-          - 拖动期间实时预览目标范围和填充结果；松开鼠标提交，取消拖动恢复原值。
-          - 支持数字、日期和编号后缀序列；按住 Ctrl 可切换序列填充与循环复制。
-          - 支持 Ctrl+Z 撤销、Ctrl+Y / Ctrl+Shift+Z 重做，覆盖填充、单元格编辑、整列修改、勾选切换和行操作。
-          - 勾选框单击即可切换；双击勾选列列头全选/取消全选，双击其他列头可批量修改整列。
-          - 移除可编辑的配合间隙列；旧版 14 列和 19 列 CSV 仍可导入，末尾间隙值会被忽略，模板内部公式保持不变。
-          - 深色模式采用更柔和的选中行颜色，当前单元格使用高对比度外框；浅色与自动主题同步适配。
-          - 更新确认窗口适配深浅色主题；关于窗口与设置选项卡的布局、对齐和高亮得到改进。
-          - 日志区域默认高度增至 140，并加入可拖动分隔条。
-          - Windows 2022 / Windows 2025 自动验证填充、撤销/重做、选中单元格边框、主题和窗口布局。
+          - 修复完整孔口半圆被拆分为多段 ARC：移除 170° 拟合上限，完整半圆输出为一条 180° ARC。
+          - 使用局部坐标计算圆心，避免图纸偏移造成拟合误差。
+          - 合并连续同圆弧与经校验的短弦段，保留真实缺口、图层及端部裁切。
+          - 新增半圆完整性、正反方向、大坐标偏移及跨 360° 边界回归测试。
           - Windows 桌面版：amd64、arm64；Linux CLI：amd64、arm64。
           - PDF 使用开源 DXF 矢量渲染；不包含 ODA 或专有 SDK。
           - PDF 需要用户提供有使用授权的 gbenor.shx、gbcbig.shx 和固定 A4 DXF 图框。
