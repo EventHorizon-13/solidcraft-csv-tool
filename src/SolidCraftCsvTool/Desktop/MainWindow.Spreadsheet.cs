@@ -13,6 +13,7 @@ namespace SolidCraftCsvTool;
 public partial class MainWindow
 {
     readonly record struct CellPosition(int Row,int Column);
+    internal bool FillHandleVisible=>fillHandle.Visibility==Visibility.Visible;
     List<CellPosition> fillSourceCells=[];
     bool fillDragging;
 
