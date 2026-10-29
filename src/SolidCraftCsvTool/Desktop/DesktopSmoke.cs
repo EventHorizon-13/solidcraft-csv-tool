@@ -77,11 +77,37 @@ internal static class DesktopSmoke
             double a=Luminance(text),b=Luminance(background);
             double ratio=(Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);
             if(ratio<4.5)throw new InvalidOperationException($"选中行文字对比度不足：{ratio:F2}");
+            if(cell.BorderThickness.Left<1||cell.BorderThickness.Top<1||cell.BorderThickness.Right<1||cell.BorderThickness.Bottom<1)
+                throw new InvalidOperationException("选中单元格缺少可见外框。");
             if(mode==AppearanceMode.Dark&&b>.18)
                 throw new InvalidOperationException($"深色选中行仍然过亮：{background}");
             if(mode==AppearanceMode.Light&&b<.50)
                 throw new InvalidOperationException($"浅色选中行背景过暗：{background}");
         }
+        var focused=cells.FirstOrDefault(c=>c.IsKeyboardFocusWithin);
+        if(focused==null)throw new InvalidOperationException("选中行没有获得焦点的当前单元格。");
+        if(focused.BorderThickness.Left<2||focused.BorderThickness.Top<2||focused.BorderThickness.Right<2||focused.BorderThickness.Bottom<2)
+            throw new InvalidOperationException("当前单元格的强调边框未显示。");
+        if(focused.BorderBrush is not SolidColorBrush focusBorder||focusBorder.Color.A==0)
+            throw new InvalidOperationException("当前单元格的强调边框颜色不可见。");
+    }
+    static void VerifySelectedTab(SettingsWindow dialog,int index)
+    {
+        if(dialog.Tabs.ItemContainerGenerator.ContainerFromIndex(index) is not TabItem tab)
+            throw new InvalidOperationException($"未找到设置选项卡 {index}。");
+        tab.ApplyTemplate();
+        if(tab.Background is not SolidColorBrush background||background.Color.A==0)
+            throw new InvalidOperationException($"选中的设置选项卡 {index} 没有高亮背景。");
+        var indicator=tab.Template.FindName("SelectionIndicator",tab) as Border;
+        if(indicator==null||indicator.Visibility!=Visibility.Visible)
+            throw new InvalidOperationException($"选中的设置选项卡 {index} 没有底部强调线。");
+        if(indicator.Background is not SolidColorBrush accent||accent.Color.A==0)
+            throw new InvalidOperationException($"选项卡 {index} 的强调线颜色不可见。");
+        if(tab.Foreground is not SolidColorBrush foreground)
+            throw new InvalidOperationException($"选项卡 {index} 未设置文字颜色。");
+        Color text=Composite(foreground.Color,background.Color,foreground.Opacity);
+        double a=Luminance(text),b=Luminance(background.Color),ratio=(Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);
+        if(ratio<4.5)throw new InvalidOperationException($"选项卡文字对比度不足：{ratio:F2}");
     }
     static void VerifyAboutLayout(Window dialog)
     {
@@ -133,7 +159,7 @@ internal static class DesktopSmoke
                 DesktopApp.SetAppearance(mode);
                 for(int tab=0;tab<dialog.Tabs.Items.Count;tab++)
                 {
-                    dialog.Tabs.SelectedIndex=tab;await Settle(dialog);VerifyContrast(dialog);
+                    dialog.Tabs.SelectedIndex=tab;await Settle(dialog);VerifyContrast(dialog);VerifySelectedTab(dialog,tab);
                     string suffix=(mode==AppearanceMode.Dark?"dark.":"")+(tab==0?"":$"tab{tab}.")+"png";
                     Capture(dialog,Path.ChangeExtension(settings,suffix));
                 }
@@ -144,7 +170,7 @@ internal static class DesktopSmoke
         {
             window.Width=window.MinWidth;window.Height=window.MinHeight;DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);window.VerifyUi();VerifyContrast(window);Capture(window,minimum);
         }
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data, light/dark/system and repeated switches; text and grid header/selection contrast; compact About dialog; taller log; main/settings/about and minimum size.");
+        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; theme contrast; selected-cell outline and focused-cell accent; selected settings-tab background and indicator; aligned About dialog; adjustable log; main/settings/about and minimum size.");
         window.Close();
     }
 }
