@@ -109,6 +109,20 @@ internal static class DesktopSmoke
         double a=Luminance(text),b=Luminance(background.Color),ratio=(Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);
         if(ratio<4.5)throw new InvalidOperationException($"选项卡文字对比度不足：{ratio:F2}");
     }
+    static void VerifyUpdatePrompt(Window dialog)
+    {
+        if(dialog.Title!="发现新版本"||dialog.ActualHeight>240)
+            throw new InvalidOperationException("更新确认窗口标题或尺寸不正确。");
+        var buttons=All(dialog).OfType<Button>().ToArray();
+        if(!buttons.Any(b=>Equals(b.Content,"是"))||!buttons.Any(b=>Equals(b.Content,"否")))
+            throw new InvalidOperationException("更新确认窗口缺少“是／否”操作。");
+        var message=All(dialog).OfType<TextBlock>().FirstOrDefault(t=>t.Text.Contains("发现新版本")&&t.Text.Contains("自动重新启动"));
+        if(message?.Foreground is not SolidColorBrush foreground)
+            throw new InvalidOperationException("更新确认窗口缺少可读的版本提示文字。");
+        Color background=Background(message),text=Composite(foreground.Color,background,foreground.Opacity);
+        double a=Luminance(text),b=Luminance(background),ratio=(Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);
+        if(ratio<4.5)throw new InvalidOperationException($"更新提示文字对比度不足：{ratio:F2}");
+    }
     static void VerifyAboutLayout(Window dialog)
     {
         if(dialog.ActualHeight>355)throw new InvalidOperationException($"关于窗口高度过大：{dialog.ActualHeight:F0}");
@@ -151,6 +165,16 @@ internal static class DesktopSmoke
             foreach(var mode in new[]{AppearanceMode.Light,AppearanceMode.Dark}){DesktopApp.SetAppearance(mode);await Settle(dialog);VerifyContrast(dialog);VerifyAboutLayout(dialog);Capture(dialog,mode==AppearanceMode.Light?about:Path.ChangeExtension(about,"dark.png"));}
             dialog.Close();
         }
+        if(Arg("--update-prompt-screenshot") is string promptPath)
+        {
+            var dialog=new UpdatePromptWindow("2.2.5","2.2.4"){Owner=window};dialog.Show();
+            foreach(var mode in new[]{AppearanceMode.Light,AppearanceMode.Dark})
+            {
+                DesktopApp.SetAppearance(mode);await Settle(dialog);VerifyContrast(dialog);VerifyUpdatePrompt(dialog);
+                Capture(dialog,mode==AppearanceMode.Light?promptPath:Path.ChangeExtension(promptPath,"dark.png"));
+            }
+            dialog.Close();
+        }
         if(Arg("--settings-screenshot") is string settings)
         {
             var dialog=new SettingsWindow(new(),AppearanceMode.Automatic){Owner=window};dialog.Show();
@@ -170,7 +194,7 @@ internal static class DesktopSmoke
         {
             window.Width=window.MinWidth;window.Height=window.MinHeight;DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);window.VerifyUi();VerifyContrast(window);Capture(window,minimum);
         }
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; theme contrast; selected-cell outline and focused-cell accent; selected settings-tab background and indicator; aligned About dialog; adjustable log; main/settings/about and minimum size.");
+        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; theme contrast; selected-cell outline and focused-cell accent; selected settings-tab background and indicator; themed update prompt; aligned About dialog; adjustable log; main/settings/about/update prompt and minimum size.");
         window.Close();
     }
 }
