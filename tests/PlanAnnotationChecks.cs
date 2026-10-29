@@ -95,6 +95,48 @@ internal static class PlanAnnotationChecks
         Console.WriteLine("PASS: arc-based 15/90/30/90/66 plan chain; both groove depths beside shoulders; hidden split female groove retained; first/last calibrated to middle pairs; border strips do not merge 15+90 into 105; one-click STEP selection excludes assembly.");
     }
 
+    public static void RunHalfHoleChecks()
+    {
+        string directory=Path.Combine(Path.GetTempPath(),"half-hole-"+Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            foreach(double radius in new[]{35.0,45.0,47.5})
+            foreach(double shift in new[]{0.0,-400.0})
+            {
+                Point2 P(double x,double y)=>new(x+shift,y+shift);
+                var contour=new List<Point2>();
+                void Arc(double center,int start,int finish)
+                {
+                    for(int i=start;i<=finish;i++)contour.Add(P(center+radius*Math.Cos(i*Math.PI/180),105+radius*Math.Sin(i*Math.PI/180)));
+                }
+                Arc(0,270,360);
+                foreach(double center in new[]{120.0,240.0,360.0,480.0})Arc(center,180,360);
+                Arc(600,180,270);
+                contour.AddRange([P(600,0),P(0,0)]);
+                Projection2 front=new("front",[],[new(contour,true,"VISIBLE")],new(shift,shift,shift+600,shift+105));
+                var edges=new List<Line2>();
+                foreach(double center in new[]{120.0,240.0,360.0,480.0})
+                    foreach(double x in new[]{center-radius,center+radius})edges.Add(new(new(x,0),new(x,200),"VISIBLE"));
+                edges.Add(new(new(radius,0),new(radius,200),"VISIBLE"));
+                // A misleading end projection lies near the real right half-hole tangent.
+                edges.Add(new(new(600-radius+1.11,0),new(600-radius+1.11,200),"VISIBLE"));
+                Projection2 top=new("top",edges,[new([new(0,0),new(600,0),new(600,200),new(0,200)],true,"VISIBLE")],new(0,0,600,200));
+                Projection2 end=new("left",[],[new([new(0,0),new(200,0),new(200,105),new(0,105)],true,"VISIBLE")],new(0,0,200,105));
+                string file=Path.Combine(directory,"sample.dxf");
+                MachiningDxf.Write(file,new("half-hole",front,top,end,DxfFeatureDetector.Analyze(front,top)));
+                double N(Dictionary<int,string> d,int c)=>double.Parse(d[c],CultureInfo.InvariantCulture);
+                var dims=ReadDimensions(file).Where(d=>(int.Parse(d[70])&7)==0&&Math.Abs(N(d,50))<.001).ToArray();
+                var overall=dims.Single(d=>Math.Abs(N(d,14)-N(d,13)-600)<.001&&Math.Abs(N(d,23)-N(d,24))<.001&&N(d,23)==dims.Min(x=>N(x,23)));
+                double origin=N(overall,13),baseline=N(overall,23);
+                if(!dims.Any(d=>Math.Abs(N(d,13)-(origin+600-radius))<.01&&Math.Abs(N(d,14)-(origin+600))<.01&&Math.Abs(N(d,23)-baseline-200)<.01))
+                    throw new Exception($"Right half-hole dimension must equal actual radius {radius}, not snap to a nearby edge");
+            }
+            Console.WriteLine("PASS: half-hole plan tangents use radii 35, 45 and 47.5, ignoring misleading end edges and coordinate shifts.");
+        }
+        finally{Directory.Delete(directory,true);}
+    }
+
     static List<Dictionary<int,string>> ReadDimensions(string file)
     {
         var result=new List<Dictionary<int,string>>();Dictionary<int,string>? current=null;

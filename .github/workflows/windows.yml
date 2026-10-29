@@ -1,4 +1,4 @@
-name: Build and release 2.4.4
+name: Build and release 2.4.5
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.4.4" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.4.5" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify semicircle and core regression checks
@@ -137,7 +137,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.4.4" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.4.5" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -210,15 +210,15 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.4.4"
-          title="标准辊密封批量生成 2.4.4"
+          tag="win-2.4.5"
+          title="标准辊密封批量生成 2.4.5"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.4.4 正式版。
+          标准辊密封批量生成 2.4.5 正式版。
 
-          - 修复上视图端部直线被误拟合成外鼓半圆的问题。
-          - 对全部源线段（包括起始两段）校验弦高误差，拒绝将跨直径长直线替换为圆弧。
-          - 新增 R100 长弦误拟合的正反方向回归检查，保留真实完整半圆。
-          - 保留按实际几何分别计算孔位置尺寸与子头尺寸的通用标注逻辑。
+          - 修复上视图右侧半孔尺寸偏差：取消向附近投影边线吸附，以对齐后的实际圆弧切线计算。
+          - 例如 Ø90 半孔输出实际 45 尺寸；数值按几何计算，不固定孔径。
+          - 新增 R35、R45、R47.5 半孔及干扰边线、坐标偏移回归检查。
+          - 保留真实完整半圆、外鼓半圆误拟合修复及孔位置与子头独立尺寸标注。
           - Windows 桌面版：amd64、arm64；Linux CLI：amd64、arm64。
           - PDF 使用开源 DXF 矢量渲染；不包含 ODA 或专有 SDK。
           - PDF 需要用户提供有使用授权的 gbenor.shx、gbcbig.shx 和固定 A4 DXF 图框。

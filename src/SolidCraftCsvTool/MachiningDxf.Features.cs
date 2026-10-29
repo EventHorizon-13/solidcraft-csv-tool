@@ -104,8 +104,8 @@ internal static partial class MachiningDxf
         offsets.Sort();
         double alignment=offsets.Count==0?0:offsets.Count%2==1?offsets[offsets.Count/2]:(offsets[offsets.Count/2-1]+offsets[offsets.Count/2])/2;
         double[] boreEdges=circles.SelectMany(a=>new[]{a.Center.X-a.Radius+b.MinX+alignment,a.Center.X+a.Radius+b.MinX+alignment})
-            .Select(x=>planEdges.Length>0&&Math.Abs(planEdges.MinBy(p=>Math.Abs(p-x))-x)<=Math.Max(.1,(references.FirstOrDefault()?.Radius??1)*.05)
-                ?planEdges.MinBy(p=>Math.Abs(p-x)):x)
+            // Keep analytic tangents after alignment. A nearby projected joint
+            // or clipping edge is not the bore tangent, especially at half holes.
             .Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05).ToArray();
         var marks=(boreEdges.Length>0 ? boreEdges : AxisMarks(map.Projection,true))
             .Where(x=>x>=bodyMin-.05&&x<=bodyMax+.05&&
