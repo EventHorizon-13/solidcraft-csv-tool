@@ -55,11 +55,10 @@ internal static class BatchOptionsChecks
             }
             var progress=new Progress<ExportProgress>(p=>Console.WriteLine(p.Message));
             string one=Path.GetFullPath(Path.Combine(directory,"single"));var row=ModelRules.DefaultRow("A01");
-            await Exporter.RunAsync(new(ModelRules.Validate([row]),seed,one,7878,10,false,false,"1027","组合试件.step",true,[row],ExportStep:false),progress,CancellationToken.None);
+            await Exporter.RunAsync(new(ModelRules.Validate([row]),seed,one,7878,10,false,false,"1027","组合试件.step",true,[row],ExportStep:false,Drawing:new(){IncludeFrame=false,OutputFileName="native-only-drawing"}),progress,CancellationToken.None);
             string nativeOnly=Path.Combine(one,"辊密封_1027_A01.solidcraft");
             if(!File.Exists(nativeOnly)||File.Exists(Path.Combine(one,"辊密封_1027_A01.step")))throw new Exception("DXF-only mode must save the native model without exporting an intermediate STEP.");
-            await StepDrawingExporter.RunAsync([nativeOnly],one,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="native-only-drawing"});
-            var nativeOnlyDxf=DxfDocument.Load(Path.Combine(one,"native-only-drawing.dxf"))??throw new Exception("Direct native SolidCraft to DXF failed.");
+            var nativeOnlyDxf=DxfDocument.Load(Path.Combine(one,"native-only-drawing.dxf"))??throw new Exception("Same-session model generation to DXF failed.");
             if(nativeOnlyDxf.Entities.Dimensions.Count()==0)throw new Exception("Direct native projection must include editable dimensions.");
             if(File.Exists(Path.Combine(one,"组合试件.step"))||CsvFiles.Read(Path.Combine(one,"辊密封_1027.csv"))[0][0]!="A01")throw new Exception("No-merge/current-task CSV options ignored.");
             string two=Path.GetFullPath(Path.Combine(directory,"combined"));var rows=new[]{ModelRules.DefaultRow("1"),ModelRules.DefaultRow("2")};
@@ -73,7 +72,7 @@ internal static class BatchOptionsChecks
             var drawing=DxfDocument.Load(Path.Combine(two,"step-source-drawing.dxf"))??throw new Exception("STEP projection failed.");
             if(drawing.Entities.Dimensions.Count()==0||nativeDrawing.Entities.Dimensions.Count()==0)throw new Exception("Orthographic projections need editable dimensions.");
             if(nativeDrawing.Entities.Dimensions.Count()!=drawing.Entities.Dimensions.Count())throw new Exception("Native SolidCraft and STEP projections produced different dimension counts.");
-            Console.WriteLine("PASS: direct .solidcraft-to-DXF; no intermediate STEP in DXF-only mode; native/STEP dimension counts match; combined STEP path remains supported.");
+            Console.WriteLine("PASS: same-session model generation to DXF; no intermediate STEP in DXF-only mode; native/STEP dimension counts match; combined STEP path remains supported.");
         }
         finally{ControlClient.HeadlessExecutable=null;}
     }
