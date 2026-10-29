@@ -26,9 +26,9 @@ public static class StepDrawingExporter
     {
         drawingOptions ??= new DrawingOptions();
         drawingOptions.Validate();
-        if (inputFiles.Count == 0) throw new InvalidDataException("请选择至少一个 STEP 文件。");
+        if (inputFiles.Count == 0) throw new InvalidDataException("请选择至少一个 SolidCraft 或 STEP 三维文件。");
         foreach (string path in inputFiles)
-            if (!File.Exists(path) || !new[] { ".step", ".stp" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+            if (!File.Exists(path) || !new[] { ".solidcraft", ".step", ".stp" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
                 throw new InvalidDataException("输入列表中包含不存在或格式不支持的文件：" + path);
 
         inputFiles = inputFiles.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase).ToArray();
@@ -71,7 +71,7 @@ public static class StepDrawingExporter
                 {
                     cancellation.ThrowIfCancellationRequested();
                     string step = Path.GetFullPath(inputFiles[i]);
-                    progress.Report(new($"正在读取 STEP 并投影三视图 {i + 1}/{inputFiles.Count}：{Path.GetFileName(step)}", i));
+                    progress.Report(new($"正在读取三维模型并投影三视图 {i + 1}/{inputFiles.Count}：{Path.GetFileName(step)}", i));
                     await client.ExecuteAsync("doc.open", new { path = step, up = "z" });
                     currentStepOpen = true;
 
@@ -245,7 +245,7 @@ internal static class DxfProjectionReader
         }
 
         var all = lines.SelectMany(l => new[] { l.A, l.B }).Concat(polylines.SelectMany(p => p.Points)).ToArray();
-        if (all.Length == 0) throw new InvalidDataException($"{name} 投影视图没有可绘制的实体，请检查 STEP 文件。");
+        if (all.Length == 0) throw new InvalidDataException($"{name} 投影视图没有可绘制的实体，请检查输入三维模型。");
         var joined = JoinConnectedLines(DeduplicateLines(lines));
         polylines.AddRange(joined.Polylines);
         return new(name, joined.Lines, polylines, new(all.Min(p => p.X), all.Min(p => p.Y), all.Max(p => p.X), all.Max(p => p.Y)));
