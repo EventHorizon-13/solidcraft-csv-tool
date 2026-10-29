@@ -243,7 +243,7 @@ public partial class MainWindow
 
     void SpreadsheetPreviewKeyDown(object sender,KeyEventArgs e)
     {
-        if(!(grid.IsKeyboardFocusWithin||fillOverlay.IsKeyboardFocusWithin)||Keyboard.FocusedElement is TextBoxBase)return;
+        // Keep spreadsheet undo available after toolbar actions; let text editors keep their native Ctrl+Z.
         if((Keyboard.Modifiers&ModifierKeys.Control)==0)return;
         if(e.Key==Key.Z&&(Keyboard.Modifiers&ModifierKeys.Shift)!=0)
         {
@@ -390,7 +390,7 @@ public partial class MainWindow
             UpdateFillPreviewBounds(target.Value);
             string column=Convert.ToString(grid.Columns[target.Value.Column].Header,CultureInfo.InvariantCulture)??ModelRules.Columns[target.Value.Column];
             string value=Convert.ToString(table.Rows[target.Value.Row][ModelRules.Columns[target.Value.Column]],CultureInfo.InvariantCulture)??"";
-            string mode=controlDown?"Ctrl：递增/复制切换":"默认填充";
+            string mode=controlDown?"Ctrl 模式（切换递增/复制）":"默认模式";
             fillPreviewText.Text=$"预览：第 {target.Value.Row+1} 行「{column}」={value} · {count} 格 · {mode} · 松开完成";
             fillPreviewBadge.Visibility=Visibility.Visible;PositionFillPreviewBadge(pointer);
             SetStatus($"填充预览中：{count} 个单元格；{mode}；松开鼠标提交。");
