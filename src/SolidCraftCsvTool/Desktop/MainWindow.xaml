@@ -39,8 +39,9 @@
     <Button Content="STEP 合并出图 DXF" Click="StepDrawingClick" Padding="10,5" Margin="0,0,6,0"/>
    </WrapPanel>
   </DockPanel>
-  <DataGrid x:Name="grid" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
-   HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" RowHeight="32" ColumnHeaderHeight="34"
+  <Grid x:Name="GridHost" Grid.Row="2" ClipToBounds="True">
+  <DataGrid x:Name="grid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+   HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="CellOrRowHeader" RowHeight="32" ColumnHeaderHeight="34"
    GridLinesVisibility="Horizontal" EnableRowVirtualization="True" EnableColumnVirtualization="True">
    <DataGrid.RowStyle>
     <Style TargetType="{x:Type DataGridRow}">
@@ -72,6 +73,17 @@
     </Style>
    </DataGrid.CellStyle>
   </DataGrid>
+  <Canvas x:Name="fillOverlay" Background="{x:Null}" IsHitTestVisible="True">
+   <Thumb x:Name="fillHandle" Width="8" Height="8" Visibility="Collapsed" Cursor="Cross"
+     DragStarted="FillDragStarted" DragDelta="FillDragDelta" DragCompleted="FillDragCompleted">
+    <Thumb.Template>
+     <ControlTemplate TargetType="{x:Type Thumb}">
+      <Border Background="{DynamicResource TabIndicatorBrush}" BorderBrush="{DynamicResource WindowBackground}" BorderThickness="1"/>
+     </ControlTemplate>
+    </Thumb.Template>
+   </Thumb>
+  </Canvas>
+ </Grid>
   <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center"
     ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="Transparent" ShowsPreview="True"
     ToolTip="拖动调整参数表和日志窗口的高度" Cursor="SizeNS"/>
