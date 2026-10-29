@@ -6,8 +6,9 @@
  Icon="/Assets/AppIcon.png">
  <Grid Margin="16,12,16,8">
   <Grid.RowDefinitions>
-   <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
-   <RowDefinition Height="64"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+   <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*" MinHeight="120"/>
+   <RowDefinition Height="6"/><RowDefinition Height="140" MinHeight="80"/>
+   <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
   </Grid.RowDefinitions>
   <Grid x:Name="Metadata" Grid.Row="0" Margin="0,0,0,10">
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -40,9 +41,35 @@
   </DockPanel>
   <DataGrid x:Name="grid" Grid.Row="2" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
    HeadersVisibility="Column" SelectionMode="Extended" SelectionUnit="FullRow" RowHeight="32" ColumnHeaderHeight="34"
-   GridLinesVisibility="Horizontal" EnableRowVirtualization="True" EnableColumnVirtualization="True"/>
-  <TextBox x:Name="log" Grid.Row="3" IsReadOnly="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" Margin="0,8,0,4" Padding="6"/>
-  <DockPanel Grid.Row="4" Margin="0,8,0,8" LastChildFill="True">
+   GridLinesVisibility="Horizontal" EnableRowVirtualization="True" EnableColumnVirtualization="True">
+   <DataGrid.RowStyle>
+    <Style TargetType="{x:Type DataGridRow}">
+     <Style.Triggers>
+      <Trigger Property="IsSelected" Value="True">
+       <Setter Property="Background" Value="{DynamicResource GridSelectionBackgroundBrush}"/>
+       <Setter Property="Foreground" Value="{DynamicResource GridSelectionForegroundBrush}"/>
+      </Trigger>
+     </Style.Triggers>
+    </Style>
+   </DataGrid.RowStyle>
+   <DataGrid.CellStyle>
+    <Style TargetType="{x:Type DataGridCell}">
+     <Style.Triggers>
+      <Trigger Property="IsSelected" Value="True">
+       <Setter Property="Background" Value="{DynamicResource GridSelectionBackgroundBrush}"/>
+       <Setter Property="Foreground" Value="{DynamicResource GridSelectionForegroundBrush}"/>
+       <Setter Property="BorderBrush" Value="{DynamicResource GridSelectionBorderBrush}"/>
+      </Trigger>
+     </Style.Triggers>
+    </Style>
+   </DataGrid.CellStyle>
+  </DataGrid>
+  <GridSplitter Grid.Row="3" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+    ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" Background="Transparent" ShowsPreview="True"
+    ToolTip="拖动调整参数表和日志窗口的高度" Cursor="SizeNS"/>
+
+  <TextBox x:Name="log" Grid.Row="4" IsReadOnly="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" Margin="0,8,0,4" Padding="6"/>
+  <DockPanel Grid.Row="5" Margin="0,8,0,8" LastChildFill="True">
    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
     <Button x:Name="run" Content="生成并导出 STEP" Padding="12,6" Margin="0,0,6,0" Click="RunExportClick"/>
     <Button x:Name="runDxf" Content="一键生成并导出 DXF" Padding="12,6" Margin="0,0,6,0" Click="RunDxfClick"/>
@@ -56,7 +83,7 @@
     <CheckBox x:Name="exportPdf" Content="同时导出 PDF" Margin="0,5,0,5"/>
    </WrapPanel>
   </DockPanel>
-  <Grid Grid.Row="5">
+  <Grid Grid.Row="6">
    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
    <TextBlock x:Name="status" Text="准备就绪" VerticalAlignment="Center"/>
    <TextBlock Grid.Column="1" Text="x.5 孔选一侧半孔；整数孔选两侧或都不选。单位：mm" Opacity="0.7" FontSize="11" VerticalAlignment="Center" Margin="12,0"/>

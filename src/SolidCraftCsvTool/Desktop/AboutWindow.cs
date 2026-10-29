@@ -12,24 +12,61 @@ internal sealed class AboutWindow : Window
     internal AboutWindow()
     {
         SetResourceReference(BackgroundProperty,"WindowBackground");
-        Title="关于";Width=470;Height=330;ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
+        Title="关于";Width=480;SizeToContent=SizeToContent.Height;
+        ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FontFamily=new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;
-        var root=new Grid{Margin=new Thickness(24)};Content=root;
-        foreach(double height in new[]{60,28,28,32})root.RowDefinitions.Add(new(){Height=new GridLength(height)});
-        root.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});root.RowDefinitions.Add(new(){Height=GridLength.Auto});
-        var header=new StackPanel{Orientation=Orientation.Horizontal};
-        header.Children.Add(new Image{Source=new BitmapImage(new Uri("pack://application:,,,/Assets/AppIcon.png")),Width=36,Height=36,Margin=new Thickness(0,0,14,0),VerticalAlignment=VerticalAlignment.Top});
-        var name=new StackPanel();name.Children.Add(new TextBlock{Text=AppBuildInfo.ProductName,FontWeight=FontWeights.SemiBold,FontSize=15});
-        name.Children.Add(new TextBlock{Text="版本 "+AppBuildInfo.Version,Margin=new Thickness(0,5,0,0)});header.Children.Add(name);root.Children.Add(header);
-        var author=Link("EventHorizon-13","https://github.com/EventHorizon-13");Grid.SetRow(author,1);root.Children.Add(author);
-        var build=new TextBlock{Text="构建时间  "+AppBuildInfo.BuildDate,VerticalAlignment=VerticalAlignment.Center};Grid.SetRow(build,2);root.Children.Add(build);
-        var links=new StackPanel{Orientation=Orientation.Horizontal};links.Children.Add(Link("项目主页","https://github.com/EventHorizon-13/solidcraft-roller-seal"));
-        var notices=new TextBlock{Margin=new Thickness(18,0,0,0),VerticalAlignment=VerticalAlignment.Center};var noticeLink=new Hyperlink(new Run("组件与许可"));noticeLink.Click+=(_,_)=>ShowNotices();notices.Inlines.Add(noticeLink);links.Children.Add(notices);Grid.SetRow(links,3);root.Children.Add(links);
-        var buttons=new StackPanel{Orientation=Orientation.Horizontal};
-        var check=new Button{Content="检查更新",Padding=new Thickness(12,5,12,5),Margin=new Thickness(0,0,8,0)};
-        var close=new Button{Content="关闭",Padding=new Thickness(18,5,18,5),IsCancel=true};close.Click+=(_,_)=>Close();
-        var status=new TextBlock{Margin=new Thickness(12,0,0,0),VerticalAlignment=VerticalAlignment.Center};
-        check.Click+=async(_,_)=>await CheckUpdateAsync(check,status);buttons.Children.Add(check);buttons.Children.Add(close);buttons.Children.Add(status);Grid.SetRow(buttons,5);root.Children.Add(buttons);
+
+        var root=new Grid{Margin=new Thickness(24,20,24,20)};
+        Content=root;
+        for(int i=0;i<3;i++)root.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
+
+        var header=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,18)};
+        header.Children.Add(new Image
+        {
+            Source=new BitmapImage(new Uri("pack://application:,,,/Assets/AppIcon.png")),
+            Width=46,Height=46,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,0,16,0)
+        });
+        var title=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
+        title.Children.Add(new TextBlock{Text=AppBuildInfo.ProductName,FontWeight=FontWeights.SemiBold,FontSize=17});
+        title.Children.Add(new TextBlock{Text="版本 "+AppBuildInfo.Version,FontSize=12,Opacity=0.70,Margin=new Thickness(0,5,0,0)});
+        header.Children.Add(title);root.Children.Add(header);
+
+        var details=new Grid();
+        details.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(76)});
+        details.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
+        for(int i=0;i<4;i++)details.RowDefinitions.Add(new RowDefinition{Height=new GridLength(30)});
+        Grid.SetRow(details,1);root.Children.Add(details);
+        static TextBlock Label(string text)=>new()
+        {
+            Text=text,Opacity=0.68,VerticalAlignment=VerticalAlignment.Center
+        };
+        void AddDetail(int row,string label,TextBlock value)
+        {
+            var caption=Label(label);Grid.SetRow(caption,row);details.Children.Add(caption);
+            Grid.SetColumn(value,1);Grid.SetRow(value,row);details.Children.Add(value);
+        }
+        AddDetail(0,"作者",Link("EventHorizon-13","https://github.com/EventHorizon-13"));
+        AddDetail(1,"构建时间",new TextBlock{Text=AppBuildInfo.BuildDate,VerticalAlignment=VerticalAlignment.Center});
+        AddDetail(2,"项目",Link("GitHub 项目主页","https://github.com/EventHorizon-13/solidcraft-roller-seal"));
+        var notices=new TextBlock{VerticalAlignment=VerticalAlignment.Center};
+        var noticeLink=new Hyperlink(new Run("组件与许可"));
+        noticeLink.Click+=(_,_)=>ShowNotices();
+        notices.Inlines.Add(noticeLink);
+        AddDetail(3,"许可",notices);
+
+        var actions=new Grid{Margin=new Thickness(0,18,0,0)};
+        actions.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+        actions.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
+        actions.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
+        Grid.SetRow(actions,2);root.Children.Add(actions);
+
+        var check=new Button{Content="检查更新",Padding=new Thickness(14,6,14,6)};
+        var status=new TextBlock{Margin=new Thickness(12,0,12,0),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};
+        var close=new Button{Content="关闭",Padding=new Thickness(20,6,20,6),IsCancel=true};
+        close.Click+=(_,_)=>Close();
+        check.Click+=async(_,_)=>await CheckUpdateAsync(check,status);
+        Grid.SetColumn(status,1);Grid.SetColumn(close,2);
+        actions.Children.Add(check);actions.Children.Add(status);actions.Children.Add(close);
     }
     static TextBlock Link(string text,string url)
     {

@@ -64,6 +64,32 @@ internal static class DesktopSmoke
                 throw new InvalidOperationException($"浅色模式列头背景过暗：{header.Content} background={background}");
         }
     }
+    static void VerifySelectedRow(MainWindow window,AppearanceMode mode)
+    {
+        var cells=All(window).OfType<DataGridCell>().Where(c=>c.IsVisible&&c.IsSelected).ToArray();
+        if(cells.Length==0)throw new InvalidOperationException("未找到选中的参数单元格。");
+        foreach(var cell in cells)
+        {
+            if(cell.Background is not SolidColorBrush || cell.Foreground is not SolidColorBrush foreground)
+                throw new InvalidOperationException("选中单元格未应用自定义主题颜色。");
+            var background=Background(cell);
+            var text=Composite(foreground.Color,background,foreground.Opacity);
+            double a=Luminance(text),b=Luminance(background);
+            double ratio=(Math.Max(a,b)+.05)/(Math.Min(a,b)+.05);
+            if(ratio<4.5)throw new InvalidOperationException($"选中行文字对比度不足：{ratio:F2}");
+            if(mode==AppearanceMode.Dark&&b>.18)
+                throw new InvalidOperationException($"深色选中行仍然过亮：{background}");
+            if(mode==AppearanceMode.Light&&b<.50)
+                throw new InvalidOperationException($"浅色选中行背景过暗：{background}");
+        }
+    }
+    static void VerifyAboutLayout(Window dialog)
+    {
+        if(dialog.ActualHeight>355)throw new InvalidOperationException($"关于窗口高度过大：{dialog.ActualHeight:F0}");
+        var controls=All(dialog).OfType<Button>().ToArray();
+        if(!controls.Any(b=>Equals(b.Content,"检查更新"))||!controls.Any(b=>Equals(b.Content,"关闭")))
+            throw new InvalidOperationException("关于窗口缺少操作按钮。");
+    }
     static void Capture(Window window,string path)
     {
         var image=new RenderTargetBitmap(Math.Max(1,(int)Math.Ceiling(window.ActualWidth)),Math.Max(1,(int)Math.Ceiling(window.ActualHeight)),96,96,PixelFormats.Pbgra32);image.Render(window);
@@ -76,14 +102,27 @@ internal static class DesktopSmoke
         foreach(var mode in new[]{AppearanceMode.Automatic,AppearanceMode.Dark,AppearanceMode.Light})
         {
             DesktopApp.SetAppearance(mode);await Settle(window);window.VerifyUi();VerifyContrast(window);VerifyGridHeaders(window,mode);
+            window.SelectSmokeRow();await Settle(window);VerifySelectedRow(window,mode);window.ClearSmokeSelection();
         }
         DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);
-        if(Arg("--screenshot") is string normal)Capture(window,normal);
-        if(Arg("--dark-screenshot") is string dark){DesktopApp.SetAppearance(AppearanceMode.Dark);await Settle(window);VerifyContrast(window);VerifyGridHeaders(window,AppearanceMode.Dark);Capture(window,dark);}
+        if(Arg("--screenshot") is string normal)
+        {
+            Capture(window,normal);
+            window.SelectSmokeRow();await Settle(window);
+            VerifySelectedRow(window,AppearanceMode.Light);
+            Capture(window,Path.ChangeExtension(normal,"selected.png"));
+            window.ClearSmokeSelection();
+        }
+        if(Arg("--dark-screenshot") is string dark)
+        {
+            DesktopApp.SetAppearance(AppearanceMode.Dark);window.SelectSmokeRow();await Settle(window);
+            VerifyContrast(window);VerifyGridHeaders(window,AppearanceMode.Dark);VerifySelectedRow(window,AppearanceMode.Dark);
+            Capture(window,dark);window.ClearSmokeSelection();
+        }
         if(Arg("--about-screenshot") is string about)
         {
             var dialog=new AboutWindow{Owner=window};dialog.Show();
-            foreach(var mode in new[]{AppearanceMode.Light,AppearanceMode.Dark}){DesktopApp.SetAppearance(mode);await Settle(dialog);VerifyContrast(dialog);Capture(dialog,mode==AppearanceMode.Light?about:Path.ChangeExtension(about,"dark.png"));}
+            foreach(var mode in new[]{AppearanceMode.Light,AppearanceMode.Dark}){DesktopApp.SetAppearance(mode);await Settle(dialog);VerifyContrast(dialog);VerifyAboutLayout(dialog);Capture(dialog,mode==AppearanceMode.Light?about:Path.ChangeExtension(about,"dark.png"));}
             dialog.Close();
         }
         if(Arg("--settings-screenshot") is string settings)
@@ -105,7 +144,7 @@ internal static class DesktopSmoke
         {
             window.Width=window.MinWidth;window.Height=window.MinHeight;DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);window.VerifyUi();VerifyContrast(window);Capture(window,minimum);
         }
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data, light/dark/system and repeated switches; text and grid header contrast; main/settings/about and minimum size.");
+        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data, light/dark/system and repeated switches; text and grid header/selection contrast; compact About dialog; taller log; main/settings/about and minimum size.");
         window.Close();
     }
 }
