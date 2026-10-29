@@ -131,8 +131,8 @@ public partial class MainWindow
         try
         {
             if(e.Canceled)return;
-            var center=new Point(Canvas.GetLeft(fillHandle)+fillHandle.Width/2,Canvas.GetTop(fillHandle)+fillHandle.Height/2);
-            Point point=fillOverlay.TranslatePoint(center,grid);
+            Point pointer=Mouse.GetPosition(fillOverlay);
+            Point point=fillOverlay.TranslatePoint(pointer,grid);
             var hit=VisualTreeHelper.HitTest(grid,point)?.VisualHit;
             var cell=FindAncestor<DataGridCell>(hit);
             if(cell==null)return;
