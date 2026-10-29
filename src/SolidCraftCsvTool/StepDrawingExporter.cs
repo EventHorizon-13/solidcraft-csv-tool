@@ -57,7 +57,11 @@ public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outpu
                     cancellation.ThrowIfCancellationRequested();
                     string input = Path.GetFullPath(inputFiles[i]);
                     progress.Report(new($"正在打开三维模型 {i + 1}/{inputFiles.Count}：{Path.GetFileName(input)}", i));
-                    await client.ExecuteAsync("doc.open", new { path = input, up = "z" });
+                    string extension = Path.GetExtension(input);
+                    if (extension.Equals(".step", StringComparison.OrdinalIgnoreCase) || extension.Equals(".stp", StringComparison.OrdinalIgnoreCase))
+                        await client.ExecuteAsync("doc.open", new { path = input, up = "z" });
+                    else
+                        await client.ExecuteAsync("doc.open", new { path = input });
                     currentDocumentOpen = true;
                     pages.Add(await CaptureCurrentAsync(client, work, i, Path.GetFileNameWithoutExtension(input), progress, cancellation));
 
