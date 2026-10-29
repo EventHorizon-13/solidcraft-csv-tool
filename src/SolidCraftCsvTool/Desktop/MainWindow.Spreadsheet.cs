@@ -95,7 +95,7 @@ public partial class MainWindow
         return null;
     }
 
-    void InitializeUndoRedo()
+    internal void InitializeUndoRedo()
     {
         lastHistorySnapshot=CaptureTableSnapshot();
         undoHistory.Clear();redoHistory.Clear();editSnapshot=null;
