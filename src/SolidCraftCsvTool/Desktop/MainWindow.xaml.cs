@@ -36,7 +36,16 @@ public partial class MainWindow : Window
             bool flag=ModelRules.Flags.Contains(name);table.Columns.Add(name,flag?typeof(bool):typeof(string));
             var binding=new Binding($"[{name}]"){Mode=BindingMode.TwoWay,UpdateSourceTrigger=UpdateSourceTrigger.PropertyChanged};
             DataGridColumn column;
-            if(flag)column=new DataGridCheckBoxColumn{Binding=binding};
+            if(flag)
+            {
+                // Make the checkbox itself hit-testable in display mode so one click toggles it.
+                var checkStyle=new Style(typeof(CheckBox));
+                checkStyle.Setters.Add(new Setter(UIElement.IsHitTestVisibleProperty,true));
+                checkStyle.Setters.Add(new Setter(FrameworkElement.FocusableProperty,false));
+                checkStyle.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center));
+                checkStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center));
+                column=new DataGridCheckBoxColumn{Binding=binding,ElementStyle=checkStyle,EditingElementStyle=checkStyle};
+            }
             else
             {
                 var display=new Style(typeof(TextBlock));
@@ -63,7 +72,7 @@ public partial class MainWindow : Window
         headerStyle.Setters.Add(new Setter(System.Windows.Controls.Primitives.DataGridColumnHeader.SeparatorBrushProperty,new Binding(nameof(Control.BorderBrush)){Source=grid,Mode=BindingMode.OneWay}));
         headerStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty,"双击列头：批量修改；勾选列：全选/取消全选"));
         grid.ColumnHeaderStyle=headerStyle;
-        grid.ItemsSource=table.DefaultView;InitializeSpreadsheetInteractions();ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());
+        grid.ItemsSource=table.DefaultView;InitializeSpreadsheetInteractions();ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());InitializeUndoRedo();
         Closing+=OnClosing;
     }
     void OnClosing(object? sender,CancelEventArgs e)
@@ -108,7 +117,9 @@ public partial class MainWindow : Window
     void ImportCsv(object sender,RoutedEventArgs e)=>Guard(()=>
     {
         var dialog=new OpenFileDialog{Filter="CSV 参数表 (*.csv)|*.csv|所有文件 (*.*)|*.*"};if(dialog.ShowDialog(this)!=true)return;
-        var rows=CsvFiles.Read(dialog.FileName);table.Rows.Clear();foreach(var row in rows)AddRow(row);
+        var rows=CsvFiles.Read(dialog.FileName);
+        RunUndoable(()=>{table.Rows.Clear();foreach(var row in rows)AddRow(row);});
+        grid.SelectedCells.Clear();grid.UnselectAll();
         Log($"已导入 {rows.Count} 行：{dialog.FileName}");SetStatus($"已导入 {rows.Count} 行");
     });
     void ExportCsv(object sender,RoutedEventArgs e)=>Guard(()=>
@@ -121,8 +132,8 @@ public partial class MainWindow : Window
         var dialog=new OpenFolderDialog{Title="选择输出文件夹",InitialDirectory=Directory.Exists(output.Text)?output.Text:""};
         if(dialog.ShowDialog(this)==true){output.Text=dialog.FolderName;SaveSettings();}
     });
-    void AddRowClick(object sender,RoutedEventArgs e)=>Guard(()=>AddRow(ModelRules.DefaultRow((table.Rows.Count+1).ToString())));
-    void DuplicateSelected(object sender,RoutedEventArgs e)=>Guard(()=>
+    void AddRowClick(object sender,RoutedEventArgs e)=>Guard(()=>RunUndoable(()=>AddRow(ModelRules.DefaultRow((table.Rows.Count+1).ToString()))));
+    void DuplicateSelected(object sender,RoutedEventArgs e)=>Guard(()=>RunUndoable(()=>
     {
         var selected=GetSelectedRows();var used=GetRows().Select(r=>r[0]).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach(var row in selected)
@@ -131,8 +142,8 @@ public partial class MainWindow : Window
             string stem=copy[0]+"_副本",candidate=stem;int suffix=2;while(used.Contains(candidate))candidate=stem+suffix++;
             copy[0]=candidate;used.Add(candidate);AddRow(copy);
         }
-    });
-    void DeleteSelected(object sender,RoutedEventArgs e)=>Guard(()=>{foreach(var row in GetSelectedRows())table.Rows.Remove(row);});
+    }));
+    void DeleteSelected(object sender,RoutedEventArgs e)=>Guard(()=>RunUndoable(()=>{foreach(var row in GetSelectedRows())table.Rows.Remove(row);}));
     void CheckRows(object sender,RoutedEventArgs e)=>Guard(()=>SetStatus($"{ModelRules.Validate(GetRows()).Count} 行参数检查通过"));
     void ConfigureDrawing(object sender,RoutedEventArgs e)=>Guard(()=>
     {
