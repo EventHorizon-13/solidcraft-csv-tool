@@ -244,6 +244,7 @@ public partial class MainWindow
     void SpreadsheetPreviewKeyDown(object sender,KeyEventArgs e)
     {
         // Keep spreadsheet undo available after toolbar actions; let text editors keep their native Ctrl+Z.
+        if(Keyboard.FocusedElement is TextBoxBase)return;
         if((Keyboard.Modifiers&ModifierKeys.Control)==0)return;
         if(e.Key==Key.Z&&(Keyboard.Modifiers&ModifierKeys.Shift)!=0)
         {
