@@ -61,8 +61,9 @@ public partial class MainWindow : Window
         headerStyle.Setters.Add(new Setter(Control.ForegroundProperty,new Binding(nameof(Control.Foreground)){Source=grid,Mode=BindingMode.OneWay}));
         headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty,new Binding(nameof(Control.BorderBrush)){Source=grid,Mode=BindingMode.OneWay}));
         headerStyle.Setters.Add(new Setter(System.Windows.Controls.Primitives.DataGridColumnHeader.SeparatorBrushProperty,new Binding(nameof(Control.BorderBrush)){Source=grid,Mode=BindingMode.OneWay}));
+        headerStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty,"双击列头：批量修改；勾选列：全选/取消全选"));
         grid.ColumnHeaderStyle=headerStyle;
-        grid.ItemsSource=table.DefaultView;ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());
+        grid.ItemsSource=table.DefaultView;InitializeSpreadsheetInteractions();ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());
         Closing+=OnClosing;
     }
     void OnClosing(object? sender,CancelEventArgs e)
@@ -123,7 +124,7 @@ public partial class MainWindow : Window
     void AddRowClick(object sender,RoutedEventArgs e)=>Guard(()=>AddRow(ModelRules.DefaultRow((table.Rows.Count+1).ToString())));
     void DuplicateSelected(object sender,RoutedEventArgs e)=>Guard(()=>
     {
-        var selected=grid.SelectedItems.Cast<DataRowView>().Select(r=>r.Row).ToArray();var used=GetRows().Select(r=>r[0]).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var selected=GetSelectedRows();var used=GetRows().Select(r=>r[0]).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach(var row in selected)
         {
             var copy=ModelRules.Columns.Select(c=>ModelRules.Flags.Contains(c)?(row[c] is true?"1":"0"):Convert.ToString(row[c])??"").ToArray();
@@ -131,7 +132,7 @@ public partial class MainWindow : Window
             copy[0]=candidate;used.Add(candidate);AddRow(copy);
         }
     });
-    void DeleteSelected(object sender,RoutedEventArgs e)=>Guard(()=>{foreach(var item in grid.SelectedItems.Cast<DataRowView>().ToArray())table.Rows.Remove(item.Row);});
+    void DeleteSelected(object sender,RoutedEventArgs e)=>Guard(()=>{foreach(var row in GetSelectedRows())table.Rows.Remove(row);});
     void CheckRows(object sender,RoutedEventArgs e)=>Guard(()=>SetStatus($"{ModelRules.Validate(GetRows()).Count} 行参数检查通过"));
     void ConfigureDrawing(object sender,RoutedEventArgs e)=>Guard(()=>
     {
@@ -149,7 +150,7 @@ public partial class MainWindow : Window
     void SetRunning(bool running)
     {
         Metadata.IsEnabled=!running;Tools.IsEnabled=!running;Info.IsEnabled=!running;Choices.IsEnabled=!running;grid.IsReadOnly=running;
-        run.IsEnabled=!running;runDxf.IsEnabled=!running;stop.IsEnabled=running;
+        run.IsEnabled=!running;runDxf.IsEnabled=!running;stop.IsEnabled=running;ScheduleFillHandleUpdate();
     }
     static string DescribeException(Exception ex)
     {
@@ -268,14 +269,16 @@ public partial class MainWindow : Window
 
     internal void SelectSmokeRow()
     {
-        grid.SelectedIndex=0;
-        if(grid.SelectedItem==null)return;
-        grid.ScrollIntoView(grid.SelectedItem);grid.UpdateLayout();
+        if(grid.Items.Count==0)return;
+        grid.UnselectAll();grid.SelectedCells.Clear();
+        grid.ScrollIntoView(grid.Items[0],grid.Columns[0]);grid.UpdateLayout();
         grid.CurrentCell=new DataGridCellInfo(grid.Items[0],grid.Columns[0]);
+        grid.SelectedCells.Add(new DataGridCellInfo(grid.Items[0],grid.Columns[0]));
         if(grid.ItemContainerGenerator.ContainerFromIndex(0) is not DataGridRow row)return;
         row.ApplyTemplate();row.UpdateLayout();
-        var cell=FindVisualChild<DataGridCell>(row);
+        var cell=FindVisualChild<DataGridCell>(row,c=>ReferenceEquals(c.Column,grid.Columns[0]));
         if(cell!=null){cell.Focus();Keyboard.Focus(cell);}
+        UpdateFillHandle();
     }
     static T? FindVisualChild<T>(DependencyObject parent) where T:DependencyObject
     {
@@ -287,7 +290,7 @@ public partial class MainWindow : Window
         }
         return null;
     }
-    internal void ClearSmokeSelection()=>grid.UnselectAll();
+    internal void ClearSmokeSelection(){grid.UnselectAll();grid.SelectedCells.Clear();UpdateFillHandle();}
     internal void LoadSmokeRows()
     {
         string csv=Path.Combine(AppContext.BaseDirectory,"辊密封参数模板.csv");
