@@ -915,40 +915,49 @@ internal static partial class MachiningDxf
         return (fitted, lines);
     }
 
+    // Suppress tessellated chords only when the ENTIRE chord is covered by an arc.
+    // Earlier logic allowed a 1.5°+ endpoint margin. For R45 that removes up to
+    // 1.18 mm of valid circular geometry on each side of a fitted arc.
     static bool IsCoveredByArc(Line2 line, IReadOnlyList<ArcPath> arcs)
     {
-        const double radialTolerance = 0.025;
-        double dx = line.B.X - line.A.X, dy = line.B.Y - line.A.Y;
-        double length = Math.Sqrt(dx * dx + dy * dy);
-        Point2[] samples = [line.A, new((line.A.X + line.B.X) / 2, (line.A.Y + line.B.Y) / 2), line.B];
         foreach (ArcPath arc in arcs)
         {
             bool sameLayer = string.Equals(line.Layer, arc.Layer, StringComparison.OrdinalIgnoreCase);
-            bool hiddenEdgeCoveredByVisibleArc = line.Layer == "HIDDEN" && arc.Layer == "VISIBLE";
-            if (!sameLayer && !hiddenEdgeCoveredByVisibleArc) continue;
-            double minX = Math.Min(line.A.X, line.B.X), maxX = Math.Max(line.A.X, line.B.X);
-            double minY = Math.Min(line.A.Y, line.B.Y), maxY = Math.Max(line.A.Y, line.B.Y);
-            if (maxX < arc.Center.X - arc.Radius - radialTolerance || minX > arc.Center.X + arc.Radius + radialTolerance ||
-                maxY < arc.Center.Y - arc.Radius - radialTolerance || minY > arc.Center.Y + arc.Radius + radialTolerance) continue;
-
-            double angleMargin = Math.Max(1.5, Math.Asin(Math.Clamp(length / (2 * arc.Radius), 0, 1)) * 180 / Math.PI + 0.5);
-            bool covered = true;
-            bool extendsPastArcEndpoint = false;
-            foreach (Point2 point in samples)
-            {
-                double radialError = Math.Abs(Distance(point, arc.Center) - arc.Radius);
-                double angle = Angle(arc.Center, point);
-                double relative = (angle - arc.StartDegrees + 360) % 360;
-                double beforeStart = (arc.StartDegrees - angle + 360) % 360;
-                double afterEnd = (angle - arc.StartDegrees - arc.SweepDegrees + 720) % 360;
-                bool insideArc = relative <= arc.SweepDegrees;
-                bool nearArc = insideArc || beforeStart <= angleMargin || afterEnd <= angleMargin;
-                if (!insideArc && (beforeStart <= angleMargin || afterEnd <= angleMargin)) extendsPastArcEndpoint = true;
-                if (radialError > radialTolerance || !nearArc) { covered = false; break; }
-            }
-            if (covered && (sameLayer || (hiddenEdgeCoveredByVisibleArc && extendsPastArcEndpoint))) return true;
+            bool hiddenBehindVisible = line.Layer == "HIDDEN" && arc.Layer == "VISIBLE";
+            if (!sameLayer && !hiddenBehindVisible) continue;
+            if (IsCoveredByArcFragment(line.A, line.B, arc.Center, arc.Radius, arc.StartDegrees, arc.SweepDegrees))
+                return true;
         }
         return false;
+    }
+
+    // Kept independently testable: never delete a chord that crosses the start or
+    // end of an ARC, even if it is very close to the arc and shares its circle.
+    internal static bool IsCoveredByArcFragment(Point2 a, Point2 b, Point2 center,
+        double radius, double startDegrees, double sweepDegrees)
+    {
+        const double radialTolerance = 0.025;
+        const double angularTolerance = 0.015;
+        if (!double.IsFinite(radius) || radius <= 0 || sweepDegrees <= 0) return false;
+
+        double minX = Math.Min(a.X, b.X), maxX = Math.Max(a.X, b.X);
+        double minY = Math.Min(a.Y, b.Y), maxY = Math.Max(a.Y, b.Y);
+        if (maxX < center.X - radius - radialTolerance || minX > center.X + radius + radialTolerance ||
+            maxY < center.Y - radius - radialTolerance || minY > center.Y + radius + radialTolerance)
+            return false;
+
+        Point2 midpoint = new((a.X + b.X) / 2, (a.Y + b.Y) / 2);
+        foreach (Point2 point in new[] { a, midpoint, b })
+        {
+            if (Math.Abs(Distance(point, center) - radius) > radialTolerance) return false;
+            if (sweepDegrees >= 360 - angularTolerance) continue;
+            double relative = RelativeAngle(Angle(center, point), startDegrees);
+            // A wrapped negative angle is only acceptable within a tiny tolerance
+            // of the start, not an entire short segment outside the arc.
+            if (relative > sweepDegrees + angularTolerance &&
+                relative < 360 - angularTolerance) return false;
+        }
+        return true;
     }
 
     static bool TryFitArc(IReadOnlyList<Point2> points, int start, out int end, out Point2 center, out double radius, out bool counterClockwise)
