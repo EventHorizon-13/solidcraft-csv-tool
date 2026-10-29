@@ -31,7 +31,11 @@ public partial class MainWindow
     {
         grid.AddHandler(Control.MouseDoubleClickEvent,new MouseButtonEventHandler(ColumnHeaderDoubleClick),true);
         grid.BeginningEdit+=(_,_)=>BeginHistoryEdit();
-        grid.CellEditEnding+=(_,_)=>Dispatcher.BeginInvoke(new Action(FinishHistoryEdit),DispatcherPriority.Background);
+        grid.CellEditEnding+=(_,_)=>
+        {
+            var expected=editSnapshot;
+            Dispatcher.BeginInvoke(new Action(()=>{if(ReferenceEquals(editSnapshot,expected))FinishHistoryEdit();}),DispatcherPriority.Background);
+        };
         table.ColumnChanged+=(_,_)=>TrackUnscopedTableChange();
         PreviewKeyDown+=SpreadsheetPreviewKeyDown;
         grid.SelectedCellsChanged+=(_,_)=>ScheduleFillHandleUpdate();
@@ -39,7 +43,7 @@ public partial class MainWindow
         grid.Loaded+=(_,_)=>ScheduleFillHandleUpdate();
         grid.SizeChanged+=(_,_)=>ScheduleFillHandleUpdate();
         grid.AddHandler(ScrollViewer.ScrollChangedEvent,new ScrollChangedEventHandler((_,_)=>ScheduleFillHandleUpdate()));
-        fillHandle.ToolTip="拖动填充柄：单个数字默认复制，按住 Ctrl 递增；日期默认递增，按住 Ctrl 复制；多格默认延续序列，按住 Ctrl 复制模式。";
+        fillHandle.ToolTip="单个单元格或连续矩形选区均可填充。拖动时实时预览；单格数字默认复制、Ctrl 递增；多格默认延续序列、Ctrl 循环复制。";
     }
 
     void ScheduleFillHandleUpdate()
