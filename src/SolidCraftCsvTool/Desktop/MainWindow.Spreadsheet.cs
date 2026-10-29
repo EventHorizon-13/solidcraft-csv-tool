@@ -243,7 +243,7 @@ public partial class MainWindow
 
     void SpreadsheetPreviewKeyDown(object sender,KeyEventArgs e)
     {
-        if(!grid.IsKeyboardFocusWithin||Keyboard.FocusedElement is TextBoxBase)return;
+        if(!(grid.IsKeyboardFocusWithin||fillOverlay.IsKeyboardFocusWithin)||Keyboard.FocusedElement is TextBoxBase)return;
         if((Keyboard.Modifiers&ModifierKeys.Control)==0)return;
         if(e.Key==Key.Z&&(Keyboard.Modifiers&ModifierKeys.Shift)!=0)
         {
@@ -455,6 +455,7 @@ public partial class MainWindow
             for(int column=left;column<=right;column++)
                 grid.SelectedCells.Add(new DataGridCellInfo(grid.Items[row],grid.Columns[column]));
         grid.CurrentCell=new DataGridCellInfo(grid.Items[targetRow],grid.Columns[targetColumn]);
+        grid.Focus();GetVisibleCell(new CellPosition(targetRow,targetColumn))?.Focus();
     }
 
     int FillCells(IReadOnlyList<CellPosition> source,int targetRow,int targetColumn,bool controlDown)
