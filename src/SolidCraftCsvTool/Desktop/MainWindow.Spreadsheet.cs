@@ -424,6 +424,10 @@ public partial class MainWindow
             FillCells([new CellPosition(0,3)],2,3,true);
             if(Convert.ToString(table.Rows[1]["孔距"])!="101"||Convert.ToString(table.Rows[2]["孔距"])!="102")
                 throw new InvalidOperationException("Ctrl 数字递增失败。");
+            if(Convert.ToString(FillSequence(new object[]{"2026-10-28"},1,false))!="2026-10-29")
+                throw new InvalidOperationException("日期序列填充失败。");
+            if(Convert.ToString(FillSequence(new object[]{"Part001","Part002"},2,false))!="Part003")
+                throw new InvalidOperationException("编号后缀序列填充失败。");
 
             foreach(DataRow row in table.Rows)row["子头"]=false;
             ToggleFlagColumn(6);
