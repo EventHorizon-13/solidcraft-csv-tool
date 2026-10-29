@@ -1,4 +1,4 @@
-name: Build and release 2.4.0
+name: Build and release 2.4.1
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.4.0" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.4.1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install open-source PDF renderer
@@ -131,7 +131,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.4.0" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.4.1" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -204,11 +204,13 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.4.0"
-          title="标准辊密封批量生成 2.4.0"
+          tag="win-2.4.1"
+          title="标准辊密封批量生成 2.4.1"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.4.0 正式版。
+          标准辊密封批量生成 2.4.1 正式版。
 
+          - 修复三视图圆弧出现局部缺口：严格判断折线段是否完全被圆弧覆盖，避免误删圆弧端点之外的短线段。
+          - 补充 R45 圆弧断口、端点跨越及跨 360° 边界的回归测试。
           - 新增生成 .solidcraft 模型时在同一后台会话直接提取前视、俯视、左视，无需关闭并重新打开模型。
           - DXF-only 模式跳过单件 STEP 中间文件，减少重复导出和模型加载；保留组合 STEP 与独立模型出图。
           - 参数表支持 WPS 风格填充柄，单个单元格与连续矩形选区均可填充；支持上下左右及二维拖动。
