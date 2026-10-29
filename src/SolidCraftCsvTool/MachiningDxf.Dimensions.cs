@@ -10,7 +10,21 @@ internal static partial class MachiningDxf
                 (Math.Abs(a.Center.Y - front.Max.Y) < 0.08 || Math.Abs(a.Center.Y - front.Min.Y) < 0.08))
             .Select(a => a.Center.X - front.Dx).ToArray();
         if (centers.Length > 0)
-            DrawHorizontalChain(w, front, IncludeEnds(centers, front.Projection.Bounds.MinX, front.Projection.Bounds.MaxX), front.Max.Y + w.DimensionRow);
+        {
+            var bounds = front.Projection.Bounds;
+            // Projected tongue roots are full-height edges. Keep their datum in
+            // the hole-position chain, rather than measuring to the tongue tip.
+            double first = centers.Min(), last = centers.Max();
+            double endZone = Math.Min(bounds.Width * .18, bounds.Height * .5);
+            var shoulders = StraightEdges(front.Projection).Where(e =>
+                Math.Abs(e.A.X - e.B.X) < .01 &&
+                Math.Abs(Math.Min(e.A.Y, e.B.Y) - bounds.MinY) < .05 &&
+                Math.Abs(Math.Max(e.A.Y, e.B.Y) - bounds.MaxY) < .05)
+                .Select(e => (e.A.X + e.B.X) / 2)
+                .Where(x => (x > last + .05 && x < bounds.MaxX - .05 && bounds.MaxX - x <= endZone) ||
+                    (x < first - .05 && x > bounds.MinX + .05 && x - bounds.MinX <= endZone));
+            DrawHorizontalChain(w, front, IncludeEnds(centers.Concat(shoulders).ToArray(), bounds.MinX, bounds.MaxX), front.Max.Y + w.DimensionRow);
+        }
 
         DrawLowerDimensions(w, front);
         Vertical(w, front.Min.X, front.Min.X - w.DimensionRow, front.Min.Y, front.Max.Y, w.FormatDimension(front.Height));

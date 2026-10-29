@@ -2,17 +2,16 @@
 
 面向标准辊密封零件的参数化建模与工程出图工具。通过参数表或 CSV 批量管理尺寸，自动调用随包提供的 SolidCraft CLI，生成三维模型和加工图文件。
 
-**版本：2.4.2**
+**版本：2.4.3**
 
 **支持平台：** Windows 10/11（x64、ARM64 桌面版）；Linux（amd64、ARM64 命令行版）。目前没有 macOS 桌面版。
 
 [下载最新正式版](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases/latest) · [查看所有版本](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases) · [查看构建与 UI 测试](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions)
 
-## 2.4.2 修复说明
+## 2.4.3 修复说明
 
-- 完整孔口输出为一条 180° 半圆 ARC，移除旧版 170° 拟合上限。
-- 使用局部坐标计算圆心，合并连续同圆弧与经过校验的短弦段，保留真实缺口与端部裁切。
-- 新增半圆完整性、正反方向、大坐标偏移、图层与跨 360° 边界回归检查。
+- 主视图顶部尺寸链保留子头根部边界，将孔位置尺寸（如 60）与子头尺寸（如 9）独立标注，不再由总尺寸 69 替代。
+- 新增有子头、无子头及坐标偏移的回归检查；保留完整半圆修复。
 
 ## 功能概览
 
@@ -157,7 +156,7 @@
 本地构建桌面项目需要 .NET 10 SDK：
 
 ```powershell
-dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.4.2
+dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.4.3
 ```
 
 第三方组件及许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。项目主页：[GitHub](https://github.com/EventHorizon-13/solidcraft-roller-seal)。

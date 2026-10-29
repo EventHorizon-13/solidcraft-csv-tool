@@ -7,6 +7,7 @@ using SolidCraftCsvTool;
 if (args.Length > 0 && args[0] == "--arc-fragment-check")
 {
     ArcFragmentChecks.Run();
+    FrontTongueDimensionChecks.Run();
     Console.WriteLine($"PASS: {DimensionChecks.Run(null)} dimension/template checks");
     if (args.Length == 3) ArcFragmentChecks.Repair(args[1], args[2]);
     return;
@@ -61,6 +62,7 @@ if (args.Length == 2 && args[0] == "--front-height-check")
 }
 
 ArcFragmentChecks.Run();
+FrontTongueDimensionChecks.Run();
 int checks = 0;
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }
 void Reject(Action action, string message) { try { action(); } catch (InvalidDataException) { checks++; return; } throw new Exception(message); }

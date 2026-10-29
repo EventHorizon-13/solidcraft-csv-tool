@@ -1,4 +1,4 @@
-name: Build and release 2.4.2
+name: Build and release 2.4.3
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.4.2" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.4.3" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify semicircle and core regression checks
@@ -137,7 +137,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.4.2" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.4.3" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -210,15 +210,14 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.4.2"
-          title="标准辊密封批量生成 2.4.2"
+          tag="win-2.4.3"
+          title="标准辊密封批量生成 2.4.3"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.4.2 正式版。
+          标准辊密封批量生成 2.4.3 正式版。
 
-          - 修复完整孔口半圆被拆分为多段 ARC：移除 170° 拟合上限，完整半圆输出为一条 180° ARC。
-          - 使用局部坐标计算圆心，避免图纸偏移造成拟合误差。
-          - 合并连续同圆弧与经校验的短弦段，保留真实缺口、图层及端部裁切。
-          - 新增半圆完整性、正反方向、大坐标偏移及跨 360° 边界回归测试。
+          - 修复主视图尺寸链：孔位置尺寸（如 60）和子头尺寸（如 9）独立标注，不再用 69 替代两个功能尺寸。
+          - 保留子头根部几何边界作为尺寸基准；新增有子头、无子头及坐标偏移回归检查。
+          - 保留 2.4.2 的完整半圆及连续圆弧修复。
           - Windows 桌面版：amd64、arm64；Linux CLI：amd64、arm64。
           - PDF 使用开源 DXF 矢量渲染；不包含 ODA 或专有 SDK。
           - PDF 需要用户提供有使用授权的 gbenor.shx、gbcbig.shx 和固定 A4 DXF 图框。
