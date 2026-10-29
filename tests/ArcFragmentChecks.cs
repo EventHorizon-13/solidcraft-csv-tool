@@ -18,6 +18,19 @@ internal static class ArcFragmentChecks
         }
         Check(!IsCoveredByArc(new(At(219.8),At(220.3),"VISIBLE"),
             [new(new(0,0),45,180,40,"VISIBLE")]), "Never suppress a chord extending beyond an arc endpoint");
+        foreach (bool reverse in new[] { false, true })
+        {
+            // A straight end edge spanning nearly the diameter, followed by
+            // a few small circular-looking chords, must not become a semicircle.
+            var angles = new[] { -90.0, 89.0, 89.5, 90.0, 90.5, 91.0 };
+            var falseArc = angles.Select(a => new Point2(100*Math.Cos(a*Math.PI/180),100*Math.Sin(a*Math.PI/180))).ToArray();
+            if (reverse) Array.Reverse(falseArc);
+            Check(!TryFitArc(falseArc,0,out _,out _,out _,out _), "Reject diameter chord masquerading as semicircle");
+            // Same check applies when the long chord is the second seed chord.
+            falseArc = new[] {-91.0,-90.5,89.0,89.5,90.0,90.5}.Select(a=>new Point2(100*Math.Cos(a*Math.PI/180),100*Math.Sin(a*Math.PI/180))).ToArray();
+            if (reverse) Array.Reverse(falseArc);
+            Check(!TryFitArc(falseArc,0,out _,out _,out _,out _), "Validate second seed chord sagitta");
+        }
         var arcs = new List<ArcPath> { new(new(0,0),45,180,40,"VISIBLE"),new(new(0,0),45,225,135,"VISIBLE") };
         var lines = Enumerable.Range(220,5).Select(i=>new Line2(At(i),At(i+1),"VISIBLE")).ToList();
         lines.Add(new(new(0,0),new(100,0),"VISIBLE"));
@@ -31,7 +44,7 @@ internal static class ArcFragmentChecks
         Check(merged.Count==2,"Keep layers distinct");
         merged=MergeCircularFragments([new(new(0,0),45,0,180,"VISIBLE"),new(new(0,0),45,180,180,"VISIBLE")],[]);
         Check(merged.Count==2 && merged.All(a=>a.SweepDegrees==180),"Preserve complete circle as two nonzero arcs");
-        Console.WriteLine("PASS: arc fragments, translated clockwise/counterclockwise semicircles, true gaps, wraparound, layers and full circles.");
+        Console.WriteLine("PASS: arc fragments, true semicircles, false R100 diameter-chord rejection, true gaps, wraparound, layers and full circles.");
     }
     public static void Repair(string input,string output)
     {

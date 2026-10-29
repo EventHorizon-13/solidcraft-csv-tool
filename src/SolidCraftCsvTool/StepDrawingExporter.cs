@@ -1053,7 +1053,12 @@ internal static partial class MachiningDxf
         if (Math.Abs(cross) < 1e-8) return false;
         counterClockwise = cross > 0;
         double tolerance = Math.Clamp(radius * 0.00015, 0.012, 0.035);
+        // Every source chord, including the two seed chords, must approximate
+        // the fitted circle within the tessellation tolerance. Endpoint radii
+        // alone would accept a diameter and invent an outward semicircle.
+        double maxStep = Math.Min(30, 2 * Math.Acos(Math.Clamp(1 - tolerance / radius, -1, 1)) * 180 / Math.PI);
         double firstTurn = SignedAngle(a, b, center), secondTurn = SignedAngle(b, c, center);
+        if (Math.Abs(firstTurn) > maxStep || Math.Abs(secondTurn) > maxStep) return false;
         if ((counterClockwise && (firstTurn <= 0 || secondTurn <= 0)) || (!counterClockwise && (firstTurn >= 0 || secondTurn >= 0))) return false;
         double sweep = firstTurn + secondTurn;
         end = start + 2;
@@ -1061,7 +1066,7 @@ internal static partial class MachiningDxf
         {
             if (Math.Abs(Distance(center, points[k]) - radius) > tolerance) break;
             double step = SignedAngle(points[k - 1], points[k], center);
-            if ((counterClockwise && step <= 0) || (!counterClockwise && step >= 0) || Math.Abs(step) > 30) break;
+            if ((counterClockwise && step <= 0) || (!counterClockwise && step >= 0) || Math.Abs(step) > maxStep) break;
             if (Math.Abs(sweep + step) > 359.9999) break;
             sweep += step;
             end = k;
