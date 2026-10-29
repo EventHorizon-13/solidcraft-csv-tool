@@ -306,6 +306,7 @@ public partial class MainWindow : Window
     {
         string csv=Path.Combine(AppContext.BaseDirectory,"辊密封参数模板.csv");
         if(File.Exists(csv)){table.Rows.Clear();foreach(var row in CsvFiles.Read(csv))AddRow(row);}
+        InitializeUndoRedo();
     }
     internal void VerifyUi()
     {
