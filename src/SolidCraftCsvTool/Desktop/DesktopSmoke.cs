@@ -167,7 +167,7 @@ internal static class DesktopSmoke
         }
         if(Arg("--update-prompt-screenshot") is string promptPath)
         {
-            var dialog=new UpdatePromptWindow("2.2.5","2.2.4"){Owner=window};dialog.Show();
+            var dialog=new UpdatePromptWindow("2.2.6","2.2.5"){Owner=window};dialog.Show();
             foreach(var mode in new[]{AppearanceMode.Light,AppearanceMode.Dark})
             {
                 DesktopApp.SetAppearance(mode);await Settle(dialog);VerifyContrast(dialog);VerifyUpdatePrompt(dialog);
