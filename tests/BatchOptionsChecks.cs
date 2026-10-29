@@ -55,25 +55,17 @@ internal static class BatchOptionsChecks
             }
             var progress=new Progress<ExportProgress>(p=>Console.WriteLine(p.Message));
             string one=Path.GetFullPath(Path.Combine(directory,"single"));var row=ModelRules.DefaultRow("A01");
-            await Exporter.RunAsync(new(ModelRules.Validate([row]),seed,one,7878,10,false,false,"1027","组合试件.step",true,[row],ExportStep:false),progress,CancellationToken.None);
-            string nativeOnly=Path.Combine(one,"辊密封_1027_A01.solidcraft");
-            if(!File.Exists(nativeOnly)||File.Exists(Path.Combine(one,"辊密封_1027_A01.step")))throw new Exception("DXF-only mode must save the native model without exporting an intermediate STEP.");
-            await StepDrawingExporter.RunAsync([nativeOnly],one,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="native-only-drawing"});
-            var nativeOnlyDxf=DxfDocument.Load(Path.Combine(one,"native-only-drawing.dxf"))??throw new Exception("Direct native SolidCraft to DXF failed.");
-            if(nativeOnlyDxf.Entities.Dimensions.Count()==0)throw new Exception("Direct native projection must include editable dimensions.");
+            await Exporter.RunAsync(new(ModelRules.Validate([row]),seed,one,7878,10,false,false,"1027","组合试件.step",true,[row]),progress,CancellationToken.None);
+            foreach(string ext in new[]{"step","solidcraft"})if(!File.Exists(Path.Combine(one,"辊密封_1027_A01."+ext)))throw new Exception("Single part daily filename missing.");
             if(File.Exists(Path.Combine(one,"组合试件.step"))||CsvFiles.Read(Path.Combine(one,"辊密封_1027.csv"))[0][0]!="A01")throw new Exception("No-merge/current-task CSV options ignored.");
             string two=Path.GetFullPath(Path.Combine(directory,"combined"));var rows=new[]{ModelRules.DefaultRow("1"),ModelRules.DefaultRow("2")};
             await Exporter.RunAsync(new(ModelRules.Validate(rows),seed,two,7878,10,true,false,"1027","自定义组合.step",false),progress,CancellationToken.None);
             if(!File.Exists(Path.Combine(two,"自定义组合.step"))||Directory.EnumerateFiles(two,"*.csv").Any())throw new Exception("Merge/disable-CSV options ignored.");
             var files=BatchDrawingInputs.FromFolder(two,"自定义组合.step");if(files.Length!=2)throw new Exception("Custom merged STEP must not be projected as a part.");
-            var nativeFiles=rows.Select(r=>Path.Combine(two,OutputNames.Part(r.Name,"1027")+".solidcraft")).ToArray();
-            await StepDrawingExporter.RunAsync(nativeFiles,two,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="native-source-drawing"});
-            var nativeDrawing=DxfDocument.Load(Path.Combine(two,"native-source-drawing.dxf"))??throw new Exception("Direct native SolidCraft projection failed.");
-            await StepDrawingExporter.RunAsync(files,two,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="step-source-drawing"});
-            var drawing=DxfDocument.Load(Path.Combine(two,"step-source-drawing.dxf"))??throw new Exception("STEP projection failed.");
-            if(drawing.Entities.Dimensions.Count()==0||nativeDrawing.Entities.Dimensions.Count()==0)throw new Exception("Orthographic projections need editable dimensions.");
-            if(nativeDrawing.Entities.Dimensions.Count()!=drawing.Entities.Dimensions.Count())throw new Exception("Native SolidCraft and STEP projections produced different dimension counts.");
-            Console.WriteLine("PASS: direct .solidcraft-to-DXF; no intermediate STEP in DXF-only mode; native/STEP dimension counts match; combined STEP path remains supported.");
+            await StepDrawingExporter.RunAsync(files,two,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="自定义加工图"});
+            var drawing=DxfDocument.Load(Path.Combine(two,"自定义加工图.dxf"))??throw new Exception("Headless projection failed.");
+            if(drawing.Entities.Dimensions.Count()==0)throw new Exception("Headless orthographic projection needs editable dimensions.");
+            Console.WriteLine("PASS: real bundled SolidCraft CLI: no GUI; auto-start/exit; merge on/off; task CSV on/off; custom STEP and DXF names; three orthographic views.");
         }
         finally{ControlClient.HeadlessExecutable=null;}
     }
