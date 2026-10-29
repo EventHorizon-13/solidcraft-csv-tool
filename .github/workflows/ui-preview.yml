@@ -23,7 +23,7 @@ jobs:
       - name: Compile Fluent desktop and run core checks
         shell: pwsh
         run: |
-          dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.2.5
+          dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.2.6
           if ($LASTEXITCODE -ne 0) { throw 'Fluent desktop build failed' }
           dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
           if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }

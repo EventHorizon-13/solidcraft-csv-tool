@@ -90,6 +90,7 @@ internal static class DesktopSmoke
             throw new InvalidOperationException("当前单元格的强调边框未显示。");
         if(focused.BorderBrush is not SolidColorBrush focusBorder||focusBorder.Color.A==0)
             throw new InvalidOperationException("当前单元格的强调边框颜色不可见。");
+        if(!window.FillHandleVisible)throw new InvalidOperationException("当前单元格的填充柄未显示。");
     }
     static void VerifySelectedTab(SettingsWindow dialog,int index)
     {
@@ -139,6 +140,7 @@ internal static class DesktopSmoke
     {
         string? Arg(string name){int i=Array.IndexOf(args,name);return i>=0&&i+1<args.Length?args[i+1]:null;}
         window.LoadSmokeRows();
+        window.VerifySpreadsheetInteractions();
         foreach(var mode in new[]{AppearanceMode.Automatic,AppearanceMode.Dark,AppearanceMode.Light})
         {
             DesktopApp.SetAppearance(mode);await Settle(window);window.VerifyUi();VerifyContrast(window);VerifyGridHeaders(window,mode);
@@ -167,7 +169,7 @@ internal static class DesktopSmoke
         }
         if(Arg("--update-prompt-screenshot") is string promptPath)
         {
-            var dialog=new UpdatePromptWindow("2.2.5","2.2.4"){Owner=window};dialog.Show();
+            var dialog=new UpdatePromptWindow("2.2.6","2.2.5"){Owner=window};dialog.Show();
             foreach(var mode in new[]{AppearanceMode.Light,AppearanceMode.Dark})
             {
                 DesktopApp.SetAppearance(mode);await Settle(dialog);VerifyContrast(dialog);VerifyUpdatePrompt(dialog);
@@ -194,7 +196,7 @@ internal static class DesktopSmoke
         {
             window.Width=window.MinWidth;window.Height=window.MinHeight;DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);window.VerifyUi();VerifyContrast(window);Capture(window,minimum);
         }
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; theme contrast; selected-cell outline and focused-cell accent; selected settings-tab background and indicator; themed update prompt; aligned About dialog; adjustable log; main/settings/about/update prompt and minimum size.");
+        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; WPS-style fill series/copy; bulk column editing; checkbox-header select-all; theme contrast; selected-cell outline and fill handle; selected settings-tab background and indicator; themed update prompt; aligned About dialog; adjustable log; main/settings/about/update prompt and minimum size.");
         window.Close();
     }
 }

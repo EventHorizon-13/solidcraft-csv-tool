@@ -11,16 +11,18 @@ public sealed record Bounds(double[] Min, double[] Max, int Bodies);
 
 public static class ModelRules
 {
-    public static readonly string[] Columns = ["编号", "孔数", "孔径", "孔距", "高度", "宽度", "子头", "母槽", "左半圆", "右半圆", "左斜边", "右斜边", "斜边Y", "斜边Z", "子头宽", "子头突出", "母槽宽", "母槽深", "配合间隙"];
+    public static readonly string[] Columns = ["编号", "孔数", "孔径", "孔距", "高度", "宽度", "子头", "母槽", "左半圆", "右半圆", "左斜边", "右斜边", "斜边Y", "斜边Z", "子头宽", "子头突出", "母槽宽", "母槽深"];
     public static readonly HashSet<string> Flags = ["子头", "母槽", "左半圆", "右半圆", "左斜边", "右斜边"];
-    public static readonly string[] ParameterNames = ["孔数", "辊径", "辊距", "实体高度", "密封宽度", "子头开关", "母槽开关", "左半孔开关", "右半孔开关", "左斜边开关", "右斜边开关", "斜边Y", "斜边Z", "子头宽", "子头突出", "母槽宽", "母槽深", "配合间隙"];
+    public static readonly string[] ParameterNames = ["孔数", "辊径", "辊距", "实体高度", "密封宽度", "子头开关", "母槽开关", "左半孔开关", "右半孔开关", "左斜边开关", "右斜边开关", "斜边Y", "斜边Z", "子头宽", "子头突出", "母槽宽", "母槽深"];
     public const int RequiredColumnCount=14;
     public static readonly string[] RequiredParameterNames=ParameterNames.Take(RequiredColumnCount-1).ToArray();
     public static readonly string[] OptionalParameterNames=ParameterNames.Skip(RequiredColumnCount-1).ToArray();
-    public static string[] DefaultRow(string name = "1") => [name, "5", "90", "120", "105", "200", "1", "1", "0", "0", "0", "0", "30", "30", "", "", "", "", ""];
+    public static string[] DefaultRow(string name = "1") => [name, "5", "90", "120", "105", "200", "1", "1", "0", "0", "0", "0", "30", "30", "", "", "", ""];
     public static string[] ExpandRow(string[] row)
     {
         if(row.Length==Columns.Length)return row;
+        // Older CSVs exposed a final fit-clearance column. Ignore it on import.
+        if(row.Length==Columns.Length+1)return row.Take(Columns.Length).ToArray();
         if(row.Length==RequiredColumnCount)return row.Concat(Enumerable.Repeat("",Columns.Length-RequiredColumnCount)).ToArray();
         throw new InvalidDataException("参数列数不正确，请使用CSV模板。");
     }
@@ -49,8 +51,8 @@ public static class ModelRules
                 row[i] = numbers[i].ToString(CultureInfo.InvariantCulture);
             }
             for(int i=RequiredColumnCount;i<Columns.Length;i++)
-                if(row[i].Length>0&&(numbers[i]<0||(Columns[i]!="配合间隙"&&numbers[i]==0)))
-                    throw new InvalidDataException($"第 {line} 行 {Columns[i]} 必须为正数（配合间隙可为0）。");
+                if(row[i].Length>0&&numbers[i]<=0)
+                    throw new InvalidDataException($"第 {line} 行 {Columns[i]} 必须为正数。");
             decimal holes = numbers[1];
             if (holes <= 0 || holes % 0.5m != 0) throw new InvalidDataException($"第 {line} 行孔数只允许正整数或 x.5。");
             decimal ends = numbers[8] + numbers[9];
