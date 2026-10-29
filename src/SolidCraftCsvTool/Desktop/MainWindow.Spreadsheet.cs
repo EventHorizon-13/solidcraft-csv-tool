@@ -292,8 +292,9 @@ public partial class MainWindow
         prefix="";numbers=[];width=0;
         var matches=values.Select(value=>Regex.Match(value,@"^(.*?)(\d+)$")).ToArray();
         if(matches.Any(match=>!match.Success))return false;
-        prefix=matches[0].Groups[1].Value;
-        if(matches.Any(match=>match.Groups[1].Value!=prefix))return false;
+        string commonPrefix=matches[0].Groups[1].Value;
+        if(matches.Any(match=>match.Groups[1].Value!=commonPrefix))return false;
+        prefix=commonPrefix;
         numbers=matches.Select(match=>int.TryParse(match.Groups[2].Value,NumberStyles.None,CultureInfo.InvariantCulture,out int value)?value:int.MinValue).ToArray();
         if(numbers.Any(value=>value==int.MinValue))return false;
         width=matches[^1].Groups[2].Value.Length;
