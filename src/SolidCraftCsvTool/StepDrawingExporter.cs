@@ -705,7 +705,7 @@ internal static partial class MachiningDxf
         public double Width => Projection.Bounds.Width;
         public double Height => Projection.Bounds.Height;
     }
-    sealed record ArcPath(Point2 Center, double Radius, double StartDegrees, double SweepDegrees, string Layer);
+    internal sealed record ArcPath(Point2 Center, double Radius, double StartDegrees, double SweepDegrees, string Layer);
 
     public static void Write(string path,StepDrawingPage page,DrawingOptions? options=null)=>WriteCombined(path,[page],options);
     public static void WriteCombined(string path,IReadOnlyList<StepDrawingPage> pages,DrawingOptions? options=null)
@@ -734,16 +734,19 @@ internal static partial class MachiningDxf
             string renderedLayer = IsHidden(line.Layer) ? "HIDDEN" : "VISIBLE";
             linework.Add(new(map.P(line.A), map.P(line.B), renderedLayer));
         }
+        // A nominal semicircle can arrive as multiple fitted ARC fragments with
+        // short polygon chords between them. Reconstruct its covered angular span
+        // before emitting geometry, rather than simply changing deletion margins.
+        var merged = MergeCircularFragments(fittedArcs, linework);
+        fittedArcs = merged.Arcs;
         var reconstructed = ReconstructHiddenArcs(linework, fittedArcs);
-        foreach (ArcPath arc in reconstructed.Arcs)
-        {
+        fittedArcs.AddRange(reconstructed.Arcs);
+        foreach (ArcPath arc in fittedArcs)
             w.Arc(arc.Center, arc.Radius, arc.StartDegrees, arc.StartDegrees + arc.SweepDegrees, arc.Layer);
-            fittedArcs.Add(arc);
-        }
         var hidden=new List<Line2>();
         for(int i=0;i<linework.Count;i++)
         {
-            if(reconstructed.ConsumedLines.Contains(i))continue;
+            if(merged.ConsumedLines.Contains(i)||reconstructed.ConsumedLines.Contains(i))continue;
             Line2 line=linework[i];if(IsCoveredByArc(line,fittedArcs))continue;
             if(IsHidden(line.Layer))hidden.Add(line);else w.Line(line.A,line.B,line.Layer);
         }
@@ -751,6 +754,160 @@ internal static partial class MachiningDxf
         foreach(var line in joined.Lines)w.Line(line.A,line.B,line.Layer);
         foreach(var poly in joined.Polylines)w.Polyline(poly.Points,poly.Closed,poly.Layer);
         return fittedArcs;
+    }
+
+
+    private readonly record struct CircularInterval(double Start, double End, int ArcIndex, int LineIndex);
+    private sealed class CircularRun(double start, double end)
+    {
+        public double Start = start;
+        public double End = end;
+        public bool HasArc;
+        public HashSet<int> LineIndices { get; } = [];
+        public void Absorb(CircularInterval interval)
+        {
+            End = Math.Max(End, interval.End);
+            if (interval.ArcIndex >= 0) HasArc = true;
+            if (interval.LineIndex >= 0) LineIndices.Add(interval.LineIndex);
+        }
+        public void Absorb(CircularRun other)
+        {
+            End = Math.Max(End, other.End);
+            HasArc |= other.HasArc;
+            LineIndices.UnionWith(other.LineIndices);
+        }
+    }
+
+    // Coaxial, same-layer arc fragments + short chords create one connected
+    // circular interval. The actual DXF regression had 78 R45 ARC pieces
+    // and 122 connecting LINE chords across 32 circle centers.
+    // Only line-supported gaps are bridged: never fabricate missing geometry.
+    internal static (List<ArcPath> Arcs, HashSet<int> ConsumedLines) MergeCircularFragments(
+        IReadOnlyList<ArcPath> arcs, IReadOnlyList<Line2> lines)
+    {
+        const double centerTolerance = 0.02;
+        const double radialTolerance = 0.03;
+        const double angularTolerance = 0.08;
+        const double maxChordLength = 3.0;
+        var groups = new List<List<int>>();
+        for (int i = 0; i < arcs.Count; i++)
+        {
+            ArcPath arc = arcs[i];
+            int group = groups.FindIndex(indices =>
+            {
+                ArcPath reference = arcs[indices[0]];
+                return reference.Layer.Equals(arc.Layer, StringComparison.OrdinalIgnoreCase)
+                    && Distance(reference.Center, arc.Center) <= centerTolerance
+                    && Math.Abs(reference.Radius - arc.Radius) <= centerTolerance;
+            });
+            if (group < 0) groups.Add([i]);
+            else groups[group].Add(i);
+        }
+
+        var mergedArcs = new List<ArcPath>();
+        var consumedLines = new HashSet<int>();
+        foreach (List<int> group in groups)
+        {
+            // Use the most-established arc to avoid centre rounding from a
+            // short fragment contaminating the reconstructed circle.
+            ArcPath reference = group.Select(index => arcs[index])
+                .OrderByDescending(arc => arc.SweepDegrees).First();
+            Point2 center = reference.Center;
+            double radius = reference.Radius;
+            var intervals = new List<CircularInterval>();
+
+            void AddInterval(double start, double span, int arcIndex, int lineIndex)
+            {
+                if (span <= 0 || span > 360 || !double.IsFinite(span)) return;
+                start = (start % 360 + 360) % 360;
+                double end = start + span;
+                if (end <= 360)
+                    intervals.Add(new(start, end, arcIndex, lineIndex));
+                else
+                {
+                    intervals.Add(new(start, 360, arcIndex, lineIndex));
+                    intervals.Add(new(0, end - 360, arcIndex, lineIndex));
+                }
+            }
+
+            foreach (int index in group)
+            {
+                ArcPath arc = arcs[index];
+                AddInterval(arc.StartDegrees, arc.SweepDegrees, index, -1);
+            }
+            for (int i = 0; i < lines.Count; i++)
+            {
+                Line2 line = lines[i];
+                if (!line.Layer.Equals(reference.Layer, StringComparison.OrdinalIgnoreCase)) continue;
+                double length = Distance(line.A, line.B);
+                if (length < 0.0001 || length > maxChordLength) continue;
+                if (Math.Abs(Distance(line.A, center) - radius) > radialTolerance ||
+                    Math.Abs(Distance(line.B, center) - radius) > radialTolerance) continue;
+
+                double start = Angle(center, line.A), end = Angle(center, line.B);
+                double sweep = RelativeAngle(end, start);
+                if (sweep > 180)
+                {
+                    (start, end) = (end, start);
+                    sweep = RelativeAngle(end, start);
+                }
+                if (sweep <= 0.0001 || sweep > 5) continue;
+                AddInterval(start, sweep, -1, i);
+            }
+
+            intervals.Sort((a, b) => a.Start.CompareTo(b.Start));
+            var runs = new List<CircularRun>();
+            foreach (CircularInterval interval in intervals)
+            {
+                if (runs.Count == 0 || interval.Start > runs[^1].End + angularTolerance)
+                    runs.Add(new(interval.Start, interval.End));
+                runs[^1].Absorb(interval);
+            }
+
+            // Join an interval straddling 0°, but never turn an actual gap
+            // into a full circle.
+            if (runs.Count > 1 &&
+                runs[0].Start <= angularTolerance &&
+                runs[^1].End >= 360 - angularTolerance)
+            {
+                CircularRun first = runs[0], last = runs[^1];
+                var joined = new CircularRun(last.Start, first.End + 360);
+                joined.Absorb(last);
+                joined.Absorb(new CircularInterval(first.Start, first.End,
+                    first.HasArc ? 0 : -1, -1));
+                joined.LineIndices.UnionWith(first.LineIndices);
+                runs.RemoveAt(runs.Count - 1);
+                runs.RemoveAt(0);
+                runs.Add(joined);
+            }
+
+            foreach (CircularRun run in runs)
+            {
+                if (!run.HasArc) continue; // don't invent isolated circular edges
+                double start = run.Start, end = run.End;
+                // Nominal 0/90/180/270/360-degree boundaries may differ from
+                // the tessellated vertex by a few hundredths of a degree.
+                static double Snap(double value)
+                {
+                    double snapped = Math.Round(value / 90) * 90;
+                    return Math.Abs(value - snapped) < 0.1 ? snapped : value;
+                }
+                start = Snap(start); end = Snap(end);
+                double sweep = end - start;
+                if (sweep <= 0) continue;
+
+                // A 360° span cannot be emitted as ARC(start == end). Keep it
+                // as two exact semicircles (DXF ARC), avoiding empty entities.
+                if (sweep >= 359.9)
+                {
+                    mergedArcs.Add(new(center, radius, start % 360, 180, reference.Layer));
+                    mergedArcs.Add(new(center, radius, (start + 180) % 360, sweep - 180, reference.Layer));
+                }
+                else mergedArcs.Add(new(center, radius, start % 360, sweep, reference.Layer));
+                consumedLines.UnionWith(run.LineIndices);
+            }
+        }
+        return (mergedArcs, consumedLines);
     }
 
     static (List<ArcPath> Arcs, HashSet<int> ConsumedLines) ReconstructHiddenArcs(
@@ -899,8 +1056,6 @@ internal static partial class MachiningDxf
             if (i + 2 < points.Count && TryFitArc(points, i, out int end, out Point2 center, out double radius, out bool counterClockwise))
             {
                 double a = Angle(center, points[i]), b = Angle(center, points[end]);
-                if (counterClockwise) w.Arc(center, radius, a, b, layer);
-                else w.Arc(center, radius, b, a, layer);
                 double start = counterClockwise ? a : b, finish = counterClockwise ? b : a;
                 double sweep = (finish - start + 360) % 360;
                 fitted.Add(new(center, radius, start, sweep, layer));
