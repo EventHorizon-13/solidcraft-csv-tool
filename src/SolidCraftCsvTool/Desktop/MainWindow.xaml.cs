@@ -41,7 +41,7 @@ public partial class MainWindow : Window
                 // Make the checkbox itself hit-testable in display mode so one click toggles it.
                 var checkStyle=new Style(typeof(CheckBox));
                 checkStyle.Setters.Add(new Setter(UIElement.IsHitTestVisibleProperty,true));
-                checkStyle.Setters.Add(new Setter(FrameworkElement.FocusableProperty,false));
+                checkStyle.Setters.Add(new Setter(UIElement.FocusableProperty,false));
                 checkStyle.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center));
                 checkStyle.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Center));
                 column=new DataGridCheckBoxColumn{Binding=binding,ElementStyle=checkStyle,EditingElementStyle=checkStyle};
