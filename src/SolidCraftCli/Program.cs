@@ -86,14 +86,8 @@ internal static class Program
             }
             var progress = new InlineProgress<ExportProgress>(entry => Console.WriteLine(entry.Message));
             var export = new ExportOptions(rows, templatePath, outputPath, 7878, 10, combine, overwrite,
-                stamp, options.GetValueOrDefault("--step-name"), exportCsv, csvRows, ExportStep: !exportDxf || combine);
+                stamp, options.GetValueOrDefault("--step-name"), exportCsv, csvRows, ExportStep: !exportDxf || combine, Drawing: drawing, ExportPdf: exportPdf);
             await Exporter.RunAsync(export, progress, cancellation.Token);
-
-            if (drawing != null)
-            {
-                string[] models = rows.Select(row => Path.Combine(outputPath, OutputNames.Part(row.Name, stamp) + ".solidcraft")).ToArray();
-                await StepDrawingExporter.RunAsync(models, outputPath, 7878, progress, cancellation.Token, drawing, exportPdf);
-            }
             return 0;
         }
         catch (OperationCanceledException)
