@@ -5,7 +5,10 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace SolidCraftCsvTool;
@@ -266,7 +269,23 @@ public partial class MainWindow : Window
     internal void SelectSmokeRow()
     {
         grid.SelectedIndex=0;
-        if(grid.SelectedItem!=null)grid.ScrollIntoView(grid.SelectedItem);
+        if(grid.SelectedItem==null)return;
+        grid.ScrollIntoView(grid.SelectedItem);grid.UpdateLayout();
+        grid.CurrentCell=new DataGridCellInfo(grid.Items[0],grid.Columns[0]);
+        if(grid.ItemContainerGenerator.ContainerFromIndex(0) is not DataGridRow row)return;
+        row.ApplyTemplate();row.UpdateLayout();
+        var cell=FindVisualChild<DataGridCell>(row);
+        if(cell!=null){cell.Focus();Keyboard.Focus(cell);}
+    }
+    static T? FindVisualChild<T>(DependencyObject parent) where T:DependencyObject
+    {
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++)
+        {
+            var child=VisualTreeHelper.GetChild(parent,i);
+            if(child is T found)return found;
+            var nested=FindVisualChild<T>(child);if(nested!=null)return nested;
+        }
+        return null;
     }
     internal void ClearSmokeSelection()=>grid.UnselectAll();
     internal void LoadSmokeRows()

@@ -1,4 +1,4 @@
-name: Build and release 2.2.3
+name: Build and release 2.2.4
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.2.3" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.2.4" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install open-source PDF renderer
@@ -131,7 +131,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.2.3" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.2.4" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -204,15 +204,16 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.2.3"
-          title="标准辊密封批量生成 2.2.3"
+          tag="win-2.2.4"
+          title="标准辊密封批量生成 2.2.4"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.2.3 正式版。
+          标准辊密封批量生成 2.2.4 正式版。
 
-          - 深色模式选中行改为柔和蓝灰色，并保证选中行文字的可读性；浅色和自动主题同步适配。
-          - “关于”窗口重新整理布局：作者、构建时间、项目和许可两列对齐，紧凑排列并重新安置操作按钮。
+          - 深色模式选中行采用柔和蓝灰色，当前单元格增加高对比度外框；浅色和自动主题同步适配。
+          - “关于”窗口重新整理布局：图标右侧的标题、作者、构建时间、项目和许可信息统一左对齐。
+          - 设置窗口突出当前选项卡：增加主题适配的高亮背景、边框和底部强调线。
           - 主界面日志窗口默认高度增至 140，并加入可拖动分隔条，以便调整日志与参数表占用空间。
-          - Windows 2022 / Windows 2025 自动验证选中行对比度、关于窗口尺寸和日志默认高度。
+          - Windows 2022 / Windows 2025 自动验证选中单元格边框、当前单元格焦点、选项卡高亮、关于窗口布局和日志默认高度。
           - 保留 2.2.2 的 SolidCraft 标准模型、STEP、DXF、PDF 和 CSV 功能。
           - Windows 桌面版：amd64、arm64
           - Linux CLI：amd64、arm64

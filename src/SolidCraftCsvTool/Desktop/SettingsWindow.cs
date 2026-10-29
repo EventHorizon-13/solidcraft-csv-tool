@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using System.Windows.Media;
 
 namespace SolidCraftCsvTool;
 
@@ -26,6 +27,8 @@ internal sealed class SettingsWindow : Window
         SetResourceReference(BackgroundProperty,"WindowBackground");
         Title="设置";Width=760;Height=540;MinWidth=700;MinHeight=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FontFamily=new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;
+        Tabs.ItemContainerStyle=BuildTabItemStyle();
+        Tabs.Background=Brushes.Transparent;
         var root=new Grid{Margin=new Thickness(16)};root.RowDefinitions.Add(new(){Height=new GridLength(1,GridUnitType.Star)});root.RowDefinitions.Add(new(){Height=GridLength.Auto});Content=root;
         root.Children.Add(Tabs);
         appearance.ItemsSource=new[]{"自动（跟随系统）","深色","浅色"};appearance.SelectedIndex=(int)mode;
@@ -49,6 +52,52 @@ internal sealed class SettingsWindow : Window
         var cancel=new Button{Content="取消",MinWidth=80,Padding=new Thickness(12,5,12,5),IsCancel=true,Margin=new Thickness(0,0,8,0)};
         var save=new Button{Content="保存",MinWidth=80,Padding=new Thickness(12,5,12,5),IsDefault=true};save.Click+=Save;
         buttons.Children.Add(cancel);buttons.Children.Add(save);Grid.SetRow(buttons,1);root.Children.Add(buttons);
+    }
+    static Style BuildTabItemStyle()
+    {
+        var style=new Style(typeof(TabItem));
+        style.Setters.Add(new Setter(Control.PaddingProperty,new Thickness(12,6,12,9)));
+        style.Setters.Add(new Setter(Control.BackgroundProperty,Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty,Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty,new Thickness(1,1,1,0)));
+        style.Setters.Add(new Setter(Control.ForegroundProperty,new DynamicResourceExtension("TabUnselectedForegroundBrush")));
+        style.Setters.Add(new Setter(Control.FontWeightProperty,FontWeights.Normal));
+
+        var border=new FrameworkElementFactory(typeof(Border),"TabBorder");
+        border.SetValue(Border.BackgroundProperty,new TemplateBindingExtension(Control.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty,new TemplateBindingExtension(Control.BorderBrushProperty));
+        border.SetValue(Border.BorderThicknessProperty,new TemplateBindingExtension(Control.BorderThicknessProperty));
+        var panel=new FrameworkElementFactory(typeof(Grid));
+        var content=new FrameworkElementFactory(typeof(ContentPresenter));
+        content.SetValue(ContentPresenter.ContentSourceProperty,"Header");
+        content.SetValue(ContentPresenter.HorizontalAlignmentProperty,HorizontalAlignment.Center);
+        content.SetValue(ContentPresenter.VerticalAlignmentProperty,VerticalAlignment.Center);
+        content.SetValue(FrameworkElement.MarginProperty,new TemplateBindingExtension(Control.PaddingProperty));
+        panel.AppendChild(content);
+        var indicator=new FrameworkElementFactory(typeof(Border),"SelectionIndicator");
+        indicator.SetValue(Border.HeightProperty,3d);
+        indicator.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Stretch);
+        indicator.SetValue(FrameworkElement.VerticalAlignmentProperty,VerticalAlignment.Bottom);
+        indicator.SetResourceReference(Border.BackgroundProperty,"TabIndicatorBrush");
+        indicator.SetValue(UIElement.VisibilityProperty,Visibility.Collapsed);
+        panel.AppendChild(indicator);border.AppendChild(panel);
+
+        var template=new ControlTemplate(typeof(TabItem)){VisualTree=border};
+        var showIndicator=new Trigger{Property=TabItem.IsSelectedProperty,Value=true};
+        showIndicator.Setters.Add(new Setter(UIElement.VisibilityProperty,Visibility.Visible,"SelectionIndicator"));
+        template.Triggers.Add(showIndicator);
+        style.Setters.Add(new Setter(Control.TemplateProperty,template));
+
+        var hover=new Trigger{Property=UIElement.IsMouseOverProperty,Value=true};
+        hover.Setters.Add(new Setter(Control.BackgroundProperty,new DynamicResourceExtension("TabHoverBackgroundBrush")));
+        style.Triggers.Add(hover);
+        var selected=new Trigger{Property=TabItem.IsSelectedProperty,Value=true};
+        selected.Setters.Add(new Setter(Control.BackgroundProperty,new DynamicResourceExtension("TabSelectedBackgroundBrush")));
+        selected.Setters.Add(new Setter(Control.ForegroundProperty,new DynamicResourceExtension("GridSelectionForegroundBrush")));
+        selected.Setters.Add(new Setter(Control.BorderBrushProperty,new DynamicResourceExtension("TabSelectedBorderBrush")));
+        selected.Setters.Add(new Setter(Control.FontWeightProperty,FontWeights.SemiBold));
+        style.Triggers.Add(selected);
+        return style;
     }
     static TextBox Field()=>new(){MinHeight=32,VerticalContentAlignment=VerticalAlignment.Center,Margin=new Thickness(0,4,0,4)};
     static Grid Rows()
