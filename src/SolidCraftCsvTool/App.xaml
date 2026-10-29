@@ -7,5 +7,12 @@
   <SolidColorBrush x:Key="GridSelectionBackgroundBrush" Color="#DDEBFA"/>
   <SolidColorBrush x:Key="GridSelectionForegroundBrush" Color="#18283D"/>
   <SolidColorBrush x:Key="GridSelectionBorderBrush" Color="#9CB7D4"/>
+  <SolidColorBrush x:Key="GridCurrentCellBorderBrush" Color="#0067C0"/>
+  <SolidColorBrush x:Key="GridCellBorderBrush" Color="#D1D8E0"/>
+  <SolidColorBrush x:Key="TabSelectedBackgroundBrush" Color="#DDEBFA"/>
+  <SolidColorBrush x:Key="TabUnselectedForegroundBrush" Color="#343A40"/>
+  <SolidColorBrush x:Key="TabSelectedBorderBrush" Color="#9CB7D4"/>
+  <SolidColorBrush x:Key="TabIndicatorBrush" Color="#0078D4"/>
+  <SolidColorBrush x:Key="TabHoverBackgroundBrush" Color="#EEF5FC"/>
  </Application.Resources>
 </Application>
