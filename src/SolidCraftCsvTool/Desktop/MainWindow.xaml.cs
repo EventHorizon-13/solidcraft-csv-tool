@@ -189,9 +189,9 @@ public partial class MainWindow : Window
             string templateFile = nativeTemplatePath.Trim(), outputFolder = output.Text.Trim();
             if (!File.Exists(templateFile) || !string.Equals(Path.GetExtension(templateFile), ".solidcraft", StringComparison.OrdinalIgnoreCase)) throw new IOException("内置标准模型缺失，请完整解压安装包中的“模板”文件夹。");
             if (outputFolder.Length == 0) throw new IOException("请选择输出文件夹。");
-            var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), ControlPort, CombinedGap, (combined.IsChecked==true), (overwrite.IsChecked==true),stamp,stepName,(taskCsv.IsChecked==true),csvRows, ExportStep: (!(exportDxf || exportPdf.IsChecked==true) || combined.IsChecked==true));
             bool createPdf=(exportPdf.IsChecked==true),createDrawing=exportDxf||createPdf;
             var drawing = drawingOptions with{OutputFileName=dxfName,OverwriteOutput=(overwrite.IsChecked==true)};
+            var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), ControlPort, CombinedGap, (combined.IsChecked==true), (overwrite.IsChecked==true),stamp,stepName,(taskCsv.IsChecked==true),csvRows, ExportStep: (!(exportDxf || exportPdf.IsChecked==true) || combined.IsChecked==true), Drawing: createDrawing ? drawing : null, ExportPdf: createPdf);
             if(createDrawing)
             {
                 drawing.Validate();
@@ -212,16 +212,7 @@ public partial class MainWindow : Window
             var token = cancellation.Token;
             await EnsureEngineAsync(token);
             await Task.Run(() => Exporter.RunAsync(options, progress, token));
-            int drawingCount=0;
-            if(createDrawing)
-            {
-                token.ThrowIfCancellationRequested();
-                string[] files=rows.Select(row=>Path.Combine(options.Output,OutputNames.Part(row.Name,stamp)+".solidcraft"))
-                    .OrderBy(path=>Path.GetFileName(path),StringComparer.OrdinalIgnoreCase).ToArray();
-                drawingCount=files.Length;progressBar.Maximum=files.Length;progressBar.Value=0;
-                Log($"正在从 {files.Length} 个原生 .solidcraft 模型直接生成加工图"+(combined.IsChecked==true?"（组合 STEP 仍按需导出）":"，跳过 STEP 中间文件")+"。");
-                await Task.Run(()=>StepDrawingExporter.RunAsync(files,options.Output,options.Port,progress,token,drawing,createPdf));
-            }
+            int drawingCount=createDrawing?rows.Count:0;
             SetStatus($"完成：{rows.Count} 个型号"+(createDrawing?$"，1 个 DXF"+(createPdf?$" 和 {drawingCount} 页 PDF":"") :"")); Log("输出目录：" + options.Output);
             MessageBox.Show(this, $"已导出 {rows.Count} 个型号。"+(createDrawing?$"\n已生成汇总 DXF"+(createPdf?$" 和 {drawingCount} 页 A4 PDF":"")+"。":"")+$"\n{options.Output}", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
             if(createDrawing)OpenCompletedDxf(Path.Combine(options.Output,drawing.ResolvedFileName));
