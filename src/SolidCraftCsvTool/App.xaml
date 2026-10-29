@@ -2,5 +2,10 @@
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  ThemeMode="System" ShutdownMode="OnMainWindowClose">
- <Application.Resources/>
+ <Application.Resources>
+  <!-- Updated by DesktopApp.SetAppearance; DynamicResource keeps selection colors in sync. -->
+  <SolidColorBrush x:Key="GridSelectionBackgroundBrush" Color="#DDEBFA"/>
+  <SolidColorBrush x:Key="GridSelectionForegroundBrush" Color="#18283D"/>
+  <SolidColorBrush x:Key="GridSelectionBorderBrush" Color="#9CB7D4"/>
+ </Application.Resources>
 </Application>
