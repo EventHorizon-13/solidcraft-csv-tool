@@ -16,7 +16,7 @@ internal static class OptionalDimensionsChecks
         if(ModelRules.Columns.Contains("配合间隙")||ModelRules.ParameterNames.Contains("配合间隙"))throw new Exception("Fit clearance must not be an editable CSV or batch parameter.");
         string legacyGap=Path.Combine(directory,"legacy-fit-clearance.csv");
         var legacyRow=ModelRules.DefaultRow().Concat(["2"]).ToArray();
-        File.WriteAllText(legacyGap,string.Join(',',ModelRules.Columns.Concat(["配合间隙"]))+"\\n"+string.Join(',',legacyRow));
+        File.WriteAllText(legacyGap,string.Join(',',ModelRules.Columns.Concat(["配合间隙"]))+"\n"+string.Join(',',legacyRow));
         var importedLegacy=CsvFiles.Read(legacyGap);
         if(importedLegacy[0].Length!=ModelRules.Columns.Length||ModelRules.Validate(importedLegacy).Count!=1)throw new Exception("Legacy CSV fit-clearance values must be ignored.");
         if(ModelRules.ExpandRow(legacyRow).Length!=ModelRules.Columns.Length)throw new Exception("Legacy 19-column rows must be truncated safely.");
