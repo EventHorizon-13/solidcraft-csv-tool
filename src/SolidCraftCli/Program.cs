@@ -86,14 +86,8 @@ internal static class Program
             }
             var progress = new InlineProgress<ExportProgress>(entry => Console.WriteLine(entry.Message));
             var export = new ExportOptions(rows, templatePath, outputPath, 7878, 10, combine, overwrite,
-                stamp, options.GetValueOrDefault("--step-name"), exportCsv, csvRows);
+                stamp, options.GetValueOrDefault("--step-name"), exportCsv, csvRows, ExportStep: !exportDxf || combine, Drawing: drawing, ExportPdf: exportPdf);
             await Exporter.RunAsync(export, progress, cancellation.Token);
-
-            if (drawing != null)
-            {
-                string[] steps = rows.Select(row => Path.Combine(outputPath, OutputNames.Part(row.Name, stamp) + ".step")).ToArray();
-                await StepDrawingExporter.RunAsync(steps, outputPath, 7878, progress, cancellation.Token, drawing, exportPdf);
-            }
             return 0;
         }
         catch (OperationCanceledException)
@@ -152,10 +146,10 @@ internal static class Program
         Console.WriteLine("选项：");
         Console.WriteLine("  --template PATH            自选 V13 SolidCraft 模板；默认内置标准辊密封模板");
         Console.WriteLine("  --output DIR               输出目录，默认与 CSV 相同");
-        Console.WriteLine("  --combine-step             另行导出合并 STEP");
+        Console.WriteLine("  --combine-step             另行导出合并 STEP（需要单件 STEP，出图仍直接读取 .solidcraft）");
         Console.WriteLine("  --step-name NAME           合并 STEP 文件名，需同时启用 --combine-step");
         Console.WriteLine("  --export-current-csv       输出本次采用的完整参数 CSV");
-        Console.WriteLine("  --export-dxf               从单件 STEP 生成汇总加工图 DXF");
+        Console.WriteLine("  --export-dxf               从原生 .solidcraft 直接生成汇总 DXF，默认跳过中间 STEP 导出");
         Console.WriteLine("  --export-pdf               按每张固定 A4 图框另导出多页 PDF（同时生成 DXF）");
         Console.WriteLine("  --drawing-template PATH    图框/标注样式 DXF 模板；默认无图框");
         Console.WriteLine("  --font-dir PATH            外置 SHX 字体目录，需含 gbenor.shx 和 gbcbig.shx；默认 模板/字体");

@@ -189,9 +189,9 @@ public partial class MainWindow : Window
             string templateFile = nativeTemplatePath.Trim(), outputFolder = output.Text.Trim();
             if (!File.Exists(templateFile) || !string.Equals(Path.GetExtension(templateFile), ".solidcraft", StringComparison.OrdinalIgnoreCase)) throw new IOException("内置标准模型缺失，请完整解压安装包中的“模板”文件夹。");
             if (outputFolder.Length == 0) throw new IOException("请选择输出文件夹。");
-            var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), ControlPort, CombinedGap, (combined.IsChecked==true), (overwrite.IsChecked==true),stamp,stepName,(taskCsv.IsChecked==true),csvRows);
             bool createPdf=(exportPdf.IsChecked==true),createDrawing=exportDxf||createPdf;
             var drawing = drawingOptions with{OutputFileName=dxfName,OverwriteOutput=(overwrite.IsChecked==true)};
+            var options = new ExportOptions(rows, Path.GetFullPath(templateFile), Path.GetFullPath(outputFolder), ControlPort, CombinedGap, (combined.IsChecked==true), (overwrite.IsChecked==true),stamp,stepName,(taskCsv.IsChecked==true),csvRows, ExportStep: (!(exportDxf || exportPdf.IsChecked==true) || combined.IsChecked==true), Drawing: createDrawing ? drawing : null, ExportPdf: createPdf);
             if(createDrawing)
             {
                 drawing.Validate();
@@ -212,15 +212,7 @@ public partial class MainWindow : Window
             var token = cancellation.Token;
             await EnsureEngineAsync(token);
             await Task.Run(() => Exporter.RunAsync(options, progress, token));
-            int drawingCount=0;
-            if(createDrawing)
-            {
-                token.ThrowIfCancellationRequested();
-                string[] files=BatchDrawingInputs.FromFolder(options.Output,stepName);
-                drawingCount=files.Length;progressBar.Maximum=files.Length;progressBar.Value=0;
-                Log($"正在汇总同文件夹的 {files.Length} 个零件 STEP，已排除组合 STEP。");
-                await Task.Run(()=>StepDrawingExporter.RunAsync(files,options.Output,options.Port,progress,token,drawing,createPdf));
-            }
+            int drawingCount=createDrawing?rows.Count:0;
             SetStatus($"完成：{rows.Count} 个型号"+(createDrawing?$"，1 个 DXF"+(createPdf?$" 和 {drawingCount} 页 PDF":"") :"")); Log("输出目录：" + options.Output);
             MessageBox.Show(this, $"已导出 {rows.Count} 个型号。"+(createDrawing?$"\n已生成汇总 DXF"+(createPdf?$" 和 {drawingCount} 页 A4 PDF":"")+"。":"")+$"\n{options.Output}", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
             if(createDrawing)OpenCompletedDxf(Path.Combine(options.Output,drawing.ResolvedFileName));
@@ -232,7 +224,7 @@ public partial class MainWindow : Window
 
     async Task RunStepDrawing()
     {
-        var input = new OpenFileDialog() { Filter = "STEP 三维文件 (*.step;*.stp)|*.step;*.stp", Multiselect = true, Title = "选择要批量生成加工图的 STEP 文件" };
+        var input = new OpenFileDialog() { Filter = "三维模型 (*.solidcraft;*.step;*.stp)|*.solidcraft;*.step;*.stp", Multiselect = true, Title = "选择要批量生成加工图的 SolidCraft 或 STEP 三维文件" };
         if (input.ShowDialog(this) != true) return;
         var outputFolder = new OpenFolderDialog() { Title = "选择加工图 DXF 的输出文件夹" };
         if (outputFolder.ShowDialog(this) != true) return;
@@ -255,11 +247,11 @@ public partial class MainWindow : Window
             await EnsureEngineAsync(cancellation.Token);
             await Task.Run(() => StepDrawingExporter.RunAsync(files, target, ControlPort, progress, cancellation.Token, drawing,createPdf));
             SetStatus($"加工图完成：1 个 DXF"+(createPdf?$" 和 {files.Length} 页 A4 PDF":"")); Log("汇总 DXF 输出文件夹：" + target);
-            MessageBox.Show(this, $"已生成 1 个汇总 DXF"+(createPdf?$" 和 {files.Length} 页 A4 PDF":"")+ $"，含 {files.Length} 张带尺寸标注的三视图，按 STEP 文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, drawing.ResolvedFileName)}", "出图完成", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, $"已生成 1 个汇总 DXF"+(createPdf?$" 和 {files.Length} 页 A4 PDF":"")+ $"，含 {files.Length} 张带尺寸标注的三视图，按输入文件名排序。尺寸单位为 mm，请在加工前核对。\n\n{Path.Combine(target, drawing.ResolvedFileName)}", "出图完成", MessageBoxButton.OK, MessageBoxImage.Information);
             OpenCompletedDxf(Path.Combine(target,drawing.ResolvedFileName));
         }
-        catch (OperationCanceledException) { SetStatus("已停止；已完成的 DXF 保留。"); Log("STEP 批量出图已停止。"); }
-        catch (Exception ex) { string details = DescribeException(ex); Log("STEP 出图中止：" + details); ShowError(details); SetStatus("STEP 出图中止"); }
+        catch (OperationCanceledException) { SetStatus("已停止；已完成的 DXF 保留。"); Log("三维模型批量出图已停止。"); }
+        catch (Exception ex) { string details = DescribeException(ex); Log("三维模型出图中止：" + details); ShowError(details); SetStatus("三维模型出图中止"); }
         finally { cancellation?.Dispose(); cancellation = null; SetRunning(false); }
     }
 

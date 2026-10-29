@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace SolidCraftCsvTool;
 
-public sealed record ExportOptions(List<PreparedRow> Rows, string Template, string Output, int Port, double Gap, bool Combined, bool Overwrite, string? DateStamp=null, string? CombinedFileName=null, bool ExportCsv=false, IReadOnlyList<string[]>? CsvRows=null);
+public sealed record ExportOptions(List<PreparedRow> Rows, string Template, string Output, int Port, double Gap, bool Combined, bool Overwrite, string? DateStamp=null, string? CombinedFileName=null, bool ExportCsv=false, IReadOnlyList<string[]>? CsvRows=null, bool ExportStep=true, DrawingOptions? Drawing=null, bool ExportPdf=false);
 public sealed record ExportProgress(string Message, int Completed = 0, bool Log = true);
 
 public static class Exporter
@@ -13,6 +13,9 @@ public static class Exporter
         string stamp=options.DateStamp??OutputNames.Stamp;
         string combinedName=OutputNames.FileName(options.CombinedFileName,".step",stamp);
         string csvName=OutputNames.DefaultBase(stamp)+".csv";
+        if(options.Combined&&!options.ExportStep)throw new InvalidDataException("生成组合 STEP 时必须启用单件 STEP 导出。");
+        if(options.Drawing!=null)StepDrawingExporter.ValidateOutputTargets(options.Output,options.Drawing,options.ExportPdf);
+        else if(options.ExportPdf)throw new InvalidDataException("导出 PDF 时必须提供加工图设置。");
         if(options.Combined&&options.Rows.Any(row=>(OutputNames.Part(row.Name,stamp)+".step").Equals(combinedName,StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("组合 STEP 名不能与单件 STEP 名相同。");
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "run-" + Guid.NewGuid().ToString("N"));
@@ -20,8 +23,12 @@ public static class Exporter
         bool success = false;
         try
         {
-            string[] targets = options.Rows.SelectMany(row => new[] { Path.Combine(options.Output, OutputNames.Part(row.Name,stamp) + ".solidcraft"), Path.Combine(options.Output, OutputNames.Part(row.Name,stamp) + ".step") })
-                .Concat(options.Combined ? [Path.Combine(options.Output, combinedName)] : Array.Empty<string>()).Concat(options.ExportCsv?[Path.Combine(options.Output,csvName)]:Array.Empty<string>()).ToArray();
+            string[] targets = options.Rows.Select(row => Path.Combine(options.Output, OutputNames.Part(row.Name,stamp) + ".solidcraft"))
+                .Concat(options.ExportStep ? options.Rows.Select(row => Path.Combine(options.Output, OutputNames.Part(row.Name,stamp) + ".step")) : Array.Empty<string>())
+                .Concat(options.Combined ? [Path.Combine(options.Output, combinedName)] : Array.Empty<string>())
+                .Concat(options.ExportCsv ? [Path.Combine(options.Output,csvName)] : Array.Empty<string>())
+                .Concat(options.Drawing!=null ? [Path.Combine(options.Output,options.Drawing.ResolvedFileName)] : Array.Empty<string>())
+                .Concat(options.Drawing!=null&&options.ExportPdf ? [Path.Combine(options.Output,Path.ChangeExtension(options.Drawing.ResolvedFileName,".pdf"))] : Array.Empty<string>()).ToArray();
             if (!options.Overwrite && targets.Any(File.Exists)) throw new IOException("已有同名输出，请更换输出目录，或勾选“覆盖已有文件”。");
             Directory.CreateDirectory(options.Output);
             string template = Path.Combine(work, "template.solidcraft");
@@ -54,6 +61,7 @@ public static class Exporter
             foreach(var row in options.Rows)_=ModelRules.ChangesWithDefaults(row,defaults);
             progress.Report(new("已连接 SolidCraft，模板副本与默认子母槽尺寸已读取。"));
             List<(PreparedRow Row, string Path, Bounds Box)> pieces = [];
+            List<StepDrawingPage> drawingPages = [];
             int completed = 0;
             List<string[]> snapshotRows=[];
             foreach (var row in options.Rows)
@@ -89,11 +97,12 @@ public static class Exporter
                 cancellation.ThrowIfCancellationRequested();
                 string native = Path.Combine(work, OutputNames.Part(row.Name,stamp) + ".solidcraft"), step = Path.Combine(work, OutputNames.Part(row.Name,stamp) + ".step");
                 await client.ExecuteAsync("file.save_as", new { path = native, format = "container", cache = true, preview = true });
-                await client.ExecuteAsync("file.export", new { path = step, format = "step" });
+                if(options.Drawing!=null)drawingPages.Add(await StepDrawingExporter.CaptureCurrentAsync(client,work,completed,row.Name,progress,cancellation));
+                if(options.ExportStep)await client.ExecuteAsync("file.export", new { path = step, format = "step" });
                 PublishFile(native, Path.Combine(options.Output, Path.GetFileName(native)), options.Overwrite);
-                PublishFile(step, Path.Combine(options.Output, Path.GetFileName(step)), options.Overwrite);
+                if(options.ExportStep)PublishFile(step, Path.Combine(options.Output, Path.GetFileName(step)), options.Overwrite);
                 completed++;
-                progress.Report(new($"已导出 {row.Name}：SolidCraft + STEP", completed));
+                progress.Report(new(options.ExportStep ? $"已导出 {row.Name}：SolidCraft + STEP" : $"已导出 {row.Name}：SolidCraft（跳过 STEP 中间文件）", completed));
                 if (bounds != null) pieces.Add((row, step, bounds));
             }
             if (options.Combined)
@@ -126,6 +135,8 @@ public static class Exporter
                 PublishFile(combined, Path.Combine(options.Output, Path.GetFileName(combined)), options.Overwrite);
                 progress.Report(new("组合 STEP 已导出，实体数量一致且相交检查通过。", completed));
             }
+            if(options.Drawing!=null)
+                await StepDrawingExporter.WritePagesAsync(drawingPages,options.Output,work,progress,cancellation,options.Drawing,options.ExportPdf);
             if(options.ExportCsv)
             {
                 var csvRows=snapshotRows;

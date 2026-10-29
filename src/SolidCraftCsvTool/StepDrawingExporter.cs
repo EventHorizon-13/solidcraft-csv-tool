@@ -20,38 +20,23 @@ internal sealed record StepDrawingPage(string Name, Projection2 Front, Projectio
 
 public static class StepDrawingExporter
 {
-    public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outputFolder, int port,
+public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outputFolder, int port,
         IProgress<ExportProgress> progress, CancellationToken cancellation, DrawingOptions? drawingOptions = null,
         bool exportPdf = false)
     {
         drawingOptions ??= new DrawingOptions();
-        drawingOptions.Validate();
-        if (inputFiles.Count == 0) throw new InvalidDataException("请选择至少一个 STEP 文件。");
+        if (inputFiles.Count == 0) throw new InvalidDataException("请选择至少一个 SolidCraft 或 STEP 三维文件。");
         foreach (string path in inputFiles)
-            if (!File.Exists(path) || !new[] { ".step", ".stp" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+            if (!File.Exists(path) || !new[] { ".solidcraft", ".step", ".stp" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
                 throw new InvalidDataException("输入列表中包含不存在或格式不支持的文件：" + path);
 
+        ValidateOutputTargets(outputFolder, drawingOptions, exportPdf);
         inputFiles = inputFiles.OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase).ToArray();
         string destination = Path.GetFullPath(outputFolder);
         Directory.CreateDirectory(destination);
-        string outputName = drawingOptions.ResolvedFileName;
-        string outputPath = Path.Combine(destination, outputName);
-        if (!drawingOptions.OverwriteOutput&&File.Exists(outputPath)) throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
-        string pdfOutputPath = Path.Combine(destination, Path.ChangeExtension(outputName, ".pdf"));
-        if (exportPdf)
-        {
-            if (string.IsNullOrWhiteSpace(drawingOptions.TemplatePath))
-                throw new InvalidDataException("PDF 导出需要选择包含固定 A4 图框的 DXF 模板。");
-            _ = DrawingResources.Load(drawingOptions);
-            if (!drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath))
-                throw new IOException("汇总 PDF 已存在，未覆盖原文件：" + pdfOutputPath);
-            PdfExportService.ValidateFontDirectory(drawingOptions.FontDirectory);
-        }
-
         string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "step-drawings-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         var pages = new List<StepDrawingPage>(inputFiles.Count);
-        string? stagedPdf = null;
         try
         {
             using var client = await ControlClient.ConnectAsync(port);
@@ -60,34 +45,33 @@ public static class StepDrawingExporter
                 throw new IOException("SolidCraft 当前正在执行其他命令，请完成后再批量出图。");
 
             var originalUi = client.IsHeadless ? default : await client.RequestAsync("ui.inspect", new { });
-            var originalCamera = originalUi.ValueKind==System.Text.Json.JsonValueKind.Object&&originalUi.TryGetProperty("camera", out var cam) ? cam.Clone() : default;
-            bool? originalPerspective = originalUi.ValueKind==System.Text.Json.JsonValueKind.Object&&originalUi.TryGetProperty("perspective", out var perspective) && perspective.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False
+            var originalCamera = originalUi.ValueKind == System.Text.Json.JsonValueKind.Object && originalUi.TryGetProperty("camera", out var cam) ? cam.Clone() : default;
+            bool? originalPerspective = originalUi.ValueKind == System.Text.Json.JsonValueKind.Object && originalUi.TryGetProperty("perspective", out var perspective) && perspective.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False
                 ? perspective.GetBoolean() : null;
-            bool currentStepOpen = false;
+            bool currentDocumentOpen = false;
             try
             {
-                if(!client.IsHeadless)await client.RequestAsync("ui.set", new { perspective = false });
+                if (!client.IsHeadless) await client.RequestAsync("ui.set", new { perspective = false });
                 for (int i = 0; i < inputFiles.Count; i++)
                 {
                     cancellation.ThrowIfCancellationRequested();
-                    string step = Path.GetFullPath(inputFiles[i]);
-                    progress.Report(new($"正在读取 STEP 并投影三视图 {i + 1}/{inputFiles.Count}：{Path.GetFileName(step)}", i));
-                    await client.ExecuteAsync("doc.open", new { path = step, up = "z" });
-                    currentStepOpen = true;
+                    string input = Path.GetFullPath(inputFiles[i]);
+                    progress.Report(new($"正在打开三维模型 {i + 1}/{inputFiles.Count}：{Path.GetFileName(input)}", i));
+                    string extension = Path.GetExtension(input);
+                    if (extension.Equals(".step", StringComparison.OrdinalIgnoreCase) || extension.Equals(".stp", StringComparison.OrdinalIgnoreCase))
+                        await client.ExecuteAsync("doc.open", new { path = input, up = "z" });
+                    else
+                        await client.ExecuteAsync("doc.open", new { path = input });
+                    currentDocumentOpen = true;
+                    pages.Add(await CaptureCurrentAsync(client, work, i, Path.GetFileNameWithoutExtension(input), progress, cancellation));
 
-                    Projection2 front = await ExportProjection(client, work, $"{i:D4}-front.dxf", "front", cancellation);
-                    Projection2 top = await ExportProjection(client, work, $"{i:D4}-top.dxf", "top", cancellation);
-                    Projection2 end = await ExportProjection(client, work, $"{i:D4}-left.dxf", "left", cancellation);
-                    pages.Add(new(Path.GetFileNameWithoutExtension(step), front, top, end, DxfFeatureDetector.Analyze(front, top)));
-
-                    if(!client.IsHeadless)await client.RequestAsync("ui.documents", new { action = "close", force = true });
-                    currentStepOpen = false;
-                    progress.Report(new($"已读取 {Path.GetFileName(step)}，三视图与几何特征已提取。", i + 1));
+                    if (!client.IsHeadless) await client.RequestAsync("ui.documents", new { action = "close", force = true });
+                    currentDocumentOpen = false;
                 }
             }
             finally
             {
-                if (currentStepOpen&&!client.IsHeadless)
+                if (currentDocumentOpen && !client.IsHeadless)
                 {
                     try { await client.RequestAsync("ui.documents", new { action = "close", force = true }); } catch (IOException) { }
                 }
@@ -97,7 +81,73 @@ public static class StepDrawingExporter
                     try { await client.RequestAsync("ui.camera", originalCamera); } catch (IOException) { }
             }
 
-            cancellation.ThrowIfCancellationRequested();
+            await WritePagesAsync(pages, destination, work, progress, cancellation, drawingOptions, exportPdf);
+        }
+        finally
+        {
+            if (Directory.Exists(work))
+            {
+                try { Directory.Delete(work, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    internal static void ValidateOutputTargets(string outputFolder, DrawingOptions drawingOptions, bool exportPdf)
+    {
+        drawingOptions.Validate();
+        string destination = Path.GetFullPath(outputFolder);
+        string outputPath = Path.Combine(destination, drawingOptions.ResolvedFileName);
+        if (!drawingOptions.OverwriteOutput && File.Exists(outputPath))
+            throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
+        if (exportPdf)
+        {
+            if (string.IsNullOrWhiteSpace(drawingOptions.TemplatePath))
+                throw new InvalidDataException("PDF 导出需要选择包含固定 A4 图框的 DXF 模板。");
+            _ = DrawingResources.Load(drawingOptions);
+            string pdfOutputPath = Path.Combine(destination, Path.ChangeExtension(drawingOptions.ResolvedFileName, ".pdf"));
+            if (!drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath))
+                throw new IOException("汇总 PDF 已存在，未覆盖原文件：" + pdfOutputPath);
+            PdfExportService.ValidateFontDirectory(drawingOptions.FontDirectory);
+        }
+    }
+
+    internal static async Task<StepDrawingPage> CaptureCurrentAsync(ControlClient client, string work, int index,
+        string name, IProgress<ExportProgress> progress, CancellationToken cancellation)
+    {
+        Directory.CreateDirectory(work);
+        progress.Report(new($"正在从当前模型提取三视图 {index + 1}：{name}", index));
+        try
+        {
+            Projection2 front = await ExportProjection(client, work, $"{index:D4}-front.dxf", "front", cancellation);
+            Projection2 top = await ExportProjection(client, work, $"{index:D4}-top.dxf", "top", cancellation);
+            Projection2 end = await ExportProjection(client, work, $"{index:D4}-left.dxf", "left", cancellation);
+            return new(name, front, top, end, DxfFeatureDetector.Analyze(front, top));
+        }
+        finally
+        {
+            // Reset the viewport before the next parameter row is saved, so the
+            // native model preview does not accidentally retain the left view.
+            try
+            {
+                if (client.IsHeadless) await client.ExecuteAsync("view.apply", new { view = "iso" });
+                else await client.RequestAsync("ui.view", new { view = "iso", animate = false });
+            }
+            catch (IOException) { }
+        }
+    }
+
+    internal static async Task WritePagesAsync(IReadOnlyList<StepDrawingPage> pages, string outputFolder, string work,
+        IProgress<ExportProgress> progress, CancellationToken cancellation, DrawingOptions drawingOptions, bool exportPdf)
+    {
+        if (pages.Count == 0) throw new InvalidDataException("没有可排版的三视图。");
+        string destination = Path.GetFullPath(outputFolder);
+        Directory.CreateDirectory(destination);
+        string outputName = drawingOptions.ResolvedFileName;
+        string outputPath = Path.Combine(destination, outputName);
+        string pdfOutputPath = Path.Combine(destination, Path.ChangeExtension(outputName, ".pdf"));
+        string? stagedPdf = null;
+        try
+        {
             cancellation.ThrowIfCancellationRequested();
             string staged = Path.Combine(work, outputName);
             progress.Report(new($"正在将 {pages.Count} 张加工图排版到一个 DXF…", pages.Count - 1));
@@ -117,13 +167,13 @@ public static class StepDrawingExporter
                 await PdfExportService.ExportAsync(pdfPages, stagedPdf, drawingOptions.FontDirectory, work, progress, cancellation);
             }
             cancellation.ThrowIfCancellationRequested();
-            if (!drawingOptions.OverwriteOutput&&File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
+            if (!drawingOptions.OverwriteOutput && File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
             if (exportPdf && !drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath)) throw new IOException("PDF 目标文件在出图期间出现，未覆盖原文件：" + pdfOutputPath);
             if (stagedPdf != null) { File.Move(stagedPdf, pdfOutputPath, drawingOptions.OverwriteOutput); stagedPdf = null; }
-            File.Move(staged, outputPath,drawingOptions.OverwriteOutput);
+            File.Move(staged, outputPath, drawingOptions.OverwriteOutput);
             progress.Report(new(exportPdf
                 ? $"已保存汇总 DXF 和 A4 PDF：{outputName}（{pages.Count} 页）"
-                : $"已保存汇总 DXF：{outputName}（含 {pages.Count} 张加工图）", inputFiles.Count));
+                : $"已保存汇总 DXF：{outputName}（含 {pages.Count} 张加工图）", pages.Count));
         }
         finally
         {
@@ -131,12 +181,9 @@ public static class StepDrawingExporter
             {
                 try { File.Delete(stagedPdf); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
-            if (Directory.Exists(work))
-            {
-                try { Directory.Delete(work, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-            }
         }
     }
+
 
     static async Task<Projection2> ExportProjection(ControlClient client, string work, string file, string view, CancellationToken cancellation)
     {
