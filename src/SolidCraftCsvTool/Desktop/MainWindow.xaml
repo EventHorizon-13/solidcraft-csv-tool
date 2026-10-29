@@ -54,11 +54,19 @@
    </DataGrid.RowStyle>
    <DataGrid.CellStyle>
     <Style TargetType="{x:Type DataGridCell}">
+     <Setter Property="BorderBrush" Value="{DynamicResource GridCellBorderBrush}"/>
+     <Setter Property="BorderThickness" Value="0,0,0,1"/>
      <Style.Triggers>
       <Trigger Property="IsSelected" Value="True">
        <Setter Property="Background" Value="{DynamicResource GridSelectionBackgroundBrush}"/>
        <Setter Property="Foreground" Value="{DynamicResource GridSelectionForegroundBrush}"/>
        <Setter Property="BorderBrush" Value="{DynamicResource GridSelectionBorderBrush}"/>
+       <Setter Property="BorderThickness" Value="1"/>
+      </Trigger>
+      <Trigger Property="IsKeyboardFocusWithin" Value="True">
+       <Setter Property="BorderBrush" Value="{DynamicResource GridCurrentCellBorderBrush}"/>
+       <Setter Property="BorderThickness" Value="2"/>
+       <Setter Property="Panel.ZIndex" Value="1"/>
       </Trigger>
      </Style.Triggers>
     </Style>
