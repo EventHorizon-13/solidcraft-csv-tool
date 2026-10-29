@@ -33,6 +33,13 @@ public partial class DesktopApp : Application
         SetBrush("GridSelectionBackgroundBrush",dark?"#394759":"#DDEBFA");
         SetBrush("GridSelectionForegroundBrush",dark?"#F4F7FC":"#18283D");
         SetBrush("GridSelectionBorderBrush",dark?"#62758B":"#9CB7D4");
+        SetBrush("GridCurrentCellBorderBrush",dark?"#8DD6FF":"#0067C0");
+        SetBrush("GridCellBorderBrush",dark?"#4B5159":"#D1D8E0");
+        SetBrush("TabSelectedBackgroundBrush",dark?"#394759":"#DDEBFA");
+        SetBrush("TabUnselectedForegroundBrush",dark?"#D1D8E2":"#343A40");
+        SetBrush("TabSelectedBorderBrush",dark?"#62758B":"#9CB7D4");
+        SetBrush("TabIndicatorBrush",dark?"#58C8FF":"#0078D4");
+        SetBrush("TabHoverBackgroundBrush",dark?"#2D3239":"#EEF5FC");
     }
 
     static void SetBrush(string key,string hex)
