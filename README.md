@@ -1,119 +1,156 @@
 # 标准辊密封批量生成
 
-Windows 10/11 amd64（x64）和 arm64 桌面版。完整解压后运行 `标准辊密封批量生成.exe`，保留同目录 `SolidCraft` 文件夹。自包含 .NET，并附带对应架构的官方 SolidCraft 0.23 CLI。
+面向标准辊密封零件的参数化建模与工程出图工具。通过参数表或 CSV 批量管理尺寸，自动调用随包提供的 SolidCraft CLI，生成三维模型和加工图文件。
 
-另提供 Linux amd64/arm64 命令行版 `standard-roller-seal`，可由 CSV 批量生成 SolidCraft、STEP、DXF 和PDF，无图形界面。Linux 安装包内也带对应架构的 SolidCraft CLI。当前没有 macOS 桌面版：WPF 桌面界面不能直接编译成 macOS universal 应用。
+**版本：2.3.0**  
+**支持平台：** Windows 10/11（x64、ARM64 桌面版）；Linux（amd64、ARM64 命令行版）。目前没有 macOS 桌面版。
+
+[下载最新正式版](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases/latest) · [查看所有版本](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases) · [查看构建与 UI 测试](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions)
+
+## 功能概览
+
+- **批量参数化建模：** 从参数表或 CSV 生成单件 SolidCraft 原生模型与 STEP 文件，可选导出组合 STEP。
+- **工程出图：** 批量生成可编辑 DXF，支持汇总加工图与多页 A4 横向 PDF。
+- **WPS 风格填充：** 单格或矩形多格选区均可使用填充柄；拖动时实时预览，松开提交，取消则恢复原值。
+- **序列与复制切换：** 按住 Ctrl 在序列填充和循环复制之间切换；支持数字、日期和带数字后缀的编号。
+- **撤销与重做：** 支持 Ctrl+Z、Ctrl+Y 和 Ctrl+Shift+Z，填充、单元格编辑、整列修改、勾选切换及行操作均纳入历史记录。
+- **高效表格操作：** 单击即可切换勾选框；双击勾选列列头可全选/取消全选，双击其他列头可批量修改整列。
+- **深浅色主题：** 支持自动跟随系统、深色和浅色模式；当前单元格有明确外框，选中状态和设置选项卡均有高亮提示。
+- **独立运行环境：** Windows 桌面版自包含 .NET；安装包附带对应架构的官方 SolidCraft 0.23 CLI。PDF 导出所需 Node.js 运行时和渲染器也随包提供。
 
 ## 界面截图
 
-> 以下截图来自此前版本。2.2.3 改进了深色选中行和日志区；2.2.4 增强当前单元格边框与设置选项卡高亮；2.2.5 更新确认窗口适配深浅色主题；2.2.6 增加表格填充柄、整列批量操作，并移除可编辑的配合间隙列。
-
-
-以下为 GitHub Actions 在 Windows 环境实际运行生成的界面截图。图片已保存在仓库的 `assets/screenshots/` 中，可在 README 直接预览，不依赖会过期的 Actions 附件。
+以下截图保存在仓库的 `assets/screenshots/` 中，可直接在 GitHub 上预览，不依赖会过期的 Actions 附件。
 
 ### 主界面
 
-**浅色模式**
-
-![标准辊密封批量生成 - 主界面（浅色模式）](assets/screenshots/main-light.png)
-
-**深色模式（已修复参数表表头白色背景）**
-
-![标准辊密封批量生成 - 主界面（深色模式）](assets/screenshots/main-dark.png)
+<p align="center">
+  <img src="assets/screenshots/main-light.png" width="49%" alt="主界面浅色模式" />
+  <img src="assets/screenshots/main-dark.png" width="49%" alt="主界面深色模式" />
+</p>
 
 ### 出图设置
 
-**浅色模式**
+<p align="center">
+  <img src="assets/screenshots/settings-light.png" width="49%" alt="出图设置浅色模式" />
+  <img src="assets/screenshots/settings-dark.png" width="49%" alt="出图设置深色模式" />
+</p>
 
-![出图设置 - 浅色模式](assets/screenshots/settings-light.png)
+### 关于页面
 
-**深色模式**
+<p align="center">
+  <img src="assets/screenshots/about-light.png" width="49%" alt="关于页面浅色模式" />
+  <img src="assets/screenshots/about-dark.png" width="49%" alt="关于页面深色模式" />
+</p>
 
-![出图设置 - 深色模式](assets/screenshots/settings-dark.png)
+截图由 Windows UI 自动化检查生成。自动化还会检查深浅色模式、参数表选中单元格边框、填充柄、设置选项卡高亮、更新确认窗口和关于窗口布局。
 
-### 关于
+## 下载与安装
 
-**浅色模式**
+### Windows 桌面版
 
-![关于页面 - 浅色模式](assets/screenshots/about-light.png)
+1. 打开[最新正式版下载页](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases/latest)，根据电脑架构下载 `StandardRollerSeal-windows-amd64.zip` 或 `StandardRollerSeal-windows-arm64.zip`。
+2. **完整解压 ZIP**，不要只复制 EXE。程序需要同目录中的 `SolidCraft`、`PdfExporter`、`模板` 等文件。
+3. 运行 `标准辊密封批量生成.exe`。
+4. 选择输出目录，然后导入 `辊密封参数模板.csv` 或直接编辑参数表。
 
-**深色模式**
+### Linux 命令行版
 
-![关于页面 - 深色模式](assets/screenshots/about-dark.png)
+根据设备架构下载 `StandardRollerSeal-linux-amd64.tar.gz` 或 `StandardRollerSeal-linux-arm64.tar.gz)，解压后运行：
 
-[查看 Windows UI 截图自动测试](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions/workflows/ui-preview.yml)
+```sh
+./standard-roller-seal --help
+./standard-roller-seal --csv 辊密封参数模板.csv --output ./输出
+```
 
-## 使用
+路径包含空格时，请使用 shell 引号。Linux 版本没有图形界面。
 
-1. 首次启动自动选择内置的 `模板/标准辊密封.solidcraft`（用户提供的标准模板），主界面不再显示模板路径和选择按钮。选择输出文件夹，导入 `辊密封参数模板.csv` 或编辑参数表。
-2. 在“出图设置…”选择本地图框 DXF 和标注样式，默认 `_5`。PDF 需要外置 `gbenor.shx` 与 `gbcbig.shx`；默认字体目录为软件包 `模板/字体`，也可指定其他目录。字体文件不会随软件分发。
-   “标题栏属性”会读取 DXF 图框中的实际属性，包括图号、材料、设计、审核、日期等；支持嵌套标题栏。填写后用于本次全部零件；留空保留模板原值，图名留空继续按零件编号自动填写，设置会保存。
-3. 可分别填写 DXF 文件名和组合 STEP 名。留空使用当天 `辊密封_MMDD`，不用填写后缀。
-4. 勾选是否“合并 STEP”“导出当前任务 CSV”“覆盖已有文件”“完成后打开 DXF”或“同时导出 PDF”（默认不勾选、记住设置；SolidCraft 固定自动后台运行，无需手动启动）。选 PDF 时会同时生成 DXF。
-5. “生成并导出Step”生成各单件 SolidCraft、STEP，以及选中的组合 STEP/任务 CSV；“一键生成并导出 DXF”再将同目录零件 STEP 汇总出图，排除组合 STEP。勾选 PDF 后也会生成多页 A4 横向 PDF，每个零件图框一页。
+## 快速使用
 
-顶部“深色模式”提供“自动（跟随系统）／开／关”，立即应用于主窗口、出图设置、关于及许可页面，并记住选择。“自动”会响应系统主题变化。主题使用 .NET / Windows 原生颜色模式；原生深色模式仅在 Windows 11 及以上受支持，其他系统回退到系统浅色，避免混合自绘深色控件。
+1. **准备参数。** 导入模板 CSV，或在主界面直接编辑参数表。
+2. **设置出图参数。** 打开“出图设置”，选择 DXF 图框、标注样式和字体目录；如需 PDF，必须指定固定 A4 图框。
+3. **选择输出选项。** 按需启用组合 STEP、当前任务 CSV、覆盖已有文件、完成后打开 DXF 或同时导出 PDF。
+4. **生成文件。** “生成并导出 STEP”生成模型和 STEP；“一键生成并导出 DXF”批量生成加工图。启用 PDF 时也会生成对应 DXF。
 
-底部选项与生成/停止按钮按内容自适应高度，窗口缩小时选项可换行，剩余高度交给参数表。关于页采用紧凑的主题适配对话框排版，“检查更新”按钮左移并与窗口内容左边缘对齐，“关闭”保留在右侧；出图设置使用 Windows 原生选项卡组织图框与字体、标注与排布、标题栏属性。
+### 表格填充与快捷操作
 
-默认文件：
+- 拖动选区右下角的填充柄，可向上、下、左、右延伸，也可扩展为二维区域。
+- **单个数字单元格：** 默认复制；按住 Ctrl 填充递增序列。
+- **日期单元格：** 默认递增；按住 Ctrl 复制日期。
+- **多格矩形选区：** 默认延续数字、日期或编号后缀序列；按住 Ctrl 循环复制整个选区。
+- 拖动期间会显示目标区域和填充结果预览；松开鼠标提交填充，取消拖动则恢复原值。
+- **Ctrl+Z** 撤销；**Ctrl+Y** 或 **Ctrl+Shift+Z** 重做。
+- 单击勾选框即可切换。双击勾选列列头可全选/取消全选；双击其他列头可批量修改整列，编号列可按输入前缀自动编号。
 
-| 内容 | 文件名 |
+## 输出文件
+
+| 文件 | 用途 |
 | --- | --- |
-| 单件原生模型 | 辊密封_MMDD_编号.solidcraft |
-| 单件 STEP | 辊密封_MMDD_编号.step |
-| 组合 STEP（可关闭、可改名） | 辊密封_MMDD.step |
-| 汇总 DXF（可改名） | 辊密封_MMDD.dxf |
-| 多页加工图 PDF | 辊密封_MMDD.pdf |
-| 当前任务 CSV（可关闭） | 辊密封_MMDD.csv |
+| `辊密封_MMDD_编号.solidcraft` | 单件原生模型 |
+| `辊密封_MMDD_编号.step` | 单件 STEP 模型 |
+| `辊密封_MMDD.step` | 组合 STEP（可关闭、可自定义文件名） |
+| `辊密封_MMDD.dxf` | 汇总 DXF 加工图 |
+| `辊密封_MMDD.pdf` | 多页 A4 横向加工图 PDF |
+| `辊密封_MMDD.csv` | 当前任务参数快照（可关闭） |
 
-“当前任务 CSV”保留本次参数与编号。软件记住合并、CSV选项和自定义名称；默认名称每天自动更新日期。
+`MMDD` 是生成当天的月日。默认名称会自动更新日期；合并 STEP、CSV 导出和自定义名称等选项会记住上次设置。
 
-## Linux CLI
+## CSV 参数说明
 
-解压对应 amd64 或 arm64 安装包，在终端运行 `./standard-roller-seal --help` 查看参数。最少需要一个参数 CSV，默认使用内置标准辊密封模板；可用 `--template` 指定其他 V13 `.solidcraft` 模板：
+- 模板使用 **UTF-8 BOM**，单位为 **mm**；开关字段填写 `0` 或 `1`。
+- 当前模板为 18 列，包含 6 行有效示例。旧 14 列 CSV 与旧版 19 列 CSV 均可导入；旧文件末尾的配合间隙值会被忽略。
+- 四个可选尺寸列为 `子头宽`、`子头突出`、`母槽宽`、`母槽深`。填写数字时覆盖相应模板参数；留空时使用所选模板原始默认表达式。
+- 孔数允许整数或 `x.5`。小数孔只能选择一侧半孔；整数孔须左右都不选，或同时选择半孔。
+- 启用斜边时，斜边 Y 和斜边 Z 必须大于 0。
+- 配合间隙不再是可编辑列或批量输入参数。V13 模板内部仍可引用自身的间隙参数，保持原有公式行为。
+
+## DXF 与 PDF 出图
+
+- DXF 使用第一角投影布局，尺寸和标注由 STEP 几何数据生成；DXF 中的尺寸对象保持可编辑。
+- 默认标注样式为 `_5`。可在“出图设置”中选择本地图框、标注样式及标题栏属性；留空的标题栏字段保留模板原值。
+- 仅导出 DXF 时可以不提供图框模板。**导出 PDF 时必须提供固定 A4 图框的 DXF 模板**，每个加工图框排成一张 A4 横向页面。
+- PDF 字体需要用户自行提供且具有使用授权的 `gbenor.shx` 和 `gbcbig.shx`。字体不会随软件分发；可在出图设置中指定字体目录。
+- PDF 将文字按矢量轮廓绘制；DXF 仍可编辑。正式用于加工前，请用实际图纸核对字体、图框、标注和 Logo。
+
+## 运行环境与实现
+
+- Windows 桌面程序：WPF、.NET 10，自包含发布。
+- 三维建模：安装包附带官方 [SolidCraft 0.23 CLI](https://github.com/tangency-labs/solidcraft/releases/tag/v0.23.0)，后台运行，不需要手动打开 SolidCraft 窗口。
+- Linux：自包含 .NET CLI，支持 amd64 和 arm64。
+- PDF：使用开源 DXF 数据模型与矢量渲染器，并随安装包提供 Node.js 运行时；不包含 ODA 或专有 SDK。
+- 默认组合间距固定为 10 mm，后台控制端口固定为 7878。桌面版使用内置标准辊密封模型；CLI 可通过 `--template` 指定其他 V13 `.solidcraft` 模板。
+
+## Linux CLI 常用参数
 
 ```sh
 ./standard-roller-seal --csv 辊密封参数模板.csv --output ./输出
 ```
 
-常用选项：`--combine-step` 输出组合 STEP，`--export-current-csv` 保存本次实际尺寸，`--export-dxf --drawing-template ./模板/图框.dxf` 生成带图框加工图；`--export-pdf` 同时生成汇总 DXF 和每个图框一页的 A4 横向 PDF，需指定含固定 A4 图框的 `--drawing-template`。字体从软件包内 `模板/字体` 读取，也可用 `--font-dir ./字体目录` 指定用户外挂的 `gbenor.shx` 与 `gbcbig.shx`；字体不打包，文字绘制为矢量轮廓。`--dimension-style _5` 指定标注样式，`--overwrite` 覆盖同名文件。仅导出 DXF 时可不提供图框模板。输入与输出路径可使用空格，需用 shell 引号包住。
+常用参数：
 
-## 后台运行与模板
+| 参数 | 说明 |
+| --- | --- |
+| `--template 路径` | 指定其他 V13 `.solidcraft` 模板 |
+| `--output 路径` | 指定输出目录 |
+| `--combine-step` | 输出组合 STEP |
+| `--export-current-csv` | 保存当前任务参数 |
+| `--export-dxf` | 输出 DXF 加工图 |
+| `--drawing-template 路径` | 指定 DXF 图框模板 |
+| `--export-pdf` | 同时输出 DXF 和多页 PDF |
+| `--font-dir 路径` | 指定包含授权 SHX 字体的目录 |
+| `--dimension-style _5` | 指定标注样式 |
+| `--overwrite` | 覆盖同名文件 |
 
-后台模式自动启动独立 `solidcraft-cli mcp --headless` 会话，全程不打开 SolidCraft 窗口，完成或中止后关闭自己启动的后台进程，不操作已打开的桌面会话。软件包固定使用官方 0.23 CLI，避免新保存格式使旧桌面版无法打开。
+更多参数请运行 `./standard-roller-seal --help`。
 
-不显示后台运行、控制端口、组合间距或启动按钮。端口固定7878，组合间距固定10 mm。
-默认从软件所在目录的 `模板` 子文件夹识别内置 `标准辊密封.solidcraft`、DXF 模板和外置字体目录，缺少时再找工作目录的 `模板` 文件夹。桌面版固定使用内置标准模型；命令行版可用 `--template` 指定其他模型。发行包包含本次用户指定的标准模型，不包含私人 DXF 图框或字体文件。
+## 构建与测试
 
-官方说明：[MCP 无窗口会话](https://docs.solidcraft.io/guide/mcp.html)。官方发行：[SolidCraft 0.23](https://github.com/tangency-labs/solidcraft/releases/tag/v0.23.0)。
+正式安装包由 GitHub Actions 构建，发布 Windows x64/ARM64 桌面版和 Linux amd64/ARM64 CLI。Windows 2022 与 Windows 2025 工作流会执行构建、核心检查和 UI 外观验证。
 
-## CSV 参数
+本地构建桌面项目需要 .NET 10 SDK：
 
-模板为 UTF-8 BOM，18 列，6 行有效示例；开关填 0/1。孔数允许整数与 x.5：小数孔只能选择一侧半孔，整数孔须左右都不选或同时选半孔。启用斜边时斜边Y、斜边Z必须大于0。单位 mm。
+```powershell
+dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.3.0
+```
 
-提供四个可选尺寸列：`子头宽`、`子头突出`、`母槽宽`、`母槽深`。填数字时覆盖对应模板参数；空白时每行恢复所选模板的原始默认表达式。模板内的母槽宽公式仍按原表达式计算，配合间隙不再作为可编辑列或批量输入参数。旧14列CSV与旧版19列CSV均可导入，旧文件末尾的配合间隙值会被忽略。
-
-V13 模板的母槽宽默认表达式会继续引用模板内部的间隙参数；该参数由模板自身提供，不再暴露为表格列。当前任务 CSV 仅记录四个可编辑尺寸的实际值，方便复现。
-
-表格交互：拖动选区右下角的小填充柄可向上、下、左、右延伸，也支持二维填充。单个数字默认复制、按住 Ctrl 递增；日期默认递增、按住 Ctrl 复制；选中多格时默认延续数字/日期/编号后缀序列，按住 Ctrl 则循环复制选区。双击勾选列列头可全选/取消全选；双击其他列头可批量修改整列，编号列会按输入前缀自动编号。
-
-## DXF
-
-第一角投影，主视图右侧放左视图，上视图放下方。主视图左侧总高，右侧不放尺寸；左视图仅宽、高和斜角。上视图首尾间距由中间完整孔边线校准，母槽即使隐藏或拆段也保留尺寸，槽深文字紧靠槽口，过滤多余的1.11/1.26 mm细节。
-
-图框与标题栏全部文字使用 gbenor.shx/gbcbig.shx；图名只保留在标题栏，编号从单件文件名提取。`_5`标注样式从本地模板复制，隐藏线比例与间距可调。每零件一张图框，全部纵向排入汇总 DXF。
-
-DXF 使用 netDxf 生成 AutoCAD 2010 完整对象与原生可编辑 DIMENSION；图框内 Logo 的实心填充会保留闭合边界。数值来自 STEP 几何，制造前请核对实际图纸。
-
-PDF 使用 MLightCAD 的开源 MIT DXF 数据模型、SHX/BigFont 字体渲染与矢量 PDF 渲染器。渲染依赖会预先打包成单个 JS 文件，安装包不带完整 `node_modules`。需提供含固定 A4 图框的 DXF 模板。生成时按每个独立加工图框排成一张 A4 横向页面，并将多页合并。PDF 中字体以矢量轮廓绘制；加工使用前请用实际图纸核对图框、标注和 Logo。可在“出图设置”指定外置字体目录；如果目录中含 `fonts.json`，可为 BigFont 指定编码。无 `fonts.json` 时，`gbcbig.shx` 默认按 GBK 读取。软件包包含依赖锁文件与许可证，便于追溯组件。
-
-## 构建和检查
-
-2.2.3 正式版由 GitHub Actions 构建并发布 Windows amd64/arm64 桌面包和 Linux amd64/arm64 CLI 包。开发分支仍可单独构建预览包。Linux CLI 项目位于 `src/SolidCraftCli/`，自包含 .NET，并调用随包的官方 SolidCraft CLI；PDF 转换随包附带开源 Node.js 运行时及 MLightCAD 渲染器。仅将用户指定的标准辊密封模型作为内置模板；其他私人模型、图框及 SHX 字体不上传仓库。
-
-文件名并排显示，生成与停止按钮放在底部导出选项同一行；半孔说明移到状态栏，不再显示大标题。SolidCraft 自动启动，控制端口固定7878，组合间距固定10 mm，界面不再提供端口和间距输入。
-
-当前单元格用蓝色外框定位；状态栏说明在进度条左侧。SolidCraft 模板标签、顶部右侧关于按钮及关于界面已加入，程序和窗口使用用户确认的实心浅玻璃辊密封图标。可编辑SVG源见 assets/roller-seal-icon.svg。
-
-项目主页：https://github.com/EventHorizon-13/solidcraft-roller-seal 。程序文件、窗口与关于界面名称统一为“标准辊密封批量生成”。
+第三方组件及许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。项目主页：[GitHub](https://github.com/EventHorizon-13/solidcraft-roller-seal)。
