@@ -263,6 +263,12 @@ public partial class MainWindow : Window
         }
     }
 
+    internal void SelectSmokeRow()
+    {
+        grid.SelectedIndex=0;
+        if(grid.SelectedItem!=null)grid.ScrollIntoView(grid.SelectedItem);
+    }
+    internal void ClearSmokeSelection()=>grid.UnselectAll();
     internal void LoadSmokeRows()
     {
         string csv=Path.Combine(AppContext.BaseDirectory,"辊密封参数模板.csv");
@@ -272,6 +278,7 @@ public partial class MainWindow : Window
     {
         if(grid.Columns.Count!=ModelRules.Columns.Length||table.Rows.Count<1)throw new InvalidOperationException("参数表初始化失败。");
         ModelRules.Validate(GetRows());
+        if(log.ActualHeight<85)throw new InvalidOperationException("日志窗口默认高度过小。");
         if(!run.IsEnabled||!runDxf.IsEnabled||stop.IsEnabled)throw new InvalidOperationException("初始按钮状态不正确。");
         if(table.Rows.Count==6&&!GetRows().Select(r=>r[0]).SequenceEqual(new[]{"1","2","3","4","5","6"}))throw new InvalidOperationException("编号必须完整且唯一。");
     }
