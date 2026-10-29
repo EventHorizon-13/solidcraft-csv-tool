@@ -74,6 +74,14 @@
    </DataGrid.CellStyle>
   </DataGrid>
   <Canvas x:Name="fillOverlay" Background="{x:Null}" IsHitTestVisible="True">
+   <Border x:Name="fillPreviewBorder" Visibility="Collapsed" IsHitTestVisible="False"
+     BorderBrush="{DynamicResource GridCurrentCellBorderBrush}" BorderThickness="2" Background="{x:Null}"/>
+   <Border x:Name="fillPreviewBadge" Visibility="Collapsed" IsHitTestVisible="False"
+     Background="{DynamicResource WindowBackground}" BorderBrush="{DynamicResource GridCurrentCellBorderBrush}"
+     BorderThickness="1" CornerRadius="4" Padding="8,4">
+    <TextBlock x:Name="fillPreviewText" Foreground="{DynamicResource GridSelectionForegroundBrush}"
+      FontSize="12" TextWrapping="Wrap" MaxWidth="340"/>
+   </Border>
    <Thumb x:Name="fillHandle" Width="8" Height="8" Visibility="Collapsed" Cursor="Cross"
      DragStarted="FillDragStarted" DragDelta="FillDragDelta" DragCompleted="FillDragCompleted">
     <Thumb.Template>
