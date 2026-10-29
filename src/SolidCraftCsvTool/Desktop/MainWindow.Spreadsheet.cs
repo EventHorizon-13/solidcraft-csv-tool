@@ -142,6 +142,7 @@ public partial class MainWindow
             int count=FillCells(fillSourceCells,row,column,controlDown);
             if(count>0)
             {
+                SelectFillRange(fillSourceCells,row,column);
                 string mode=controlDown?"Ctrl 模式":"默认模式";
                 SetStatus($"已填充 {count} 个单元格（{mode}）。");
                 Log($"表格填充完成：{count} 个单元格，{mode}。");
@@ -152,6 +153,17 @@ public partial class MainWindow
         {
             fillDragging=false;fillSourceCells.Clear();ScheduleFillHandleUpdate();
         }
+    }
+
+    void SelectFillRange(IReadOnlyList<CellPosition> source,int targetRow,int targetColumn)
+    {
+        int top=Math.Min(source.Min(c=>c.Row),targetRow),bottom=Math.Max(source.Max(c=>c.Row),targetRow);
+        int left=Math.Min(source.Min(c=>c.Column),targetColumn),right=Math.Max(source.Max(c=>c.Column),targetColumn);
+        grid.SelectedCells.Clear();
+        for(int row=top;row<=bottom;row++)
+            for(int column=left;column<=right;column++)
+                grid.SelectedCells.Add(new DataGridCellInfo(grid.Items[row],grid.Columns[column]));
+        grid.CurrentCell=new DataGridCellInfo(grid.Items[targetRow],grid.Columns[targetColumn]);
     }
 
     int FillCells(IReadOnlyList<CellPosition> source,int targetRow,int targetColumn,bool controlDown)
