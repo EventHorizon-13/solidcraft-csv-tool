@@ -83,6 +83,35 @@ Check(!MachiningDxf.IsCoveredByArcFragment(ArcPoint(349.0), ArcPoint(350.5),
     new(0, 0), 45, 350, 20),
     "Arc overlap checks must preserve chords crossing a wrapped start");
 
+// Geometry-based regression: join ARC fragments with circular LINE chords,
+// replacing them by exactly one editable R45 ARC (semicircle, not polylines).
+var arcFragments = new[]
+{
+    new MachiningDxf.ArcPath(new(0, 0), 45, 180, 65, "VISIBLE"),
+    new MachiningDxf.ArcPath(new(0, 0), 45, 250, 110, "VISIBLE")
+};
+Line2 Chord(double start, double end) => new(ArcPoint(start), ArcPoint(end), "VISIBLE");
+var circleChords = new[] { Chord(245, 246.6666667), Chord(246.6666667, 248.3333333),
+    Chord(248.3333333, 250), new Line2(new(5, 5), new(6, 6), "VISIBLE") };
+var repaired = MachiningDxf.MergeCircularFragments(arcFragments, circleChords);
+Check(repaired.Arcs.Count == 1, "circular fragments and short chords must become one ARC");
+Check(Math.Abs(repaired.Arcs[0].StartDegrees - 180) < 1e-4 &&
+      Math.Abs(repaired.Arcs[0].SweepDegrees - 180) < 1e-4,
+      "a broken R45 semicircle must become exactly 180 degrees");
+Check(repaired.ConsumedLines.SetEquals(new[] { 0, 1, 2 }),
+      "consume just the three circular chords, preserving unrelated geometry");
+var unbridged = MachiningDxf.MergeCircularFragments(arcFragments, []);
+Check(unbridged.Arcs.Count == 2, "never fabricate an arc across an unsupported gap");
+var quarter = MachiningDxf.MergeCircularFragments(
+    [new MachiningDxf.ArcPath(new(0, 0), 45, 270, 90, "VISIBLE")], []);
+Check(quarter.Arcs.Count == 1 && Math.Abs(quarter.Arcs[0].SweepDegrees - 90) < 1e-6,
+      "true quarter circles must not be forced into semicircles");
+var seam = MachiningDxf.MergeCircularFragments(
+    [new MachiningDxf.ArcPath(new(0, 0), 45, 350, 10, "VISIBLE"),
+     new MachiningDxf.ArcPath(new(0, 0), 45, 0, 15, "VISIBLE")], []);
+Check(seam.Arcs.Count == 1 && Math.Abs(seam.Arcs[0].SweepDegrees - 25) < 1e-6,
+      "consecutive arcs across the 360-degree seam must merge without becoming a full circle");
+
 string[] Row(string holes, string left, string right) { var row = ModelRules.DefaultRow(); row[1] = holes; row[8] = left; row[9] = right; return row; }
 
 foreach (string holes in new[] { "4.5", "5.5" })
