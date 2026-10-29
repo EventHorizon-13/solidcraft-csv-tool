@@ -23,7 +23,7 @@ jobs:
       - name: Compile Fluent desktop and run core checks
         shell: pwsh
         run: |
-          dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.2.4
+          dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.2.5
           if ($LASTEXITCODE -ne 0) { throw 'Fluent desktop build failed' }
           dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
           if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }
@@ -35,7 +35,7 @@ jobs:
           New-Item -ItemType Directory -Force work/ui-previews | Out-Null
           $app = Join-Path $appDir '标准辊密封批量生成.exe'
           $shots = Join-Path $env:GITHUB_WORKSPACE 'work/ui-previews'
-          $process = Start-Process $app -ArgumentList '--smoke-test', '--screenshot', (Join-Path $shots 'window.png'), '--minimum-screenshot', (Join-Path $shots 'minimum.png'), '--dark-screenshot', (Join-Path $shots 'dark.png'), '--about-screenshot', (Join-Path $shots 'about.png'), '--settings-screenshot', (Join-Path $shots 'settings.png') -PassThru
+          $process = Start-Process $app -ArgumentList '--smoke-test', '--screenshot', (Join-Path $shots 'window.png'), '--minimum-screenshot', (Join-Path $shots 'minimum.png'), '--dark-screenshot', (Join-Path $shots 'dark.png'), '--about-screenshot', (Join-Path $shots 'about.png'), '--update-prompt-screenshot', (Join-Path $shots 'update-prompt.png'), '--settings-screenshot', (Join-Path $shots 'settings.png') -PassThru
           if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Fluent appearance check timed out' }
           if ($process.ExitCode -ne 0) {
             $errorFile = Join-Path $appDir 'smoke-error.txt'
