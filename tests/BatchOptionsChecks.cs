@@ -66,7 +66,7 @@ internal static class BatchOptionsChecks
             await Exporter.RunAsync(new(ModelRules.Validate(rows),seed,two,7878,10,true,false,"1027","自定义组合.step",false),progress,CancellationToken.None);
             if(!File.Exists(Path.Combine(two,"自定义组合.step"))||Directory.EnumerateFiles(two,"*.csv").Any())throw new Exception("Merge/disable-CSV options ignored.");
             var files=BatchDrawingInputs.FromFolder(two,"自定义组合.step");if(files.Length!=2)throw new Exception("Custom merged STEP must not be projected as a part.");
-            var nativeFiles=rows.Select(r=>Path.Combine(two,OutputNames.Part(r.Name,"1027")+".solidcraft")).ToArray();
+            var nativeFiles=rows.Select(r=>Path.Combine(two,OutputNames.Part(r[0],"1027")+".solidcraft")).ToArray();
             await StepDrawingExporter.RunAsync(nativeFiles,two,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="native-source-drawing"});
             var nativeDrawing=DxfDocument.Load(Path.Combine(two,"native-source-drawing.dxf"))??throw new Exception("Direct native SolidCraft projection failed.");
             await StepDrawingExporter.RunAsync(files,two,7878,progress,CancellationToken.None,new(){IncludeFrame=false,OutputFileName="step-source-drawing"});
