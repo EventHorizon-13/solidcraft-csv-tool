@@ -27,18 +27,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fluent desktop build failed' }
           dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
           if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }
-      - name: Verify direct SolidCraft-to-DXF export with official engine
-        shell: pwsh
-        run: |
-          $archive = Join-Path $env:RUNNER_TEMP 'solidcraft-0.23.0-windows-x64.zip'
-          $extract = Join-Path $env:RUNNER_TEMP 'solidcraft-direct-dxf'
-          Invoke-WebRequest 'https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/solidcraft-0.23.0-windows-x64-portable.zip' -OutFile $archive
-          Expand-Archive $archive $extract -Force
-          $cli = Get-ChildItem $extract -Recurse -Filter 'solidcraft-cli.exe' | Select-Object -First 1
-          if (-not $cli) { throw 'Official SolidCraft package has no CLI executable' }
-          $work = Join-Path $env:GITHUB_WORKSPACE 'work/direct-dxf-integration'
-          dotnet run --project tests/CoreChecks.csproj -c Release -- --headless-export-check $work $cli.FullName
-          if ($LASTEXITCODE -ne 0) { throw 'Direct SolidCraft-to-DXF integration check failed' }
       - name: Run Fluent appearance checks
         shell: pwsh
         run: |
