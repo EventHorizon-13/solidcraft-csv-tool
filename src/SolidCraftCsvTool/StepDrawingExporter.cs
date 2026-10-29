@@ -112,10 +112,24 @@ public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outpu
     {
         Directory.CreateDirectory(work);
         progress.Report(new($"正在从当前模型提取三视图 {index + 1}：{name}", index));
-        Projection2 front = await ExportProjection(client, work, $"{index:D4}-front.dxf", "front", cancellation);
-        Projection2 top = await ExportProjection(client, work, $"{index:D4}-top.dxf", "top", cancellation);
-        Projection2 end = await ExportProjection(client, work, $"{index:D4}-left.dxf", "left", cancellation);
-        return new(name, front, top, end, DxfFeatureDetector.Analyze(front, top));
+        try
+        {
+            Projection2 front = await ExportProjection(client, work, $"{index:D4}-front.dxf", "front", cancellation);
+            Projection2 top = await ExportProjection(client, work, $"{index:D4}-top.dxf", "top", cancellation);
+            Projection2 end = await ExportProjection(client, work, $"{index:D4}-left.dxf", "left", cancellation);
+            return new(name, front, top, end, DxfFeatureDetector.Analyze(front, top));
+        }
+        finally
+        {
+            // Reset the viewport before the next parameter row is saved, so the
+            // native model preview does not accidentally retain the left view.
+            try
+            {
+                if (client.IsHeadless) await client.ExecuteAsync("view.apply", new { view = "iso" });
+                else await client.RequestAsync("ui.view", new { view = "iso", animate = false });
+            }
+            catch (IOException) { }
+        }
     }
 
     internal static async Task WritePagesAsync(IReadOnlyList<StepDrawingPage> pages, string outputFolder, string work,
