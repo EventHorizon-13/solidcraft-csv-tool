@@ -88,7 +88,8 @@ internal sealed class AboutWindow : Window
             var release=await UpdateService.GetLatestAsync();
             if(!UpdateService.IsNewer(release)){status.Text="已是最新版本";return;}
             if(!release.Target.CanInstallInPlace){OpenLink(release.PageUrl);return;}
-            if(MessageBox.Show(this,$"发现新版本 {release.Version}（当前 {AppBuildInfo.Version}）。\n下载并更新后程序会自动重新启动。","发现新版本",MessageBoxButton.YesNo,MessageBoxImage.Information)!=MessageBoxResult.Yes)return;
+            var prompt=new UpdatePromptWindow(release.Version,AppBuildInfo.Version){Owner=this};
+            if(prompt.ShowDialog()!=true)return;
             string install=Path.GetDirectoryName(Environment.ProcessPath??"")??AppContext.BaseDirectory;
             string probe=Path.Combine(install,".update-permission-"+Guid.NewGuid().ToString("N"));
             try{using(File.Create(probe)){}File.Delete(probe);}
