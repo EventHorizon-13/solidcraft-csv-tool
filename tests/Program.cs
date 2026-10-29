@@ -56,6 +56,33 @@ int checks = 0;
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }
 void Reject(Action action, string message) { try { action(); } catch (InvalidDataException) { checks++; return; } throw new Exception(message); }
 JsonElement Json(string value) { using var doc = JsonDocument.Parse(value); return doc.RootElement.Clone(); }
+
+// Regression: R45 arcs had 0.95 mm and longer gaps after short chords just
+// outside fitted ARC endpoints were wrongly suppressed.
+Point2 ArcPoint(double angle)
+{
+    double radians = angle * Math.PI / 180.0;
+    return new(45 * Math.Cos(radians), 45 * Math.Sin(radians));
+}
+Check(!MachiningDxf.IsCoveredByArcFragment(ArcPoint(284.3658), ArcPoint(285.5742),
+    new(0, 0), 45, 221.7219, 284.3658 - 221.7219),
+    "R45 circle chord AFTER the fitted endpoint must not disappear");
+Check(!MachiningDxf.IsCoveredByArcFragment(ArcPoint(180.0), ArcPoint(180.858),
+    new(0, 0), 45, 185.291, 221.722 - 185.291),
+    "R45 circle chord BEFORE the fitted start must not disappear");
+Check(!MachiningDxf.IsCoveredByArcFragment(ArcPoint(284.0), ArcPoint(285.0),
+    new(0, 0), 45, 221.722, 284.366 - 221.722),
+    "R45 chord crossing arc endpoint must be preserved");
+Check(MachiningDxf.IsCoveredByArcFragment(ArcPoint(260.0), ArcPoint(261.0),
+    new(0, 0), 45, 221.722, 284.366 - 221.722),
+    "R45 chord fully covered by an arc should be deduplicated");
+Check(MachiningDxf.IsCoveredByArcFragment(ArcPoint(355.0), ArcPoint(356.0),
+    new(0, 0), 45, 350, 20),
+    "Arc overlap checks must handle the 360-degree seam");
+Check(!MachiningDxf.IsCoveredByArcFragment(ArcPoint(349.0), ArcPoint(350.5),
+    new(0, 0), 45, 350, 20),
+    "Arc overlap checks must preserve chords crossing a wrapped start");
+
 string[] Row(string holes, string left, string right) { var row = ModelRules.DefaultRow(); row[1] = holes; row[8] = left; row[9] = right; return row; }
 
 foreach (string holes in new[] { "4.5", "5.5" })
