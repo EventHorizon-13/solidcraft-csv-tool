@@ -42,7 +42,7 @@ jobs:
         if: matrix.arch == 'amd64'
         shell: pwsh
         run: |
-          dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
+          dotnet run --project tests/CoreChecks.csproj -c Release "-p:Version=$env:BUILD_VERSION" -- work/core-checks
           if ($LASTEXITCODE -ne 0) { throw 'Core and semicircle regression checks failed' }
       - name: Install open-source PDF renderer
         shell: pwsh
