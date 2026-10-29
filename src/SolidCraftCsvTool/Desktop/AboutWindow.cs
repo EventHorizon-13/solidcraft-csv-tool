@@ -12,33 +12,37 @@ internal sealed class AboutWindow : Window
     internal AboutWindow()
     {
         SetResourceReference(BackgroundProperty,"WindowBackground");
-        Title="关于";Width=480;SizeToContent=SizeToContent.Height;
+        Title="关于";Width=520;SizeToContent=SizeToContent.Height;
         ResizeMode=ResizeMode.NoResize;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FontFamily=new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;
 
         var root=new Grid{Margin=new Thickness(24,20,24,20)};
-        Content=root;
+        root.ColumnDefinitions.Add(new ColumnDefinition{Width=46});
+        root.ColumnDefinitions.Add(new ColumnDefinition{Width=16});
+        root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         for(int i=0;i<3;i++)root.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
+        Content=root;
 
-        var header=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,0,0,18)};
-        header.Children.Add(new Image
+        var icon=new Image
         {
             Source=new BitmapImage(new Uri("pack://application:,,,/Assets/AppIcon.png")),
-            Width=46,Height=46,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,0,16,0)
-        });
-        var title=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
-        title.Children.Add(new TextBlock{Text=AppBuildInfo.ProductName,FontWeight=FontWeights.SemiBold,FontSize=17});
-        title.Children.Add(new TextBlock{Text="版本 "+AppBuildInfo.Version,FontSize=12,Opacity=0.70,Margin=new Thickness(0,5,0,0)});
-        header.Children.Add(title);root.Children.Add(header);
+            Width=46,Height=46,VerticalAlignment=VerticalAlignment.Top
+        };
+        Grid.SetColumn(icon,0);Grid.SetRowSpan(icon,2);root.Children.Add(icon);
 
-        var details=new Grid();
-        details.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(76)});
+        var header=new StackPanel{VerticalAlignment=VerticalAlignment.Center};
+        header.Children.Add(new TextBlock{Text=AppBuildInfo.ProductName,FontWeight=FontWeights.SemiBold,FontSize=17});
+        header.Children.Add(new TextBlock{Text="版本 "+AppBuildInfo.Version,FontSize=12,Opacity=.70,Margin=new Thickness(0,5,0,0)});
+        Grid.SetColumn(header,2);root.Children.Add(header);
+
+        var details=new Grid{Margin=new Thickness(0,12,0,0)};
+        details.ColumnDefinitions.Add(new ColumnDefinition{Width=84});
         details.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         for(int i=0;i<4;i++)details.RowDefinitions.Add(new RowDefinition{Height=new GridLength(30)});
-        Grid.SetRow(details,1);root.Children.Add(details);
+        Grid.SetRow(details,1);Grid.SetColumn(details,2);root.Children.Add(details);
         static TextBlock Label(string text)=>new()
         {
-            Text=text,Opacity=0.68,VerticalAlignment=VerticalAlignment.Center
+            Text=text,Opacity=.68,VerticalAlignment=VerticalAlignment.Center
         };
         void AddDetail(int row,string label,TextBlock value)
         {
@@ -58,7 +62,7 @@ internal sealed class AboutWindow : Window
         actions.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
         actions.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         actions.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
-        Grid.SetRow(actions,2);root.Children.Add(actions);
+        Grid.SetRow(actions,2);Grid.SetColumn(actions,2);root.Children.Add(actions);
 
         var check=new Button{Content="检查更新",Padding=new Thickness(14,6,14,6)};
         var status=new TextBlock{Margin=new Thickness(12,0,12,0),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};
@@ -84,7 +88,7 @@ internal sealed class AboutWindow : Window
             var release=await UpdateService.GetLatestAsync();
             if(!UpdateService.IsNewer(release)){status.Text="已是最新版本";return;}
             if(!release.Target.CanInstallInPlace){OpenLink(release.PageUrl);return;}
-            if(MessageBox.Show(this,$"发现新版本 {release.Version}（当前 {AppBuildInfo.Version}）。\n下载并更新后程序会自动重新启动。","发现新版本",MessageBoxButton.YesNo,MessageBoxImage.Information)!=MessageBoxResult.Yes)return;
+            if(MessageBox.Show(this,$"发现新版本 {release.Version}（当前 {AppBuildInfo.Version}）。\\n下载并更新后程序会自动重新启动。","发现新版本",MessageBoxButton.YesNo,MessageBoxImage.Information)!=MessageBoxResult.Yes)return;
             string install=Path.GetDirectoryName(Environment.ProcessPath??"")??AppContext.BaseDirectory;
             string probe=Path.Combine(install,".update-permission-"+Guid.NewGuid().ToString("N"));
             try{using(File.Create(probe)){}File.Delete(probe);}
