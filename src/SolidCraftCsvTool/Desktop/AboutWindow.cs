@@ -17,8 +17,8 @@ internal sealed class AboutWindow : Window
         FontFamily=new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei UI");FontSize=13;
 
         var root=new Grid{Margin=new Thickness(24,20,24,20)};
-        root.ColumnDefinitions.Add(new ColumnDefinition{Width=46});
-        root.ColumnDefinitions.Add(new ColumnDefinition{Width=16});
+        root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(46)});
+        root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(16)});
         root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         for(int i=0;i<3;i++)root.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
         Content=root;
@@ -36,7 +36,7 @@ internal sealed class AboutWindow : Window
         Grid.SetColumn(header,2);root.Children.Add(header);
 
         var details=new Grid{Margin=new Thickness(0,12,0,0)};
-        details.ColumnDefinitions.Add(new ColumnDefinition{Width=84});
+        details.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(84)});
         details.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         for(int i=0;i<4;i++)details.RowDefinitions.Add(new RowDefinition{Height=new GridLength(30)});
         Grid.SetRow(details,1);Grid.SetColumn(details,2);root.Children.Add(details);
