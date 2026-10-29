@@ -1,4 +1,6 @@
 using System.IO;
+using Microsoft.Win32;
+using System.Windows.Media;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -11,17 +13,53 @@ public partial class DesktopApp : Application
 {
     // Microsoft documents ThemeMode as the Fluent theme entry point; .NET 10 still marks the API as evaluation.
 #pragma warning disable WPF0001
-    internal static void SetAppearance(AppearanceMode mode)=>Current.ThemeMode=mode switch
+    static AppearanceMode selectedAppearance=AppearanceMode.Automatic;
+    internal static void SetAppearance(AppearanceMode mode)
     {
-        AppearanceMode.Dark=>System.Windows.ThemeMode.Dark,
-        AppearanceMode.Light=>System.Windows.ThemeMode.Light,
-        _=>System.Windows.ThemeMode.System
-    };
+        selectedAppearance=mode;
+        Current.ThemeMode=mode switch
+        {
+            AppearanceMode.Dark=>System.Windows.ThemeMode.Dark,
+            AppearanceMode.Light=>System.Windows.ThemeMode.Light,
+            _=>System.Windows.ThemeMode.System
+        };
+        ApplySelectionPalette();
+    }
+
+    static void ApplySelectionPalette()
+    {
+        bool dark=selectedAppearance==AppearanceMode.Dark ||
+            selectedAppearance==AppearanceMode.Automatic && SystemUsesDarkApps();
+        SetBrush("GridSelectionBackgroundBrush",dark?"#394759":"#DDEBFA");
+        SetBrush("GridSelectionForegroundBrush",dark?"#F4F7FC":"#18283D");
+        SetBrush("GridSelectionBorderBrush",dark?"#62758B":"#9CB7D4");
+    }
+
+    static void SetBrush(string key,string hex)
+    {
+        Current.Resources[key]=new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+    }
+
+    static bool SystemUsesDarkApps()
+    {
+        try
+        {
+            return Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "AppsUseLightTheme",1) is int value && value==0;
+        }
+        catch{return false;}
+    }
 #pragma warning restore WPF0001
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        // System theme changes update WPF automatically; keep custom selection brushes synchronized.
+        SystemEvents.UserPreferenceChanged+=(_,_)=>Dispatcher.BeginInvoke(new Action(()=>
+        {
+            if(selectedAppearance==AppearanceMode.Automatic)ApplySelectionPalette();
+        }));
         if(e.Args.Length==4&&e.Args[0]=="--apply-update")
         {try{Shutdown(UpdateInstaller.Apply(e.Args));}catch(Exception ex){MessageBox.Show(ex.Message,"更新失败");Shutdown(1);}return;}
         if(e.Args.Length==3&&e.Args[0]=="--cleanup-update")UpdateInstaller.CleanupStage(e.Args);
