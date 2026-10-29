@@ -37,7 +37,7 @@ jobs:
           $cli = Get-ChildItem $extract -Recurse -Filter 'solidcraft-cli.exe' | Select-Object -First 1
           if (-not $cli) { throw 'Official SolidCraft package has no CLI executable' }
           $work = Join-Path $env:GITHUB_WORKSPACE 'work/direct-dxf-integration'
-          dotnet run --project tests/CoreChecks.csproj -c Release -- --headless-export-check $work $cli.FullName
+          dotnet run --project tests/CoreChecks.csproj -c Release -- --headless-export-check $work "$($cli.FullName)"
           if ($LASTEXITCODE -ne 0) { throw 'Direct SolidCraft-to-DXF integration check failed' }
       - name: Run Fluent appearance checks
         shell: pwsh
