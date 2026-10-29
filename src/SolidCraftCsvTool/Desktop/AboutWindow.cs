@@ -62,7 +62,7 @@ internal sealed class AboutWindow : Window
         actions.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
         actions.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(1,GridUnitType.Star)});
         actions.ColumnDefinitions.Add(new ColumnDefinition{Width=GridLength.Auto});
-        Grid.SetRow(actions,2);Grid.SetColumn(actions,2);root.Children.Add(actions);
+        Grid.SetRow(actions,2);Grid.SetColumn(actions,0);Grid.SetColumnSpan(actions,3);root.Children.Add(actions);
 
         var check=new Button{Content="检查更新",Padding=new Thickness(14,6,14,6)};
         var status=new TextBlock{Margin=new Thickness(12,0,12,0),VerticalAlignment=VerticalAlignment.Center,TextTrimming=TextTrimming.CharacterEllipsis};
