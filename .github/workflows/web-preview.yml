@@ -220,21 +220,6 @@ jobs:
           path: dist/release-assets
           merge-multiple: true
 
-      - name: Bundle Source Han Sans SC (SIL OFL)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist/app/PdfExporter/fonts
-          curl --fail --location --retry 3 https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/Variable/TTF/SourceHanSansSC-VF.ttf --output dist/SourceHanSansSC-VF.ttf
-          curl --fail --location --retry 3 https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/LICENSE.txt --output dist/app/PdfExporter/fonts/LICENSE-SourceHanSans.txt
-          python3 -m venv work/font-tools
-          work/font-tools/bin/pip install 'fonttools[woff]==4.60.1'
-          work/font-tools/bin/fonttools varLib.instancer dist/SourceHanSansSC-VF.ttf wght=400 --output dist/app/PdfExporter/fonts/SourceHanSansSC-Regular.ttf
-          cat src/SolidCraftWeb/wwwroot/index.html src/SolidCraftWeb/wwwroot/app.js src/SolidCraftCsvTool/*.cs > work/ui-font-text.txt
-          mkdir -p dist/app/wwwroot/fonts
-          work/font-tools/bin/pyftsubset dist/app/PdfExporter/fonts/SourceHanSansSC-Regular.ttf --text-file=work/ui-font-text.txt --unicodes=U+0020-00FF --flavor=woff2 --output-file=dist/app/wwwroot/fonts/SourceHanSansSC-UI.woff2
-          cp dist/app/PdfExporter/fonts/LICENSE-SourceHanSans.txt dist/app/wwwroot/fonts/LICENSE.txt
-
       - name: Publish Web preview pre-release
         shell: bash
         env:
