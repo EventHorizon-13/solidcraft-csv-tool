@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>标准辊密封批量生成 · Web Preview</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>标准辊密封批量生成</h1>
+    <p>Web Preview · Linux 后端</p>
+  </div>
+  <div class="connection">
+    <input id="apiToken" type="password" autocomplete="off" placeholder="API 令牌（如已启用）">
+    <button id="connectBtn" type="button">连接</button>
+    <span id="connectionState">正在连接…</span>
+  </div>
+</header>
+
+<main>
+  <section class="panel toolbar">
+    <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
+    <button id="importBtn" type="button">导入 CSV</button>
+    <button id="addBtn" type="button">新增一行</button>
+    <button id="validateBtn" type="button">检查参数</button>
+    <span id="rowCount">0 行</span>
+  </section>
+
+  <section class="panel table-panel">
+    <div class="table-wrap">
+      <table id="grid" aria-label="辊密封参数表">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint">支持从 WPS/Excel 复制多格后直接粘贴到单元格；开关列使用复选框。</p>
+  </section>
+
+  <section class="layout">
+    <section class="panel settings">
+      <h2>输出设置</h2>
+      <div class="check-row">
+        <label><input id="combineStep" type="checkbox"> 合并 STEP</label>
+        <label><input id="exportCsv" type="checkbox"> 保存任务 CSV</label>
+        <label><input id="exportPdf" type="checkbox"> 同时导出 PDF</label>
+      </div>
+      <div class="fields">
+        <label>DXF 文件名<input id="dxfName" type="text" maxlength="180"></label>
+        <label>组合 STEP 文件名<input id="stepName" type="text" maxlength="180"></label>
+        <label>标注样式<input id="dimensionStyle" type="text" maxlength="40"></label>
+        <label>隐藏线比例<input id="hiddenLineScale" type="number" min="0.05" max="100" step="0.05"></label>
+        <label>视图间距 mm<input id="viewGap" type="number" min="10" max="5000" step="1"></label>
+      </div>
+      <div class="actions">
+        <button id="stepBtn" type="button" class="primary">生成 STEP</button>
+        <button id="dxfBtn" type="button" class="primary">生成 DXF / PDF</button>
+      </div>
+      <p id="capabilities" class="hint"></p>
+    </section>
+
+    <section class="panel job">
+      <h2>任务</h2>
+      <div class="job-status">
+        <strong id="jobState">未开始</strong>
+        <span id="jobMessage"></span>
+      </div>
+      <progress id="jobProgress" value="0" max="1"></progress>
+      <div class="actions">
+        <button id="cancelBtn" type="button" disabled>取消任务</button>
+        <a id="downloadBtn" class="button-link disabled" aria-disabled="true">下载结果 ZIP</a>
+      </div>
+      <pre id="log" aria-live="polite"></pre>
+    </section>
+  </section>
+</main>
+
+<script src="/app.js" defer></script>
+</body>
+</html>
