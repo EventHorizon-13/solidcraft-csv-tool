@@ -1,5 +1,5 @@
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
@@ -36,7 +36,7 @@ with sync_playwright() as p:
             checkbox.check()
         for selector,kind in [('#dxfBtn','dxf'),('#pdfBtn','pdf'),('#stepBtn','project')]:
             page.locator(selector).click()
-            page.wait_for_function('!document.querySelector("#stepBtn").disabled')
+            expect(page.locator("#stepBtn")).to_be_enabled()
             assert requests[-1]['outputFormat']==kind
             for key in ['exportDxf','exportStep','combineStep','exportPdf','exportCsv']:
                 assert requests[-1][key] == (kind=='project')
