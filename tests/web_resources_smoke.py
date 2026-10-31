@@ -2,6 +2,7 @@
 import io
 import json
 import os
+from pathlib import Path
 import time
 import urllib.error
 import urllib.request
@@ -123,6 +124,7 @@ assert any('SourceHanSansSC-Regular.ttf' in style.dxf.font for style in drawing.
 result, raw = run_job({'rows': rows, 'outputFormat': 'pdf', 'includeFrame': False})
 assert result['contentType'] == 'application/pdf' and result['downloadName'].endswith('.pdf')
 assert raw.startswith(b'%PDF-') and not raw.startswith(b'PK')
+Path('../../work/export-no-frame.pdf').write_bytes(raw)
 pdf = PdfReader(io.BytesIO(raw))
 assert len(pdf.pages) == 2
 for page in pdf.pages:
@@ -136,12 +138,13 @@ def boundary(page):
         nonlocal points
         if operator == b'm': points = [(float(operands[0]), float(operands[1]))]
         elif operator == b'l': points.append((float(operands[0]), float(operands[1])))
-        elif operator == b'h' and len(points) >= 4:
+        elif operator in (b'h',b'S',b's') and len(points) >= 4:
             xs, ys = zip(*points)
             if max(xs) > min(xs) and max(ys) > min(ys):
                 closed.append((max(xs)-min(xs),max(ys)-min(ys),tuple(round(float(v),5) for v in cm)))
         elif operator in (b'S', b's', b'f', b'f*', b'n'): points=[]
     page.extract_text(visitor_operand_before=visit)
+    print('Largest PDF closed paths:', sorted(closed,key=lambda b:b[0]*b[1])[-5:])
     assert closed, 'missing PDF page boundary'
     return max(closed,key=lambda b:b[0]*b[1])
 a,b = boundary(pdf.pages[0]),boundary(pdf.pages[1])

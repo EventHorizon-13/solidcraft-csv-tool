@@ -176,15 +176,17 @@ jobs:
             if curl --fail --silent -H 'X-RollerSeal-Token: upload-smoke-token' http://127.0.0.1:5080/api/bootstrap > /dev/null; then break; fi
             sleep 1
           done
-          ../../work/upload-check-env/bin/python ../../tests/web_resources_smoke.py
           ../../work/upload-check-env/bin/python ../../tests/web_ui_check.py
+          ../../work/upload-check-env/bin/python ../../tests/web_resources_smoke.py
 
       - name: Save Web UI previews
         if: always() && matrix.arch == 'amd64'
         uses: actions/upload-artifact@v4
         with:
           name: WebUI-previews
-          path: work/ui-*.png
+          path: |
+            work/ui-*.png
+            work/export-no-frame.pdf
           retention-days: 7
 
       - name: Remove smoke-test data from distribution
