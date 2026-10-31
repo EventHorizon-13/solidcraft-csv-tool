@@ -23,13 +23,13 @@
 <main class="workspace">
   <section class="work-area">
     <div class="workspace-heading">
-      <div><h1>参数工作台<span id="rowCount">0 行</span></h1></div>
       <div class="toolbar">
         <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
         <button id="importBtn" type="button">导入 CSV</button>
         <button id="addBtn" type="button">＋ 新增一行</button>
         <button id="validateBtn" type="button">检查参数</button>
       </div>
+      <span id="rowCount" hidden>0 行</span>
     </div>
     <section class="table-panel" aria-label="参数表">
       <div class="table-wrap"><table id="grid" aria-label="辊密封参数表"><thead></thead><tbody></tbody></table></div>
