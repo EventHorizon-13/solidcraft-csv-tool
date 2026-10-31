@@ -6,7 +6,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.Features;
 
-namespace SolidCraftCsvTool;
+using SolidCraftCsvTool;
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
