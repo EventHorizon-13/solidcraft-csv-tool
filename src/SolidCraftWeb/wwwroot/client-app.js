@@ -475,3 +475,47 @@ async function submitGenerationRecord(rows,generatedAtUtc) {
     return false;
   }
 }
+
+
+// Keep the existing task controls in a native modal, including live downloads.
+document.addEventListener('DOMContentLoaded', () => {
+  const panel = document.querySelector('.job');
+  if (!panel) return;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'progressDialog';
+  dialog.className = 'progress-dialog';
+  dialog.setAttribute('aria-label', '任务进度');
+  const bar = document.createElement('div');
+  bar.className = 'progress-dialog-bar';
+  const title = document.createElement('strong');
+  title.textContent = '任务进度';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.textContent = '关闭';
+  close.setAttribute('aria-label', '关闭任务进度弹窗');
+  close.autofocus = true;
+  close.addEventListener('click', () => dialog.close());
+  bar.append(title, close);
+  dialog.append(bar, panel);
+  document.body.append(dialog);
+  const message = document.getElementById('jobMessage');
+  if (message) { message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite'); }
+  const reopen = document.createElement('button');
+  reopen.id = 'showProgressBtn';
+  reopen.type = 'button';
+  reopen.textContent = '查看任务进度';
+  reopen.hidden = false;
+  document.querySelector('.toolbar').append(reopen);
+  function openProgress() {
+    reopen.hidden = false;
+    if (panel.tagName === 'DETAILS') panel.open = true;
+    if (!dialog.open) dialog.showModal();
+  }
+  window.showTaskProgress = openProgress;
+  reopen.addEventListener('click', openProgress);
+  // Capture the click before async submission so feedback appears immediately.
+  document.addEventListener('click', event => {
+    const button = event.target.closest('button');
+    if (button && !button.disabled && ['stepBtn','dxfBtn','pdfBtn','validateBtn'].includes(button.id)) openProgress();
+  }, true);
+});
