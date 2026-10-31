@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>standard-roller-seal-web</AssemblyName>
+    <RootNamespace>SolidCraftCsvTool</RootNamespace>
+    <Version>0.1.0-preview</Version>
+    <Product>标准辊密封批量生成 Web Preview</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="../../模板/标准辊密封.solidcraft" Link="模板/标准辊密封.solidcraft" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Compile Include="../SolidCraftCsvTool/LocalTemplates.cs" Link="LocalTemplates.cs" />
+    <Compile Include="../SolidCraftCsvTool/Core.cs" Link="Core.cs" />
+    <Compile Include="../SolidCraftCsvTool/ControlClient.cs" Link="ControlClient.cs" />
+    <Compile Include="../SolidCraftCsvTool/HeadlessSession.cs" Link="HeadlessSession.cs" />
+    <Compile Include="../SolidCraftCsvTool/Exporter.cs" Link="Exporter.cs" />
+    <Compile Include="../SolidCraftCsvTool/OutputNames.cs" Link="OutputNames.cs" />
+    <Compile Include="../SolidCraftCsvTool/Dxf2010Compatibility.cs" Link="Dxf2010Compatibility.cs" />
+    <Compile Include="../SolidCraftCsvTool/StepDrawingExporter.cs" Link="StepDrawingExporter.cs" />
+    <Compile Include="../SolidCraftCsvTool/DrawingOptions.cs" Link="DrawingOptions.cs" />
+    <Compile Include="../SolidCraftCsvTool/PdfExportService.cs" Link="PdfExportService.cs" />
+    <Compile Include="../SolidCraftCsvTool/MachiningDxf.Dimensions.cs" Link="MachiningDxf.Dimensions.cs" />
+    <Compile Include="../SolidCraftCsvTool/MachiningDxf.Features.cs" Link="MachiningDxf.Features.cs" />
+    <Compile Include="../SolidCraftCsvTool/MachiningDxf.Layout.cs" Link="MachiningDxf.Layout.cs" />
+    <PackageReference Include="netDxf" Version="2023.11.10" />
+  </ItemGroup>
+</Project>
