@@ -16,13 +16,14 @@ const {spawn}=require('child_process');
   const url=new URL(r.request().url());url.searchParams.set('webgl','');
   return r.continue({url:url.href});
  });
+ await page.addInitScript(()=>localStorage.setItem('solidcraft.webgl','1'));
  await page.goto('http://127.0.0.1:8765/roller-seal/',{waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>document.querySelector('#connectionState').textContent.includes('已就绪'),{},{timeout:240000});
+ await page.waitForFunction(()=>document.querySelector('#connectionState').textContent.includes('已就绪'),{},{timeout:240000}).catch(async e=>{console.log(await page.locator('#connectionState').textContent());await page.screenshot({path:'browser-result-failed.png',fullPage:true});throw e;});
  console.log('Browser engine ready');
  for(let n=0;n<2;n++){
   const downloadPromise=page.waitForEvent('download',{timeout:240000});
   await page.click('#stepBtn');
-  const download=await downloadPromise;
+  const download=await Promise.race([downloadPromise,page.waitForFunction(()=>document.querySelector('#jobState').textContent==='失败',{},{timeout:240000}).then(async()=>{throw Error(await page.locator('#log').textContent())})]);
   await download.saveAs('browser-result-'+n+'.zip');
   await page.waitForFunction(()=>document.querySelector('#jobState').textContent.includes('完成'),{},{timeout:30000});
   const b=fs.readFileSync('browser-result-'+n+'.zip');
