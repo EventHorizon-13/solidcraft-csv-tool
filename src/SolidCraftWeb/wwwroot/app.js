@@ -2,11 +2,11 @@
 
 const els = {};
 const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null, resourceId: sessionStorage.getItem("rollerSealResources") || null, resources: null };
-const settingIds = ["combineStep","exportCsv","includeFrame","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap"];
+const settingIds = ["combineStep","exportCsv","includeFrame","stepName","hiddenLineScale","viewGap"];
 
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid","jobPanel","jobActions",
-    "combineStep","exportCsv","includeFrame","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap",
+    "combineStep","exportCsv","includeFrame","stepName","hiddenLineScale","viewGap",
     "stepBtn","dxfBtn","pdfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log","drawingTemplate","fontFiles","uploadResourcesBtn","resetResourcesBtn","resourceStatus"]) {
     els[id] = document.getElementById(id);
   }
@@ -245,11 +245,9 @@ function jobRequest(format) {
     exportCsv: els.exportCsv.checked,
     outputFormat: format,
     includeFrame: els.includeFrame.checked,
-    dxfName: els.dxfName.value.trim(),
     stepName: els.stepName.value.trim(),
     hiddenLineScale: Number(els.hiddenLineScale.value),
-    viewGap: Number(els.viewGap.value),
-    dimensionStyle: els.dimensionStyle.value.trim()
+    viewGap: Number(els.viewGap.value)
   };
 }
 
@@ -292,7 +290,7 @@ async function pollJob() {
     setJobState(data.status, data.message);
     els.jobProgress.max = Math.max(state.rows.length, 1);
     els.jobProgress.value = Math.min(data.completed, els.jobProgress.max);
-    els.log.textContent = data.logs.join("\n");
+    els.log.textContent = data.logs.filter(line => !line.startsWith("PDF 已保存：") && !line.startsWith("PDF 已保存:")).join("\n");
     els.log.scrollTop = els.log.scrollHeight;
 
     if (["completed","failed","cancelled"].includes(data.status)) {

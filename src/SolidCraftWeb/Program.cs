@@ -56,7 +56,7 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
     var local = LocalTemplates.Find(AppContext.BaseDirectory, AppContext.BaseDirectory);
     return Results.Json(new
     {
-        version = "0.1.3-preview",
+        version = "0.1.5-preview",
         columns = ModelRules.Columns,
         flags = ModelRules.Flags.OrderBy(x => x).ToArray(),
         defaultRow = ModelRules.DefaultRow(),
@@ -381,7 +381,8 @@ public sealed class JobState
         {
             Message = message;
             Completed = Math.Max(Completed, completed);
-            if (log)
+            if (log && !message.StartsWith("PDF 已保存：", StringComparison.Ordinal) &&
+                !message.StartsWith("PDF 已保存:", StringComparison.Ordinal))
             {
                 logs.Add(message);
                 if (logs.Count > 200) logs.RemoveRange(0, logs.Count - 200);

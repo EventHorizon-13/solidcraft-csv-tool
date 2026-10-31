@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#19252b">
-  <title>标准辊密封 · Web Preview</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#eef2f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141b18" media="(prefers-color-scheme: dark)">
+  <title>标准辊密封批量生成</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <header class="topbar">
   <a class="brand" href="/" aria-label="标准辊密封首页">
-    <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" stroke="currentColor" opacity=".35"/><path d="M8 11h18M8 23h18M11 8v18m12-18v18" stroke="currentColor" stroke-width="1.4"/><circle cx="17" cy="17" r="5" stroke="currentColor" stroke-width="1.4"/></svg>
-    <span>标准辊密封</span>
+    <span>标准辊密封批量生成</span>
   </a>
   <div class="connection">
     <span id="connectionState" role="status">正在连接…</span>
@@ -27,7 +28,7 @@
         <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
         <button id="importBtn" type="button">导入 CSV</button>
         <button id="addBtn" type="button">＋ 新增一行</button>
-        <button id="validateBtn" type="button" class="quiet">检查参数</button>
+        <button id="validateBtn" type="button">检查参数</button>
       </div>
     </div>
     <section class="table-panel" aria-label="参数表">
@@ -47,10 +48,8 @@
   <aside class="settings panel">
     <div class="section-heading"><h2>输出设置</h2><span class="format-mark">A4 · mm</span></div>
     <div class="fields">
-      <label class="field-wide">图纸文件名<input id="dxfName" type="text" maxlength="180"></label>
       <label>隐藏线比例<input id="hiddenLineScale" type="number" min="0.05" max="100" step="0.05" value="2"></label>
       <label>视图间距 mm<input id="viewGap" type="number" min="10" max="5000" step="1"></label>
-      <label class="field-wide">标注样式<input id="dimensionStyle" type="text" maxlength="40"></label>
     </div>
     <details class="resource-upload">
       <summary>图框与字体<span class="optional">可选</span></summary>
@@ -65,7 +64,7 @@
     <label class="check-option"><input id="includeFrame" type="checkbox">使用上传图框</label>
     <p id="capabilities" class="resource-note">无图框时附零件编号；PDF 按页等比例输出。</p>
     <div class="export-actions"><button id="dxfBtn" type="button">生成 DXF <span>↗</span></button><button id="pdfBtn" type="button" class="primary">生成 PDF <span>↗</span></button></div>
-    <details class="step-options"><summary>STEP 输出</summary><div class="fields"><label class="field-wide">组合 STEP 文件名<input id="stepName" type="text" maxlength="180"></label></div><div class="check-row"><label><input id="combineStep" type="checkbox">合并 STEP</label><label><input id="exportCsv" type="checkbox">任务 CSV</label></div><button id="stepBtn" type="button" class="step-button">生成 STEP / ZIP</button></details>
+    <details class="step-options" open><summary>STEP 输出</summary><div class="fields"><label class="field-wide">组合 STEP 文件名<input id="stepName" type="text" maxlength="180"></label></div><div class="check-row"><label><input id="combineStep" type="checkbox">合并 STEP</label><label><input id="exportCsv" type="checkbox">任务 CSV</label></div><button id="stepBtn" type="button" class="step-button">生成 STEP / ZIP</button></details>
   </aside>
 </main>
 <script src="/app.js" defer></script>

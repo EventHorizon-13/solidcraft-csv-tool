@@ -216,7 +216,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.4')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.5')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -238,8 +238,8 @@ jobs:
             printf 'Expected two Web preview packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="web-0.1.4-preview"
-          title="标准辊密封批量生成 Web 0.1.4 Preview"
+          tag="web-0.1.5-preview"
+          title="标准辊密封批量生成 Web 0.1.5 Preview"
           cat > dist/release-notes.md <<'EOF'
           Web UI + Linux 后端测试版，不作为 Windows 正式版替代。
 
@@ -254,6 +254,8 @@ jobs:
 
           本次更新：
           - 重排参数工作台与侧栏，优化窄屏、深浅色和键盘焦点；UI提供思源黑体子集。隐藏线默认比例改为2。
+          - 移除图纸文件名和标注样式输入；默认展开 STEP 输出；检查参数按钮与其他工具栏按钮统一，并按系统主题平滑切换。
+          - 清理运行日志中的 PDF 临时文件绝对路径。
           - DXF、PDF 独立按钮；直接下载所选文件，PDF 不再打包 ZIP。
           - 默认内置开源思源黑体 Source Han Sans SC；可选上传 gbenor.shx、gbcbig.shx、isocp.shx。
           - 无图框导出自动补编号；PDF 单独生成分页边界，整批各页使用相同比例，下载的无图框 DXF 不加边框。
