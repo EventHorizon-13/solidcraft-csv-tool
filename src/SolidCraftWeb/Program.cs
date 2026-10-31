@@ -268,6 +268,7 @@ public sealed class JobStore
                 TemplatePath = selected.Dxf ?? "",
                 FontDirectory = fontDirectory,
                 UseBundledFont = true,
+                UseDefaultSourceHan = !selected.HasUploadedFonts,
                 DimensionStyleName = string.IsNullOrWhiteSpace(request.DimensionStyle) ? "_5" : request.DimensionStyle.Trim(),
                 HiddenLineScale = request.HiddenLineScale,
                 ViewGap = request.ViewGap,

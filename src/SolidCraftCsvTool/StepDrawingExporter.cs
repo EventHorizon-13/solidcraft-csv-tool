@@ -543,12 +543,7 @@ internal static partial class MachiningDxf
         public double ExtensionGap => Resources.Style.ExtLineOffset*Resources.Scale;
         public double ExtensionBeyond => Resources.Style.ExtLineExtend*Resources.Scale;
         public double TextGap => Resources.Style.TextOffset*Resources.Scale;
-        public string FormatDimension(double value)
-        {
-            double round=Resources.Style.DimRoundoff;
-            if(round>0)value=Math.Round(value/round,MidpointRounding.AwayFromZero)*round;
-            return value.ToString("0."+new string('#',Math.Clamp((int)Resources.Style.LengthPrecision,0,8)),CultureInfo.InvariantCulture).TrimEnd('.');
-        }
+        public string FormatDimension(double value) => DrawingResources.FormatDimension(value, Resources.Style);
         public void SetOffset(double x,double y){offsetX=x;offsetY=y;}
         public Scene Record(Action draw)
         {

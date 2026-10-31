@@ -49,6 +49,7 @@ public sealed class WebResources
             if (file.Length <= 0 || file.Length > limit) throw new InvalidDataException("DXF 最大 8 MiB，每个字体最大 4 MiB，文件不能为空。");
         }
         var previous = Resolve(form["resourceId"].ToString());
+        bool customFontsUploaded = previous.HasUploadedFonts;
         string id = Guid.NewGuid().ToString("N");
         string directory = Path.Combine(root, id);
         string fonts = Path.Combine(directory, "fonts");
@@ -78,6 +79,7 @@ public sealed class WebResources
                 }
                 else
                 {
+                    customFontsUploaded = true;
                     byte[] header = new byte[64];
                     using var stream = File.OpenRead(target);
                     int length = stream.Read(header);
@@ -87,6 +89,7 @@ public sealed class WebResources
                         throw new InvalidDataException("字体不是有效的编译 SHX 文件，请上传您获授权的原始 SHX 字体。");
                 }
             }
+            await File.WriteAllTextAsync(Path.Combine(fonts, customFontsUploaded ? ".uploaded-fonts" : ".default-source-han"), "1", cancellation);
             await File.WriteAllTextAsync(Path.Combine(directory, "ready"), "1", cancellation);
             return Resolve(id);
         }
@@ -100,9 +103,20 @@ public sealed class WebResources
 
 public sealed record ResourcePaths(string? Id, string? Dxf, string FontDirectory)
 {
+    public bool HasUploadedFonts
+    {
+        get
+        {
+            if (Id == null) return false;
+            if (File.Exists(Path.Combine(FontDirectory, ".uploaded-fonts"))) return true;
+            if (File.Exists(Path.Combine(FontDirectory, ".default-source-han"))) return false;
+            return new[] { "gbenor.shx", "gbcbig.shx", "isocp.shx" }.Any(font =>
+                File.Exists(Path.Combine(FontDirectory, font)) || File.Exists(Path.Combine(FontDirectory, "fonts", font)));
+        }
+    }
     public bool FontsReady => new[] { "gbenor.shx", "gbcbig.shx", "isocp.shx" }.All(font =>
         File.Exists(Path.Combine(FontDirectory, font)) || File.Exists(Path.Combine(FontDirectory, "fonts", font)));
-    public object Snapshot() => new { resourceId = Id, drawingTemplate = Dxf != null, fonts = new {
+    public object Snapshot() => new { resourceId = Id, drawingTemplate = Dxf != null, customFonts = HasUploadedFonts, fonts = new {
         gbenor = File.Exists(Path.Combine(FontDirectory, "gbenor.shx")) || File.Exists(Path.Combine(FontDirectory, "fonts", "gbenor.shx")),
         isocp = File.Exists(Path.Combine(FontDirectory, "isocp.shx")),
         gbcbig = File.Exists(Path.Combine(FontDirectory, "gbcbig.shx")) || File.Exists(Path.Combine(FontDirectory, "fonts", "gbcbig.shx")) }, pdf = File.Exists(SolidCraftCsvTool.PdfExportService.BundledFontPath) || FontsReady };

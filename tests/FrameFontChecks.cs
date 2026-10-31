@@ -8,6 +8,22 @@ internal static class FrameFontChecks
 {
     public static void Run(string directory)
     {
+        var sourceHan = DrawingResources.Load(new DrawingOptions { UseBundledFont = true, UseDefaultSourceHan = true });
+        if (sourceHan.Style.LengthPrecision != 2 || sourceHan.Style.TextStyle.FontFile != "SourceHanSansSC-Regular.ttf")
+            throw new Exception("Web default Source Han must use two optional decimal places.");
+        foreach (var sample in new[] { (60d, "60"), (60.1, "60.1"), (60.126, "60.13"), (-60.126, "-60.13") })
+            if (DrawingResources.FormatDimension(sample.Item1, sourceHan.Style) != sample.Item2)
+                throw new Exception("Default Source Han dimension formatting failed: " + sample.Item1);
+
+        string customFontDirectory = Path.Combine(directory, "custom-font-precision");
+        Directory.CreateDirectory(customFontDirectory);
+        File.WriteAllText(Path.Combine(customFontDirectory, "isocp.shx"), "fixture");
+        var customFont = DrawingResources.Load(new DrawingOptions { UseBundledFont = true, FontDirectory = customFontDirectory });
+        customFont.Style.DimRoundoff = 0;
+        if (customFont.Style.LengthPrecision != 3 || customFont.Style.TextStyle.FontFile != "isocp.shx" ||
+            DrawingResources.FormatDimension(60.126, customFont.Style) != "60.126")
+            throw new Exception("Custom SHX fonts must retain the original dimension precision.");
+
         var source=new DxfDocument(netDxf.Header.DxfVersion.AutoCad2010);
         source.DimensionStyles.Add(DrawingResources.DefaultStyle());
         var old=new TextStyle("OLD_FRAME_FONT","arial.ttf");
@@ -57,6 +73,6 @@ internal static class FrameFontChecks
         }
         foreach(var insert in saved.Entities.Inserts)Check(insert);
         if(count<7)throw new Exception("Frame font fixture must cover nested text, MText, attributes and definitions.");
-        Console.WriteLine("PASS: all frame/title TEXT, MTEXT, nested labels, attributes and definitions use gbenor/gbcbig; inline overrides removed; wording preserved.");
+        Console.WriteLine("PASS: default Source Han uses integer/2-decimal CAD-style labels; custom SHX precision remains unchanged; frame/title fonts and wording are preserved.");
     }
 }

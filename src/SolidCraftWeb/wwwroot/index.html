@@ -11,7 +11,7 @@
 <header class="topbar">
   <a class="brand" href="/" aria-label="标准辊密封首页">
     <svg width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" stroke="currentColor" opacity=".35"/><path d="M8 11h18M8 23h18M11 8v18m12-18v18" stroke="currentColor" stroke-width="1.4"/><circle cx="17" cy="17" r="5" stroke="currentColor" stroke-width="1.4"/></svg>
-    <span>标准辊密封</span><span class="preview">WEB</span>
+    <span>标准辊密封</span>
   </a>
   <div class="connection">
     <span id="connectionState" role="status">正在连接…</span>
@@ -22,7 +22,7 @@
 <main class="workspace">
   <section class="work-area">
     <div class="workspace-heading">
-      <div><span class="eyebrow">STANDARD ROLLER SEAL</span><h1>参数工作台<span id="rowCount">0 行</span></h1></div>
+      <div><h1>参数工作台<span id="rowCount">0 行</span></h1></div>
       <div class="toolbar">
         <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
         <button id="importBtn" type="button">导入 CSV</button>
@@ -34,13 +34,15 @@
       <div class="table-wrap"><table id="grid" aria-label="辊密封参数表"><thead></thead><tbody></tbody></table></div>
       <div class="table-footer"><span>单位 mm</span><span>支持粘贴 Excel / WPS 多格数据</span></div>
     </section>
-    <section class="job panel">
-      <div class="section-heading"><h2>任务进度</h2><strong id="jobState">未开始</strong></div>
-      <div class="job-status"><span id="jobMessage">参数就绪后，选择右侧输出格式。</span></div>
-      <progress id="jobProgress" value="0" max="1" aria-label="生成进度"></progress>
-      <div class="actions job-actions"><button id="cancelBtn" type="button" disabled>取消任务</button><a id="downloadBtn" class="button-link disabled" aria-disabled="true">下载结果</a></div>
-      <details class="log-details"><summary>运行日志</summary><pre id="log" aria-live="polite"></pre></details>
-    </section>
+    <details class="job panel" id="jobPanel">
+      <summary class="section-heading job-summary"><h2>任务进度</h2><strong id="jobState">未开始</strong></summary>
+      <div class="job-body">
+        <div class="job-status" id="jobMessage">参数就绪后，选择右侧输出格式。</div>
+        <progress id="jobProgress" value="0" max="1" aria-label="生成进度" hidden></progress>
+        <div class="actions job-actions" id="jobActions" hidden><button id="cancelBtn" type="button" disabled hidden>取消任务</button><a id="downloadBtn" class="button-link disabled" aria-disabled="true" hidden>下载结果</a></div>
+        <details class="log-details"><summary>运行日志</summary><pre id="log" aria-live="polite"></pre></details>
+      </div>
+    </details>
   </section>
   <aside class="settings panel">
     <div class="section-heading"><h2>输出设置</h2><span class="format-mark">A4 · mm</span></div>
@@ -61,10 +63,9 @@
       <p id="resourceStatus" class="hint" role="status" aria-live="polite">默认使用内置思源黑体</p>
     </details>
     <label class="check-option"><input id="includeFrame" type="checkbox">使用上传图框</label>
-    <p id="capabilities" class="resource-note">无图框出图附零件编号，PDF 各页比例一致。</p>
+    <p id="capabilities" class="resource-note">无图框时附零件编号；PDF 按页等比例输出。</p>
     <div class="export-actions"><button id="dxfBtn" type="button">生成 DXF <span>↗</span></button><button id="pdfBtn" type="button" class="primary">生成 PDF <span>↗</span></button></div>
     <details class="step-options"><summary>STEP 输出</summary><div class="fields"><label class="field-wide">组合 STEP 文件名<input id="stepName" type="text" maxlength="180"></label></div><div class="check-row"><label><input id="combineStep" type="checkbox">合并 STEP</label><label><input id="exportCsv" type="checkbox">任务 CSV</label></div><button id="stepBtn" type="button" class="step-button">生成 STEP / ZIP</button></details>
-    <div class="settings-footer"><span class="status-dot"></span>本地建模 · 独立出图</div>
   </aside>
 </main>
 <script src="/app.js" defer></script>

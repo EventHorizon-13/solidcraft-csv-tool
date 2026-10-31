@@ -69,10 +69,14 @@ call('/api/resources/' + 'a' * 32, status=404)
 
 first = upload([frame])
 assert first['drawingTemplate'] and first['pdf']
+assert first['customFonts'] is False, first
 isocp = ('fonts', 'isocp.shx', font[2])
 second = upload([font, bigfont, isocp], first['resourceId'])
 assert second['fonts']['isocp']
+assert second['customFonts'] is True, second
 assert second['pdf'] and second['resourceId'] != first['resourceId']
+preserved = upload([frame], second['resourceId'])
+assert preserved['customFonts'] is True, preserved
 assert not call('/api/resources/' + first['resourceId'])['fonts']['gbenor'], 'previous set mutated'
 assert call('/api/resources/' + second['resourceId'])['pdf']
 call('/WebData/resources/' + second['resourceId'] + '/frame.dxf', status=404)

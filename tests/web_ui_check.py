@@ -12,6 +12,11 @@ with sync_playwright() as p:
         page.locator('#connectionState').filter(has_text='已连接').wait_for()
         page.evaluate('document.fonts.ready')
         assert page.locator('#hiddenLineScale').input_value()=='2'
+        assert page.locator('#jobPanel').evaluate('(el) => !el.open')
+        assert page.locator('#jobProgress').is_hidden()
+        assert page.locator('#jobActions').is_hidden()
+        assert page.locator('.eyebrow').count()==0
+        assert page.locator('.table-wrap').bounding_box()['height'] < 180
         assert page.locator('#pdfBtn').inner_text().startswith('生成 PDF')
         assert page.locator('#dxfBtn').inner_text().startswith('生成 DXF')
         assert page.locator('#exportPdf').count()==0

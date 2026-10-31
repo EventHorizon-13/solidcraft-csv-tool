@@ -5,7 +5,7 @@ const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJo
 const settingIds = ["combineStep","exportCsv","includeFrame","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap"];
 
 document.addEventListener("DOMContentLoaded", () => {
-  for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid",
+  for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid","jobPanel","jobActions",
     "combineStep","exportCsv","includeFrame","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap",
     "stepBtn","dxfBtn","pdfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log","drawingTemplate","fontFiles","uploadResourcesBtn","resetResourcesBtn","resourceStatus"]) {
     els[id] = document.getElementById(id);
@@ -59,7 +59,7 @@ async function connect() {
     const caps = [];
 
     caps.push(data.capabilities.drawingTemplate ? "DXF 图框已就绪" : "无图框（附编号）");
-    caps.push("默认思源黑体 · PDF 等比例分页");
+    caps.push("PDF 按页等比例输出");
     els.capabilities.textContent = caps.join(" · ");
     state.resources = { pdf: data.capabilities.pdf };
     els.includeFrame.disabled = !data.capabilities.drawingTemplate;
@@ -264,7 +264,11 @@ async function startJob(format) {
       body: JSON.stringify(jobRequest(format))
     });
     state.currentJob = data.id;
+    els.jobPanel.open = true;
     document.querySelector(".log-details").open = true;
+    els.jobProgress.hidden = false;
+    els.jobActions.hidden = false;
+    els.cancelBtn.hidden = false;
     els.cancelBtn.disabled = false;
     els.stepBtn.disabled = true;
     els.dxfBtn.disabled = true;
@@ -273,6 +277,9 @@ async function startJob(format) {
     await pollJob();
     state.poll = setInterval(pollJob, 800);
   } catch (error) {
+    els.cancelBtn.hidden = true;
+    els.jobProgress.hidden = true;
+    els.jobActions.hidden = true;
     setJobState("failed", error.message);
     writeLog("启动失败：" + error.message);
   }
@@ -292,6 +299,7 @@ async function pollJob() {
       clearInterval(state.poll);
       state.poll = null;
       els.cancelBtn.disabled = true;
+      els.cancelBtn.hidden = true;
       els.stepBtn.disabled = false;
       els.dxfBtn.disabled = false;
       els.pdfBtn.disabled = false;
@@ -301,6 +309,11 @@ async function pollJob() {
         els.downloadBtn.textContent = data.contentType === "application/pdf" ? "下载 PDF" : data.contentType === "application/dxf" ? "下载 DXF" : "下载结果 ZIP";
         els.downloadBtn.classList.remove("disabled");
         els.downloadBtn.setAttribute("aria-disabled", "false");
+        els.downloadBtn.hidden = false;
+        els.jobActions.hidden = false;
+      } else {
+        els.downloadBtn.hidden = true;
+        els.jobActions.hidden = true;
       }
       state.currentJob = null;
     }
@@ -309,6 +322,9 @@ async function pollJob() {
     state.poll = null;
     state.currentJob = null;
     els.cancelBtn.disabled = true;
+    els.cancelBtn.hidden = true;
+    els.jobActions.hidden = true;
+    els.jobProgress.hidden = true;
     els.stepBtn.disabled = false;
     els.dxfBtn.disabled = false;
       els.pdfBtn.disabled = false;
@@ -366,10 +382,16 @@ function clearDownload() {
   els.downloadBtn.classList.add("disabled");
   els.downloadBtn.setAttribute("aria-disabled", "true");
   els.jobProgress.value = 0;
+  els.jobProgress.hidden = true;
+  els.cancelBtn.hidden = true;
+  els.downloadBtn.hidden = true;
+  els.jobActions.hidden = true;
   els.log.textContent = "";
 }
 
 function writeLog(text) {
+  els.jobPanel.open = true;
+  document.querySelector(".log-details").open = true;
   if (els.log.textContent) els.log.textContent += "\n";
   els.log.textContent += text;
   els.log.scrollTop = els.log.scrollHeight;
@@ -382,10 +404,11 @@ function selectResources(data) {
   if (data) els.includeFrame.disabled = !data.drawingTemplate;
   if (state.resourceId) sessionStorage.setItem("rollerSealResources", state.resourceId);
   else sessionStorage.removeItem("rollerSealResources");
+  const fontLabel = data?.customFonts ? "自定义字体" : "默认思源黑体";
   els.resourceStatus.textContent = data
-    ? [data.drawingTemplate ? "图框已上传" : "无图框（附编号）", data.fonts.gbenor ? "gbenor 已上传" : "内置思源黑体", data.fonts.gbcbig ? "gbcbig 已上传" : "内置中文字体", data.fonts.isocp ? "isocp 已上传" : "内置标注字体", data.pdf ? "可导出 PDF" : "PDF 资源未齐"].join(" · ")
-    : "使用内置资源";
-  if (data) els.capabilities.textContent = "当前使用上传资源 · " + (data.pdf ? "PDF 已就绪" : "PDF 资源未齐");
+    ? [data.drawingTemplate ? "图框已上传" : "无图框", fontLabel, data.pdf ? "PDF 可用" : "PDF 资源未齐"].join(" · ")
+    : "使用默认资源";
+  if (data) els.capabilities.textContent = [data.drawingTemplate ? "图框已就绪" : "无图框（附编号）", fontLabel, data.pdf ? "PDF 等比例分页" : "PDF 资源未齐"].join(" · ");
 }
 
 async function uploadResources() {

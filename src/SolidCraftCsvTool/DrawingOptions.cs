@@ -1,3 +1,4 @@
+using System.Globalization;
 using netDxf;
 using netDxf.Entities;
 using netDxf.Tables;
@@ -18,6 +19,7 @@ public sealed record DrawingOptions
     public double SheetGap { get; init; } = 100;
     public bool IncludeFrame { get; init; } = true;
     public bool UseBundledFont { get; init; }
+    public bool UseDefaultSourceHan { get; init; }
     public bool PdfPageBoundary { get; init; }
     public double MinimumSheetScale { get; init; } = 1;
     // Empty values keep the template's text; absent/empty TITLE keeps the per-part automatic name.
@@ -67,6 +69,7 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         {
             var defaults = DefaultStyle();
             if (options.UseBundledFont) defaults.TextStyle = PreferredTextStyle(options, false);
+            if (options.UseDefaultSourceHan) defaults.LengthPrecision = 2;
             return new(defaults, null);
         }
         DxfDocument template = DxfDocument.Load(options.TemplatePath) ?? throw new InvalidDataException("无法读取 DXF 模板。");
@@ -82,17 +85,28 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         }
         var style = (DimensionStyle)template.DimensionStyles[options.DimensionStyleName].Clone();
         if (options.UseBundledFont) style.TextStyle = PreferredTextStyle(options, false);
+        if (options.UseDefaultSourceHan) style.LengthPrecision = 2;
         FrameSource? frame = options.IncludeFrame ? FindFrame(template) : null;
         if (options.IncludeFrame && frame == null) throw new InvalidDataException("模板中没有找到独立的矩形图框块；请关闭图框或使用含图框块的 DXF。");
         return new(style, frame);
     }
     public static TextStyle PreferredTextStyle(DrawingOptions options, bool title)
     {
+        if (options.UseDefaultSourceHan) return new TextStyle("SC_SOURCE_HAN", "SourceHanSansSC-Regular.ttf");
         bool Has(string name) => File.Exists(Path.Combine(options.FontDirectory, name));
         if (!title && Has("isocp.shx")) return new TextStyle("SC_ISO", "isocp.shx") { BigFont = Has("gbcbig.shx") ? "gbcbig.shx" : "" };
         if (Has("gbenor.shx") && Has("gbcbig.shx")) return new TextStyle("SC_GB", "gbenor.shx") { BigFont = "gbcbig.shx" };
         return new TextStyle("SC_SOURCE_HAN", "SourceHanSansSC-Regular.ttf");
     }
+    public static string FormatDimension(double value, DimensionStyle style)
+    {
+        double round = style.DimRoundoff;
+        if (round > 0) value = Math.Round(value / round, MidpointRounding.AwayFromZero) * round;
+        int precision = Math.Clamp((int)style.LengthPrecision, 0, 8);
+        string format = precision == 0 ? "0" : "0." + new string('#', precision);
+        return value.ToString(format, CultureInfo.InvariantCulture);
+    }
+
     public static DimensionStyle DefaultStyle() => new("_5")
     {
         TextStyle = new TextStyle("SYMBOLS", "isocp.shx") { BigFont = "extfont.shx" },
