@@ -33,6 +33,12 @@ public static class ModelRules
         {
             int line = result.Count + 2;
             var row = ExpandRow(cells).Select(x => x.Trim()).ToArray();
+            // Disabled bevels accept blank dimensions; use the standard row values
+            // internally so model formulas never receive empty numeric expressions.
+            if (decimal.TryParse(row[10], NumberStyles.Number, CultureInfo.InvariantCulture, out var leftBevel) && leftBevel == 0 &&
+                decimal.TryParse(row[11], NumberStyles.Number, CultureInfo.InvariantCulture, out var rightBevel) && rightBevel == 0)
+                for (int i = 12; i <= 13; i++)
+                    if (row[i].Length == 0) row[i] = DefaultRow()[i];
             if (row.Take(RequiredColumnCount).Any(string.IsNullOrWhiteSpace)) throw new InvalidDataException($"第 {line} 行有空白参数。");
             string name = Regex.Replace(row[0], "[<>:\"/\\\\|?*\\x00-\\x1f]", "_").Trim(' ', '.');
             if (name.Length == 0) throw new InvalidDataException($"第 {line} 行编号无效。");
