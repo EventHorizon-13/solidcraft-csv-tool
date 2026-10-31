@@ -146,3 +146,53 @@ jobs:
           name: StandardRollerSeal-web-linux-${{ matrix.arch }}
           path: dist/StandardRollerSeal-web-linux-${{ matrix.arch }}.tar.gz
           retention-days: 14
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.0')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: StandardRollerSeal-web-linux-*
+          path: dist/release-assets
+          merge-multiple: true
+
+      - name: Publish Web preview pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          files=(dist/release-assets/StandardRollerSeal-web-linux-*.tar.gz)
+          if [ "${#files[@]}" -ne 2 ]; then
+            printf 'Expected two Web preview packages, found %s\n' "${#files[@]}"
+            exit 1
+          fi
+          tag="web-0.1.0-preview"
+          title="标准辊密封批量生成 Web 0.1.0 Preview"
+          cat > dist/release-notes.md <<'EOF'
+          Web UI + Linux 后端测试版，不作为 Windows 正式版替代。
+
+          已实现：
+          - 原生 HTML/CSS/JavaScript 轻量 Web UI，无 React/Vue 前端运行时。
+          - CSV 导入、参数表编辑、多单元格粘贴、参数校验。
+          - STEP、DXF 生成，任务进度、日志、取消及 ZIP 下载。
+          - 复用现有 SolidCraft 0.28.0、Exporter、StepDrawingExporter、MachiningDxf 等核心逻辑。
+          - Linux amd64 / arm64 自包含包。
+          - API 输入限制、CSP、安全响应头、路径隔离；未配置访问令牌时 API 仅允许本机访问。
+          - CI 已实际启动 amd64 Web 服务并提交一行参数，验证生成 .solidcraft、DXF 和 CSV。
+
+          当前限制：
+          - 仍为测试版，尚未完全达到 Windows UI 的表格交互细节。
+          - 暂不提供 3D/图纸预览。
+          - PDF 需要有效 A4 DXF 图框和授权 SHX 字体资源。
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --title "$title" --notes-file dist/release-notes.md --prerelease
+          else
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease
+          fi
