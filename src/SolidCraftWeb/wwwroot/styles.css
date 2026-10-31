@@ -1,4 +1,4 @@
-@font-face{font-family:SourceHanUI;src:url('/fonts/SourceHanSansSC-UI.woff2') format('woff2');font-display:swap;font-weight:400}
+@font-face{font-family:SourceHanUI;src:url('./fonts/SourceHanSansSC-UI.woff2') format('woff2');font-display:swap;font-weight:400}
 :root{font-family:SourceHanUI,"Source Han Sans SC",system-ui,-apple-system,"Microsoft YaHei",sans-serif;color-scheme:light dark;--bg:#eef2f0;--panel:#fff;--text:#182721;--muted:#6b7972;--line:#dce5df;--accent:#147865;--accent-soft:#e4f2ec;--head:#f5f8f6;--focus:#c0e4d5}
 *{box-sizing:border-box}.panel,.table-panel,.table-footer,th,td,.fields input,pre{transition:background-color .22s ease,color .22s ease,border-color .22s ease}
 [hidden]{display:none!important}
@@ -34,7 +34,7 @@ table{border-collapse:separate;border-spacing:0;min-width:1560px;width:100%;font
 th{position:sticky;top:0;z-index:2;white-space:nowrap;font-weight:500;color:#6a7770;letter-spacing:.1px;padding:9px 9px;background:var(--head);border-bottom:1px solid var(--line);text-align:center}
 td{border-right:1px solid #edf0ee;border-bottom:1px solid var(--line);padding:0;background:var(--panel);height:40px}
 tbody tr:hover td{background:#f8fcf9}
-td input[type=text],td input[type=number]{width:100%;min-width:75px;margin:0;padding:9px 8px;border:0;border-radius:0;background:transparent;color:var(--text);font-variant-numeric:tabular-nums;outline:none;font-family:inherit}
+td input[type=text],td input[type=number]{text-align:center;width:100%;min-width:75px;margin:0;padding:9px 8px;border:0;border-radius:0;background:transparent;color:var(--text);font-variant-numeric:tabular-nums;outline:none;font-family:inherit}
 td input:focus{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft)}
 td.flag{text-align:center;padding:6px}
 td.flag input{margin:0}
