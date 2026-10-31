@@ -376,7 +376,7 @@ async function startGeneration() {
   el.log.textContent = ""; setJob("running","所有建模和 STEP 导出均在浏览器本地执行。");
   const files = [], pieces = [], prefix = "rs-" + crypto.randomUUID().replace(/-/g,"");
   try {
-    await engineExecute("file.open", {path:state.templatePath});
+    await engineExecute("doc.open", {path:state.templatePath});
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i], base = filePart(row[0]), temp = prefix + "-" + (i + 1);
       setJob("running","正在生成 " + (i + 1) + "/" + rows.length + "：" + row[0]);
