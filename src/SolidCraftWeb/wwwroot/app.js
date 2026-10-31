@@ -2,11 +2,11 @@
 
 const els = {};
 const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null };
-const settingIds = ["combineStep","exportCsv","stepName","hiddenLineScale","viewGap"];
+const settingIds = ["exportDxf","exportStep","exportPdf","combineStep","exportCsv","stepName","hiddenLineScale","viewGap"];
 
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid","jobPanel","jobActions",
-    "combineStep","exportCsv","stepName","hiddenLineScale","viewGap",
+    "exportDxf","exportStep","exportPdf","combineStep","exportCsv","stepName","hiddenLineScale","viewGap",
     "stepBtn","dxfBtn","pdfBtn","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log"]) {
     els[id] = document.getElementById(id);
   }
@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   els.csvFile.addEventListener("change", importCsv);
   els.addBtn.addEventListener("click", addRow);
   els.validateBtn.addEventListener("click", validateRows);
-  els.stepBtn.addEventListener("click", () => startJob("step"));
+  els.stepBtn.addEventListener("click", () => startJob("project"));
   els.dxfBtn.addEventListener("click", () => startJob("dxf"));
   els.pdfBtn.addEventListener("click", () => startJob("pdf"));
   els.cancelBtn.addEventListener("click", cancelJob);
@@ -74,7 +74,7 @@ function loadSettings() {
     localStorage.setItem("rollerSealWebSettings.v1", JSON.stringify(saved));
   }
   for (const id of settingIds) {
-    const fallback = state.defaults[id];
+    const fallback = id === "exportStep" ? true : state.defaults[id];
     const value = Object.prototype.hasOwnProperty.call(saved, id) ? saved[id] : fallback;
     if (els[id].type === "checkbox") els[id].checked = Boolean(value);
     else if (value !== undefined && value !== null) els[id].value = String(value);
@@ -100,6 +100,7 @@ function renderTable() {
   state.columns.forEach(name => {
     const th = document.createElement("th");
     th.textContent = name;
+    if (state.flags.has(name)) th.className = "flag-head";
     headerRow.appendChild(th);
   });
   thead.appendChild(headerRow);
@@ -110,7 +111,9 @@ function renderTable() {
     const del = document.createElement("button");
     del.type = "button";
     del.className = "delete";
-    del.textContent = "删除";
+    del.textContent = "×";
+    del.setAttribute("aria-label", "删除第 " + (rowIndex + 1) + " 行");
+    del.title = "删除此行";
     del.addEventListener("click", () => {
       state.rows.splice(rowIndex, 1);
       if (!state.rows.length) state.rows.push(defaultRowFor(state.rows.length + 1));
@@ -228,8 +231,11 @@ async function validateRows() {
 function jobRequest(format) {
   return {
     rows: state.rows,
-    combineStep: els.combineStep.checked,
-    exportCsv: els.exportCsv.checked,
+    combineStep: format === "project" && els.combineStep.checked,
+    exportStep: format === "project" && els.exportStep.checked,
+    exportDxf: format === "project" && els.exportDxf.checked,
+    exportPdf: format === "project" && els.exportPdf.checked,
+    exportCsv: format === "project" && els.exportCsv.checked,
     outputFormat: format,
     stepName: els.stepName.value.trim(),
     hiddenLineScale: Number(els.hiddenLineScale.value),
@@ -237,10 +243,19 @@ function jobRequest(format) {
   };
 }
 
+function setOutputBusy(busy) {
+  [els.stepBtn, els.dxfBtn, els.pdfBtn].forEach(button => { button.disabled = busy; });
+}
+
 async function startJob(format) {
-  if (state.currentJob) return;
+  if (state.currentJob || els.stepBtn.disabled) return;
   saveSettings();
+  if (format === "project" && !["exportDxf", "exportStep", "combineStep", "exportPdf", "exportCsv"].some(id => els[id].checked)) {
+    writeLog("请至少勾选一项项目输出。");
+    return;
+  }
   clearDownload();
+  setOutputBusy(true);
   try {
     const data = await api("/api/jobs", {
       method: "POST",
@@ -254,9 +269,7 @@ async function startJob(format) {
     els.jobActions.hidden = false;
     els.cancelBtn.hidden = false;
     els.cancelBtn.disabled = false;
-    els.stepBtn.disabled = true;
-    els.dxfBtn.disabled = true;
-    els.pdfBtn.disabled = true;
+    setOutputBusy(true);
     setJobState("queued", "等待执行");
     await pollJob();
     state.poll = setInterval(pollJob, 800);
@@ -265,6 +278,7 @@ async function startJob(format) {
     els.jobProgress.hidden = true;
     els.jobActions.hidden = true;
     setJobState("failed", error.message);
+    setOutputBusy(false);
     writeLog("启动失败：" + error.message);
   }
 }
@@ -284,9 +298,7 @@ async function pollJob() {
       state.poll = null;
       els.cancelBtn.disabled = true;
       els.cancelBtn.hidden = true;
-      els.stepBtn.disabled = false;
-      els.dxfBtn.disabled = false;
-      els.pdfBtn.disabled = false;
+      setOutputBusy(false);
       if (data.downloadable) {
         els.downloadBtn.dataset.job = state.currentJob;
         els.downloadBtn.dataset.filename = data.downloadName || "结果.zip";
@@ -309,9 +321,7 @@ async function pollJob() {
     els.cancelBtn.hidden = true;
     els.jobActions.hidden = true;
     els.jobProgress.hidden = true;
-    els.stepBtn.disabled = false;
-    els.dxfBtn.disabled = false;
-      els.pdfBtn.disabled = false;
+    setOutputBusy(false);
     setJobState("failed", error.message);
   }
 }

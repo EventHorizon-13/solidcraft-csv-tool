@@ -84,6 +84,8 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
         defaults = new
         {
             combineStep = true,
+            exportStep = true,
+            exportDxf = false,
             exportCsv = true,
             exportPdf = false,
             dxfName = OutputNames.DefaultBase(),
@@ -265,7 +267,8 @@ public sealed record JobRequest(
     string DimensionStyle = "_5",
     string? ResourceId = null,
     string? OutputFormat = null,
-    bool IncludeFrame = true);
+    bool IncludeFrame = true,
+    bool? ExportStep = null);
 
 public sealed class JobStore
 {
@@ -300,10 +303,12 @@ public sealed class JobStore
     public JobState Create(JobRequest request)
     {
         string? format = request.OutputFormat?.ToLowerInvariant();
-        if (format != null && format is not ("step" or "dxf" or "pdf")) throw new InvalidDataException("输出格式仅支持 step、dxf、pdf。");
-        if (format != null) request = request with {
+        if (format != null && format is not ("step" or "dxf" or "pdf" or "project")) throw new InvalidDataException("输出格式仅支持 step、dxf、pdf、project。");
+        if (format != null && format != "project") request = request with {
             ExportDxf = format is "dxf" or "pdf", ExportPdf = format == "pdf",
             CombineStep = format == "step" && request.CombineStep, ExportCsv = format == "step" && request.ExportCsv };
+        if (format == "project" && !(request.ExportStep == true || request.CombineStep || request.ExportDxf || request.ExportPdf || request.ExportCsv))
+            throw new InvalidDataException("请至少勾选一项项目输出。");
         List<PreparedRow> prepared = NormalizeAndValidate(request.Rows);
         string stamp = string.IsNullOrWhiteSpace(request.Stamp) ? OutputNames.Stamp : request.Stamp.Trim();
         if (!Regex.IsMatch(stamp, "^[A-Za-z0-9-]{1,16}$")) throw new ArgumentException("日期/前缀只允许 1 至 16 位英文字母、数字或连字符。");
@@ -361,15 +366,15 @@ public sealed class JobStore
             stepName,
             request.ExportCsv,
             request.Rows,
-            ExportStep: !request.ExportDxf || request.CombineStep,
+            ExportStep: format == "project" ? request.ExportStep == true || request.CombineStep : !request.ExportDxf || request.CombineStep,
             Drawing: drawing,
             ExportPdf: request.ExportPdf);
 
-        _ = Task.Run(() => RunAsync(state, options, engine, directory, output, format));
+        _ = Task.Run(() => RunAsync(state, options, engine, directory, output, format, request));
         return state;
     }
 
-    async Task RunAsync(JobState state, ExportOptions options, string engine, string directory, string output, string? format)
+    async Task RunAsync(JobState state, ExportOptions options, string engine, string directory, string output, string? format, JobRequest request)
     {
         bool entered = false;
         try
@@ -391,7 +396,27 @@ public sealed class JobStore
             }
             string zip = Path.Combine(directory, "result.zip");
             if (File.Exists(zip)) File.Delete(zip);
-            ZipFile.CreateFromDirectory(output, zip, CompressionLevel.Fastest, false);
+            if (format == "project")
+            {
+                // Publish only requested deliverables. Native models and STEP/DXF
+                // intermediates remain server-side, including merge-only STEP inputs.
+                string combinedName = OutputNames.FileName(options.CombinedFileName, ".step", options.DateStamp ?? OutputNames.Stamp);
+                using var archive = ZipFile.Open(zip, ZipArchiveMode.Create);
+                foreach (string file in Directory.EnumerateFiles(output))
+                {
+                    string extension = Path.GetExtension(file).ToLowerInvariant();
+                    bool include = extension switch {
+                        ".dxf" => request.ExportDxf,
+                        ".pdf" => request.ExportPdf,
+                        ".csv" => request.ExportCsv,
+                        ".step" => Path.GetFileName(file).Equals(combinedName, StringComparison.OrdinalIgnoreCase)
+                            ? request.CombineStep : request.ExportStep == true,
+                        _ => false
+                    };
+                    if (include) archive.CreateEntryFromFile(file, Path.GetFileName(file), CompressionLevel.Fastest);
+                }
+            }
+            else ZipFile.CreateFromDirectory(output, zip, CompressionLevel.Fastest, false);
             state.Complete(zip);
         }
         catch (OperationCanceledException)
@@ -488,6 +513,7 @@ public sealed class JobState
         }
     }
 }
+
 
 
 

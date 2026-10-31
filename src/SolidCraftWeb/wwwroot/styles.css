@@ -97,3 +97,20 @@ th:first-child,td:first-child{min-width:54px;width:54px}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}}
 /* Keep the light header consistent with the workspace palette. */
 @media(prefers-color-scheme:light){.topbar{background:var(--panel);color:var(--text);border-bottom:1px solid var(--line)}.connection input{background:var(--head);border-color:var(--line);color:var(--text)}.connection button{background:var(--accent-soft);border-color:var(--line);color:var(--accent)}.connection button:hover{background:var(--focus)}.connection input::placeholder,#connectionState{color:var(--muted)}}
+
+/* Separate direct downloads from selectable project exports. */
+.quick-output h3,.project-output h3{font-size:12px;font-weight:600;margin:0 0 10px}
+.project-output{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}
+.project-checks{display:grid;grid-template-columns:1fr 1fr;gap:10px 8px;margin-bottom:14px;font-size:11px;color:var(--text)}
+.project-checks label{display:flex;align-items:center;min-height:26px;cursor:pointer}
+#grid th:first-child,#grid td:first-child{width:40px;min-width:40px;text-align:center;padding:0}
+#grid .delete{width:36px;min-height:36px;padding:0;font-size:22px;line-height:1}
+@media(max-width:800px){
+  #grid{min-width:0;width:max-content;table-layout:fixed;font-size:11px}
+  #grid th{width:66px;min-width:66px;max-width:66px;white-space:normal;overflow-wrap:anywhere;padding:6px 3px;letter-spacing:0;line-height:1.35}
+  #grid td{height:36px;text-align:center}
+  #grid td input[type=text],#grid td input[type=number]{width:66px;min-width:0;padding:8px 2px;font-size:12px;text-align:center}
+  #grid th:nth-child(2),#grid td:nth-child(2) input{width:76px;min-width:76px;max-width:76px}
+  #grid th.flag-head,#grid td.flag{width:44px;min-width:44px;max-width:44px;padding:3px}
+  #grid th:first-child,#grid td:first-child{width:36px;min-width:36px;max-width:36px;text-align:center}
+}

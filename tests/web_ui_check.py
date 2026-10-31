@@ -17,14 +17,43 @@ with sync_playwright() as p:
         assert page.locator('#jobActions').is_hidden()
         assert page.locator('.eyebrow').count()==0
         assert page.locator('.table-wrap').bounding_box()['height'] < 180
-        assert page.locator('#pdfBtn').inner_text().startswith('生成 PDF')
-        assert page.locator('#dxfBtn').inner_text().startswith('生成 DXF')
-        assert page.locator('#exportPdf').count()==0
+        assert page.locator('#pdfBtn').inner_text().startswith('输出 PDF')
+        assert page.locator('#dxfBtn').inner_text().startswith('输出 DXF')
+        assert page.locator('.project-checks input[type=checkbox]').count()==5
+        assert page.locator('#grid .delete').inner_text()=='×'
+        assert page.locator('#grid tbody td').first.evaluate('(el) => getComputedStyle(el).textAlign')=='center'
+        if name=='mobile':
+            assert page.locator('#grid').bounding_box()['width'] < 1250
+            assert page.locator('#grid tbody td').first.bounding_box()['width'] <= 36
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'body overflows viewport'
+        # Verify what the controls submit without performing geometry jobs here.
+        requests=[]
+        def capture(route):
+            requests.append(route.request.post_data_json)
+            route.fulfill(status=400,content_type='application/json',body='{"error":"UI request check"}')
+        page.route('**/api/jobs',capture)
+        for checkbox in page.locator('.project-checks input').all():
+            checkbox.check()
+        for selector,kind in [('#dxfBtn','dxf'),('#pdfBtn','pdf'),('#stepBtn','project')]:
+            page.locator(selector).click()
+            page.wait_for_function('!document.querySelector("#stepBtn").disabled')
+            assert requests[-1]['outputFormat']==kind
+            for key in ['exportDxf','exportStep','combineStep','exportPdf','exportCsv']:
+                assert requests[-1][key] == (kind=='project')
+        for checkbox in page.locator('.project-checks input').all():
+            checkbox.uncheck()
+        count=len(requests)
+        page.locator('#stepBtn').click()
+        assert page.locator('#log').inner_text().endswith('请至少勾选一项项目输出。')
+        assert len(requests)==count
+        page.locator('#jobPanel').evaluate('(el) => el.open=false')
         page.locator('#addBtn').click()
         assert page.locator('#grid tbody tr').count()==2
+        page.locator('#grid .delete').first.click()
+        assert page.locator('#grid tbody tr').count()==1
         page.screenshot(path=f'../../work/ui-{name}.png',full_page=True)
         assert not errors,errors
         page.close()
     browser.close()
 print('Desktop/mobile UI, hidden-line default 2, separate export actions and viewport checks passed.')
+

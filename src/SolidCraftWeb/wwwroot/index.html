@@ -51,8 +51,22 @@
       <label>隐藏线比例<input id="hiddenLineScale" type="number" min="0.05" max="100" step="0.05" value="2"></label>
       <label>视图间距 mm<input id="viewGap" type="number" min="10" max="5000" step="1"></label>
     </div>    <p class="output-note">导出自动附零件编号；PDF 按页等比例输出。</p>
-    <div class="export-actions"><button id="dxfBtn" type="button">生成 DXF <span>↗</span></button><button id="pdfBtn" type="button" class="primary">生成 PDF <span>↗</span></button></div>
-    <details class="step-options" open><summary>STEP 输出</summary><div class="fields"><label class="field-wide">组合 STEP 文件名<input id="stepName" type="text" maxlength="180"></label></div><div class="check-row"><label><input id="combineStep" type="checkbox">合并 STEP</label><label><input id="exportCsv" type="checkbox">任务 CSV</label></div><button id="stepBtn" type="button" class="step-button">生成 STEP / ZIP</button></details>
+    <section class="quick-output" aria-labelledby="quickHeading">
+      <h3 id="quickHeading">快速输出</h3>
+      <div class="export-actions"><button id="dxfBtn" type="button">输出 DXF <span aria-hidden="true">↗</span></button><button id="pdfBtn" type="button" class="primary">输出 PDF <span aria-hidden="true">↗</span></button></div>
+    </section>
+    <section class="project-output" aria-labelledby="projectHeading">
+      <h3 id="projectHeading">项目输出</h3>
+      <div class="project-checks">
+        <label><input id="exportDxf" type="checkbox">导出 DXF</label>
+        <label><input id="exportStep" type="checkbox" checked>导出 STEP</label>
+        <label><input id="combineStep" type="checkbox">合并 STEP</label>
+        <label><input id="exportPdf" type="checkbox">导出 PDF</label>
+        <label class="field-wide"><input id="exportCsv" type="checkbox">导出列表 CSV</label>
+      </div>
+      <div class="fields"><label class="field-wide">合并 STEP 文件名<input id="stepName" type="text" maxlength="180"></label></div>
+      <button id="stepBtn" type="button" class="step-button primary">输出项目 ZIP</button>
+    </section>
   </aside>
 </main>
 <script src="/app.js" defer></script>
