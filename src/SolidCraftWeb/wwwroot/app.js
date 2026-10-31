@@ -57,9 +57,9 @@ async function connect() {
     if (!state.rows.length) state.rows = [data.defaultRow.slice()];
     renderTable();
     const caps = [];
-    caps.push(data.capabilities.solidCraft ? "SolidCraft CLI 已就绪" : "缺少 SolidCraft CLI");
+
     caps.push(data.capabilities.drawingTemplate ? "DXF 图框已就绪" : "无图框（附编号）");
-    caps.push(data.capabilities.pdf ? "PDF 已就绪" : "默认思源黑体");
+    caps.push("默认思源黑体 · PDF 等比例分页");
     els.capabilities.textContent = caps.join(" · ");
     state.resources = { pdf: data.capabilities.pdf };
     els.includeFrame.disabled = !data.capabilities.drawingTemplate;
