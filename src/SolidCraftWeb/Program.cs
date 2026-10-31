@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO.Compression;
+using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.Features;
@@ -37,11 +39,12 @@ app.UseStaticFiles();
 
 bool Authorized(HttpRequest request)
 {
-    if (string.IsNullOrEmpty(apiToken)) return true;
-    return request.Headers.TryGetValue("X-RollerSeal-Token", out var supplied) &&
-           CryptographicOperations.FixedTimeEquals(
-               Encoding.UTF8.GetBytes(supplied.ToString()),
-               Encoding.UTF8.GetBytes(apiToken));
+    if (string.IsNullOrEmpty(apiToken))
+        return request.HttpContext.Connection.RemoteIpAddress is IPAddress address && IPAddress.IsLoopback(address);
+    if (!request.Headers.TryGetValue("X-RollerSeal-Token", out var supplied)) return false;
+    byte[] actual = Encoding.UTF8.GetBytes(supplied.ToString());
+    byte[] expected = Encoding.UTF8.GetBytes(apiToken);
+    return actual.Length == expected.Length && CryptographicOperations.FixedTimeEquals(actual, expected);
 }
 
 IResult Denied() => Results.Json(new { error = "未授权。请配置正确的 Web API 访问令牌。" }, statusCode: StatusCodes.Status401Unauthorized);
@@ -269,9 +272,11 @@ public sealed class JobStore
 
     async Task RunAsync(JobState state, ExportOptions options, string engine, string directory, string output)
     {
-        await gate.WaitAsync(state.Token);
+        bool entered = false;
         try
         {
+            await gate.WaitAsync(state.Token);
+            entered = true;
             state.SetRunning();
             ControlClient.HeadlessExecutable = engine;
             var progress = new Progress<ExportProgress>(entry => state.Report(entry.Message, entry.Completed, entry.Log));
@@ -292,7 +297,7 @@ public sealed class JobStore
         }
         finally
         {
-            gate.Release();
+            if (entered) gate.Release();
         }
     }
 
