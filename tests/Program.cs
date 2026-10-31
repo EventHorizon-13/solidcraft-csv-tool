@@ -4,6 +4,26 @@ using System.Text;
 using System.Text.Json;
 using SolidCraftCsvTool;
 
+// Regression: bevel dimensions are optional only when both bevel switches are off.
+{
+    foreach (var emptyColumns in new[] { new[] { 12 }, new[] { 13 }, new[] { 12, 13 } })
+    {
+        var bevelRow = ModelRules.DefaultRow();
+        foreach (int column in emptyColumns) bevelRow[column] = "   ";
+        var prepared = ModelRules.Validate(new[] { bevelRow });
+        if (prepared[0].Parameters["斜边Y"] != "30" || prepared[0].Parameters["斜边Z"] != "30")
+            throw new Exception("Disabled bevel blank dimensions did not receive defaults.");
+        foreach (int flag in new[] { 10, 11 })
+        {
+            var enabledRow = bevelRow.ToArray(); enabledRow[flag] = "1";
+            bool rejected = false;
+            try { ModelRules.Validate(new[] { enabledRow }); } catch (InvalidDataException) { rejected = true; }
+            if (!rejected) throw new Exception("Enabled bevel accepted blank dimensions.");
+        }
+    }
+    Console.WriteLine("PASS: disabled/enabled bevel blank-dimension checks");
+}
+
 if(args.Length==2&&args[0]=="--anonymous-title-check")
 {
     AnonymousTitleChecks.Run(args[1]);return;
