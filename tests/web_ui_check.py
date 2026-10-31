@@ -37,6 +37,16 @@ with sync_playwright() as p:
         for selector,kind in [('#dxfBtn','dxf'),('#pdfBtn','pdf'),('#stepBtn','project')]:
             page.locator(selector).click()
             expect(page.locator("#stepBtn")).to_be_enabled()
+            assert page.locator('#progressDialog').is_visible()
+            box=page.locator('#progressDialog').bounding_box()
+            assert box['x'] >= 0 and box['y'] >= 0
+            assert box['x']+box['width'] <= width and box['y']+box['height'] <= height
+            page.get_by_role('button',name='关闭任务进度弹窗').click()
+            assert page.locator('#progressDialog').is_hidden()
+            page.locator('#showProgressBtn').click()
+            assert page.locator('#progressDialog').is_visible()
+            page.keyboard.press('Escape')
+            assert page.locator('#progressDialog').is_hidden()
             assert requests[-1]['outputFormat']==kind
             for key in ['exportDxf','exportStep','combineStep','exportPdf','exportCsv']:
                 assert requests[-1][key] == (kind=='project')
@@ -46,14 +56,17 @@ with sync_playwright() as p:
         page.locator('#stepBtn').click()
         assert page.locator('#log').inner_text().endswith('请至少勾选一项项目输出。')
         assert len(requests)==count
+        page.get_by_role('button',name='关闭任务进度弹窗').click()
         page.locator('#jobPanel').evaluate('(el) => el.open=false')
         page.locator('#addBtn').click()
         assert page.locator('#grid tbody tr').count()==2
         page.locator('#grid .delete').first.click()
         assert page.locator('#grid tbody tr').count()==1
+        page.locator('#showProgressBtn').click()
         page.screenshot(path=f'../../work/ui-{name}.png',full_page=True)
         assert not errors,errors
         page.close()
     browser.close()
 print('Desktop/mobile UI, hidden-line default 2, separate export actions and viewport checks passed.')
+
 
