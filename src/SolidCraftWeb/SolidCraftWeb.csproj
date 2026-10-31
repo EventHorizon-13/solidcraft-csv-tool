@@ -10,7 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="../../模板/标准辊密封.solidcraft" Link="模板/标准辊密封.solidcraft" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../模板/标准辊密封.solidcraft" Link="wwwroot/client-template.solidcraft" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Compile Include="../SolidCraftCsvTool/LocalTemplates.cs" Link="LocalTemplates.cs" />
     <Compile Include="../SolidCraftCsvTool/Core.cs" Link="Core.cs" />
     <Compile Include="../SolidCraftCsvTool/ControlClient.cs" Link="ControlClient.cs" />
