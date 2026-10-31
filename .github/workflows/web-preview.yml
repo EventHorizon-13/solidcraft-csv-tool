@@ -11,6 +11,8 @@ on:
       - '模板/**'
       - '.github/workflows/web-preview.yml'
       - 'tests/web_resources_smoke.py'
+      - 'tests/CoreChecks.csproj'
+      - 'tests/*.cs'
       - 'tests/web_ui_check.py'
       - 'tests/PdfPathChecks/**'
 
@@ -47,6 +49,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+
+      - name: Run shared geometry and dimension regression checks
+        if: matrix.arch == 'amd64'
+        shell: bash
+        run: dotnet run --project tests/CoreChecks.csproj -c Release
 
       - name: Build Web project and check browser code
         shell: bash
@@ -209,7 +216,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.3')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.4')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -231,8 +238,8 @@ jobs:
             printf 'Expected two Web preview packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="web-0.1.3-preview"
-          title="标准辊密封批量生成 Web 0.1.3 Preview"
+          tag="web-0.1.4-preview"
+          title="标准辊密封批量生成 Web 0.1.4 Preview"
           cat > dist/release-notes.md <<'EOF'
           Web UI + Linux 后端测试版，不作为 Windows 正式版替代。
 
@@ -252,6 +259,7 @@ jobs:
           - 无图框导出自动补编号；PDF 单独生成分页边界，整批各页使用相同比例，下载的无图框 DXF 不加边框。
 
           修复：
+          - 修复右端半孔末端 1 mm 边界线段被过滤导致的尺寸链少 1 mm；Ø90 半孔末段为45 mm，600/660 mm 尺寸链闭合。
           - PDF 渲染子进程的清单文件改用绝对路径，避免切换工作目录后出现 ENOENT。
           - 系统服务没有用户应用数据目录时，工作文件落到系统临时目录；临时路径统一绝对化。
           - 新增相对/绝对工作目录、空格和中文路径的子进程回归检查。

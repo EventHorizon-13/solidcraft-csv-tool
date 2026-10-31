@@ -121,7 +121,9 @@ internal static class PlanAnnotationChecks
                 edges.Add(new(new(radius,0),new(radius,200),"VISIBLE"));
                 // A misleading end projection lies near the real right half-hole tangent.
                 edges.Add(new(new(600-radius+1.11,0),new(600-radius+1.11,200),"VISIBLE"));
-                Projection2 top=new("top",edges,[new([new(0,0),new(600,0),new(600,200),new(0,200)],true,"VISIBLE")],new(0,0,600,200));
+                // The real top boundary may end with a 1 mm collinear fragment. Keep it in
+                // the body span so the final half-hole tangent is dimensioned to the true end.
+                Projection2 top=new("top",edges,[new([new(0,0),new(600,0),new(600,200),new(599,200),new(0,200)],true,"VISIBLE")],new(0,0,600,200));
                 Projection2 end=new("left",[],[new([new(0,0),new(200,0),new(200,105),new(0,105)],true,"VISIBLE")],new(0,0,200,105));
                 string file=Path.Combine(directory,"sample.dxf");
                 MachiningDxf.Write(file,new("half-hole",front,top,end,DxfFeatureDetector.Analyze(front,top)));
@@ -131,10 +133,62 @@ internal static class PlanAnnotationChecks
                 double origin=N(overall,13),baseline=N(overall,23);
                 if(!dims.Any(d=>Math.Abs(N(d,13)-(origin+600-radius))<.01&&Math.Abs(N(d,14)-(origin+600))<.01&&Math.Abs(N(d,23)-baseline-200)<.01))
                     throw new Exception($"Right half-hole dimension must equal actual radius {radius}, not snap to a nearby edge");
+                var chain=dims.Where(d=>Math.Abs(N(d,23)-baseline-200)<.01&&Math.Abs(N(d,24)-baseline-200)<.01&&
+                    N(d,13)>=origin-.01&&N(d,14)<=origin+600+.01).ToArray();
+                if(Math.Abs(chain.Sum(d=>Math.Abs(N(d,14)-N(d,13)))-600)>.01)
+                    throw new Exception("A 1 mm right boundary fragment must be included so the 600 mm plan chain closes.");
             }
-            Console.WriteLine("PASS: half-hole plan tangents use radii 35, 45 and 47.5, ignoring misleading end edges and coordinate shifts.");
+            Check660RightHalfHoleBoundaryFragment(directory);
+            Console.WriteLine("PASS: half-hole plan tangents use radii 35, 45 and 47.5; 1 mm right boundary fragments remain in the body span; 600/660 mm plan chains close.");
         }
         finally{Directory.Delete(directory,true);}
+    }
+
+    static void Check660RightHalfHoleBoundaryFragment(string directory)
+    {
+        const double length=660,radius=45;
+        Point2 P(double x,double y)=>new(x,y);
+        var contour=new List<Point2>{P(0,105)};
+        void Arc(double center,int start,int finish)
+        {
+            for(int i=start;i<=finish;i++)
+            {
+                double angle=i*Math.PI/180;
+                contour.Add(P(center+radius*Math.Cos(angle),105+radius*Math.Sin(angle)));
+            }
+        }
+        foreach(double center in new[]{60.0,180.0,300.0,420.0,540.0})Arc(center,180,360);
+        Arc(length,180,270);
+        contour.AddRange([P(length,0),P(0,0)]);
+        Projection2 front=new("front",[],[new(contour,true,"VISIBLE")],new(0,0,length,105));
+        var edges=new List<Line2>();
+        foreach(double center in new[]{60.0,180.0,300.0,420.0,540.0})
+            foreach(double x in new[]{center-radius,center+radius})
+                edges.Add(new(new(x,0),new(x,200),"VISIBLE"));
+        edges.Add(new(new(length-radius+1.11,0),new(length-radius+1.11,200),"VISIBLE"));
+        Projection2 top=new("top",edges,
+            [new([P(0,0),P(length,0),P(length,200),P(length-1,200),P(0,200)],true,"VISIBLE")],
+            new(0,0,length,200));
+        Projection2 end=new("left",[],[new([P(0,0),P(200,0),P(200,105),P(0,105)],true,"VISIBLE")],new(0,0,200,105));
+        string file=Path.Combine(directory,"half-hole-660-boundary-fragment.dxf");
+        MachiningDxf.Write(file,new("half-hole-660",front,top,end,DxfFeatureDetector.Analyze(front,top)));
+        double N(Dictionary<int,string> d,int c)=>double.Parse(d[c],CultureInfo.InvariantCulture);
+        bool Near(double a,double b)=>Math.Abs(a-b)<.01;
+        double Width(Dictionary<int,string> d)=>Math.Abs(N(d,14)-N(d,13));
+        var dims=ReadDimensions(file).Where(d=>(int.Parse(d[70],CultureInfo.InvariantCulture)&7)==0&&Near(N(d,50),0)).ToArray();
+        double minY=dims.Min(d=>N(d,23));
+        var overall=dims.Single(d=>Near(Width(d),length)&&Near(N(d,23),N(d,24))&&Near(N(d,23),minY));
+        double origin=N(overall,13),baseline=N(overall,23);
+        if(!dims.Any(d=>Near(N(d,13),origin+length-radius)&&Near(N(d,14),origin+length)&&
+            Near(N(d,23),baseline+200)&&Near(N(d,24),baseline+200)))
+            throw new Exception("The 660 mm case must dimension the Ø90 right half-hole end segment as 45 mm, not 44 mm.");
+        if(!dims.Any(d=>Near(N(d,13),origin)&&Near(N(d,14),origin+15)&&
+            Near(N(d,23),baseline+200)&&Near(N(d,24),baseline+200)))
+            throw new Exception("The 660 mm case must preserve its 15 mm left end segment.");
+        var chain=dims.Where(d=>Near(N(d,23),baseline+200)&&Near(N(d,24),baseline+200)&&
+            N(d,13)>=origin-.01&&N(d,14)<=origin+length+.01).ToArray();
+        if(!Near(chain.Sum(Width),length))
+            throw new Exception($"The 660 mm plan dimension chain must close to 660 mm; actual sum: {chain.Sum(Width):0.###}.");
     }
 
     static List<Dictionary<int,string>> ReadDimensions(string file)
