@@ -17,6 +17,7 @@ builder.Services.Configure<FormOptions>(options =>
     options.ValueLengthLimit = 128 * 1024;
 });
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = WebResources.MaxBodyBytes);
+builder.Services.AddSingleton(new BrowserGenerationRecordStore(AppContext.BaseDirectory));
 
 var app = builder.Build();
 var resources = new WebResources(AppContext.BaseDirectory);
@@ -28,10 +29,35 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
-    context.Response.Headers["Content-Security-Policy"] =
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+    bool solidCraftPage = context.Request.Path.StartsWithSegments("/solidcraft", StringComparison.Ordinal);
+    context.Response.Headers["Content-Security-Policy"] = solidCraftPage
+        ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"
+        : "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
     if (context.Request.Path.StartsWithSegments("/api", StringComparison.Ordinal))
+    {
         context.Response.Headers["Cache-Control"] = "no-store";
+        if (!string.Equals(context.Request.Path.Value, "/api/generation-records", StringComparison.Ordinal))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        string requestOrigin = context.Request.Headers["Origin"].ToString();
+        bool trustedSite = requestOrigin is "https://iobyte.cn" or "https://www.iobyte.cn";
+        if (trustedSite)
+        {
+            context.Response.Headers["Access-Control-Allow-Origin"] = requestOrigin;
+            context.Response.Headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
+            context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
+            context.Response.Headers["Access-Control-Max-Age"] = "600";
+            context.Response.Headers.AppendCommaSeparatedValues("Vary", "Origin");
+        }
+        if (HttpMethods.IsOptions(context.Request.Method))
+        {
+            context.Response.StatusCode = trustedSite ? StatusCodes.Status204NoContent : StatusCodes.Status403Forbidden;
+            return;
+        }
+    }
     await next();
 });
 
@@ -183,6 +209,48 @@ app.MapGet("/api/jobs/{id}/download", (HttpRequest request, string id) =>
     if (!jobs.TryGet(id, out var state) || state.Status != "completed" || state.DownloadPath == null || !File.Exists(state.DownloadPath))
         return Results.NotFound(new { error = "任务结果尚不可下载。" });
     return Results.File(state.DownloadPath, state.ContentType, state.DownloadName, enableRangeProcessing: true);
+});
+
+app.MapPost("/api/generation-records", async (HttpContext context, BrowserGenerationRecordRequest input, BrowserGenerationRecordStore store, CancellationToken cancellation) =>
+{
+    if (!context.Request.Headers.TryGetValue("Origin", out var originValue) ||
+        !Uri.TryCreate(originValue.ToString(), UriKind.Absolute, out var origin))
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    bool trustedSiteOrigin = origin.Scheme == Uri.UriSchemeHttps &&
+        (string.Equals(origin.Authority, "iobyte.cn", StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(origin.Authority, "www.iobyte.cn", StringComparison.OrdinalIgnoreCase));
+    bool sameOrigin = string.Equals(origin.Authority, context.Request.Host.Value, StringComparison.OrdinalIgnoreCase);
+    if (!trustedSiteOrigin && !sameOrigin)
+        return Results.StatusCode(StatusCodes.Status403Forbidden);
+    if (context.Request.ContentLength is > 2_097_152)
+        return Results.Json(new { error = "生成记录不能超过 2 MiB。" }, statusCode: StatusCodes.Status413PayloadTooLarge);
+    if (input.Rows == null || input.Rows.Length == 0 || input.Rows.Length > 500)
+        return Results.BadRequest(new { error = "生成记录必须包含 1 至 500 行参数。" });
+    if (!DateTimeOffset.TryParse(input.GeneratedAtUtc, out var generatedAt))
+        return Results.BadRequest(new { error = "生成时间格式无效。" });
+    foreach (var row in input.Rows)
+    {
+        if (row == null || row.Length != 18 || row.Any(cell => cell == null || cell.Length > 200))
+            return Results.BadRequest(new { error = "生成参数格式无效。" });
+    }
+
+    string clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    if (context.Connection.RemoteIpAddress is IPAddress peer && IPAddress.IsLoopback(peer) &&
+        context.Request.Headers.TryGetValue("X-Forwarded-For", out var forwarded))
+    {
+        var addresses = forwarded.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        for (int index = addresses.Length - 1; index >= 0; index--)
+        {
+            if (IPAddress.TryParse(addresses[index], out var parsed))
+            {
+                clientIp = parsed.IsIPv4MappedToIPv6 ? parsed.MapToIPv4().ToString() : parsed.ToString();
+                break;
+            }
+        }
+    }
+    var record = new BrowserGenerationRecord(DateTimeOffset.UtcNow, generatedAt, clientIp, input.Rows);
+    await store.AppendAsync(record, cancellation);
+    return Results.Json(new { ok = true, recordedAtUtc = record.RecordedAtUtc }, statusCode: StatusCodes.Status201Created);
 });
 
 app.MapFallbackToFile("index.html");
