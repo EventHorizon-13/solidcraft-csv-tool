@@ -72,8 +72,7 @@ second = upload([font, bigfont], first['resourceId'])
 assert second['pdf'] and second['resourceId'] != first['resourceId']
 assert not call('/api/resources/' + first['resourceId'])['pdf'], 'previous set mutated'
 assert call('/api/resources/' + second['resourceId'])['pdf']
-call('/WebData/resources/' + second['resourceId'] + '/frame.dxf', status=200)  # SPA fallback, never the DXF bytes
-assert call('/WebData/resources/' + second['resourceId'] + '/frame.dxf') != dxf
+call('/WebData/resources/' + second['resourceId'] + '/frame.dxf', status=404)
 boot = call('/api/bootstrap')
 payload = {'rows': [boot['defaultRow']], 'combineStep': False, 'exportCsv': True,
            'exportDxf': True, 'resourceId': first['resourceId'], 'dimensionStyle': 'upload-test'}
