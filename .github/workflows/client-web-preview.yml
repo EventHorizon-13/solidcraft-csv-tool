@@ -109,15 +109,15 @@ jobs:
           cp src/SolidCraftWeb/wwwroot/styles.css dist/site-root/roller-seal/
           cp src/SolidCraftWeb/wwwroot/client.css dist/site-root/roller-seal/
           cp src/SolidCraftWeb/wwwroot/client-app.js dist/site-root/roller-seal/
-          cp README.md THIRD_PARTY_NOTICES.md CLIENT_COMPUTE_EXPERIMENT.md dist/site-root/
-          cat > dist/site-root/DEPLOY-ROLLER-SEAL.txt <<'EOF'
-          Extract roller-seal/ into the existing iobyte.cn website document root.
-          It creates /roller-seal/ and leaves the site's existing homepage files untouched.
+          cp README.md THIRD_PARTY_NOTICES.md CLIENT_COMPUTE_EXPERIMENT.md dist/site-root/roller-seal/
+          cat > dist/site-root/roller-seal/DEPLOY.txt <<'EOF'
+          Copy this roller-seal/ directory into the existing iobyte.cn website document root.
+          It becomes /roller-seal/ and leaves the site's root and homepage files untouched.
           The page sends only generated parameters and timestamp to https://srs.arcsiny.com;
           that server records the request IP. The API server package must be deployed separately.
           EOF
           cd dist/site-root
-          zip -qr ../iobyte-cn-roller-seal-subdirectory.zip roller-seal DEPLOY-ROLLER-SEAL.txt CLIENT_COMPUTE_EXPERIMENT.md
+          zip -qr ../iobyte-cn-roller-seal-subdirectory.zip roller-seal
 
       - uses: actions/upload-artifact@v4
         if: matrix.arch == 'amd64'
