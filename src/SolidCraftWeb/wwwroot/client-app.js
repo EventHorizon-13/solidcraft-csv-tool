@@ -24,7 +24,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const url = new URL("./solidcraft/", location.href);
   url.searchParams.set("open", template);
   // Exporting requires normal mode: embed mode disables files_tick/OPFS flushing.
-  el.solidCraftFrame.src = url.toString();
+  state.engineUrl = url.toString();
+  el.solidCraftFrame.src = state.engineUrl;
   waitForEngine().catch(error => setConnection("SolidCraft 加载失败：" + error.message));
 });
 
@@ -204,12 +205,9 @@ async function waitForEngine() {
         const defaults = await readTemplateDefaults(api, 60000);
         state.engine = api;
         state.defaults = defaults;
-        state.templatePath = "/opfs/rs-template-" + crypto.randomUUID() + ".solidcraft";
-        const saved = await api.execute("file.save_as", {path:state.templatePath,format:"container",cache:true});
-        await opfsBytes(state.templatePath.slice("/opfs/".length), saved.bytes);
         setConnection("SolidCraft 已就绪 · 本机计算");
         el.jobMessage.textContent = "建模、校验与 STEP 导出均在此浏览器完成。";
-        setBusy(false);
+        setBusy(state.busy);
         return;
       }
     } catch (_) {}
@@ -376,7 +374,17 @@ async function startGeneration() {
   el.log.textContent = ""; setJob("running","所有建模和 STEP 导出均在浏览器本地执行。");
   const files = [], pieces = [], prefix = "rs-" + crypto.randomUUID().replace(/-/g,"");
   try {
-    await engineExecute("doc.open", {path:state.templatePath});
+    if (state.needsReset) {
+      state.engine = null;
+      await new Promise((resolve, reject) => {
+        const frame = el.solidCraftFrame;
+        const timeout = setTimeout(() => reject(new Error("重新加载模型模板超时。")), 60000);
+        frame.addEventListener("load", () => { clearTimeout(timeout); resolve(); }, {once:true});
+        frame.src = state.engineUrl;
+      });
+      await waitForEngine();
+    }
+    state.needsReset = true;
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i], base = filePart(row[0]), temp = prefix + "-" + (i + 1);
       setJob("running","正在生成 " + (i + 1) + "/" + rows.length + "：" + row[0]);
