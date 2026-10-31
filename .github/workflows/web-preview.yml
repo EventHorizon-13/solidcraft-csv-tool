@@ -12,6 +12,10 @@ on:
       - '.github/workflows/web-preview.yml'
       - 'tests/web_resources_smoke.py'
 
+concurrency:
+  group: web-preview-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -221,6 +225,8 @@ jobs:
           if gh release view "$tag" -R "$repo" >/dev/null 2>&1; then
             gh release upload "$tag" "${files[@]}" --clobber -R "$repo"
             gh release edit "$tag" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
+            # Keep this preview tag in sync with its replaceable build assets.
+            gh api --method PATCH "repos/$repo/git/refs/tags/$tag" -f sha="$GITHUB_SHA" -F force=true
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
           fi
