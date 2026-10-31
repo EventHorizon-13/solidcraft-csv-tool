@@ -50,7 +50,7 @@ app.Use(async (context, next) =>
             context.Response.Headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
             context.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type";
             context.Response.Headers["Access-Control-Max-Age"] = "600";
-            context.Response.Headers.AppendCommaSeparatedValues("Vary", "Origin");
+            context.Response.Headers["Vary"] = "Origin";
         }
         if (HttpMethods.IsOptions(context.Request.Method))
         {
