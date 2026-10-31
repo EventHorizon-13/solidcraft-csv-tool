@@ -1,0 +1,22 @@
+.client-workspace{grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"work settings" "craft craft";align-items:start}
+.client-workspace .work-area{grid-area:work;display:block;min-width:0}
+.client-workspace .settings{grid-area:settings;position:static;top:auto}
+.client-workspace .craft-panel{grid-area:craft;padding:14px;min-width:0;overflow:hidden}
+.client-workspace .craft-panel>.section-heading{margin:0 2px 10px}
+.client-workspace .craft-panel>.section-heading h2{font-size:13px}
+#solidCraftFrame{display:block;width:100%;height:min(70vh,820px);min-height:540px;border:1px solid var(--line);border-radius:6px;background:#f7f8f7}
+.client-workspace .settings .output-note{font-size:11px;color:var(--muted);line-height:1.65;margin:12px 0}
+.client-workspace .step-options>.fields{margin-top:12px}
+.client-workspace .fields{grid-template-columns:1fr}
+.client-workspace .check-row{margin:4px 0 12px}
+.client-limit{margin:14px 0 0;color:var(--muted);font-size:10px;line-height:1.6}
+.client-workspace .job{margin-top:12px}
+.client-workspace .job .section-heading strong{font-size:10px;font-weight:500;background:var(--accent-soft);color:var(--accent);padding:3px 8px;border-radius:20px}
+.client-workspace .job-body{margin-top:10px}
+.client-workspace .job-status{min-height:0;color:var(--muted);font-size:11px;margin:0 0 8px}
+.client-workspace .log-details{margin-top:8px}
+.client-workspace .step-button{width:100%;min-height:40px}
+@media(max-width:900px){.client-workspace{grid-template-columns:1fr;grid-template-areas:"work" "settings" "craft";padding:20px}.client-workspace .settings{position:static}.client-workspace .fields{grid-template-columns:1fr 1fr}}
+@media(max-width:800px){.client-workspace .work-area{display:block}.client-workspace .workspace-heading{grid-row:auto}.client-workspace .table-panel{grid-row:auto}.client-workspace .job{grid-row:auto}.client-workspace .craft-panel{grid-row:auto}#solidCraftFrame{height:62vh;min-height:420px}}
+@media(max-width:480px){.client-workspace{padding:18px 12px}.client-workspace .craft-panel{padding:10px}#solidCraftFrame{height:58vh;min-height:360px}}
+.download-link{position:fixed;left:-10000px;top:0}
