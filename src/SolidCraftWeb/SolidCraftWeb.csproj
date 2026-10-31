@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>standard-roller-seal-web</AssemblyName>
     <RootNamespace>SolidCraftCsvTool</RootNamespace>
-    <Version>0.1.1-preview</Version>
+    <Version>0.1.2-preview</Version>
     <Product>标准辊密封批量生成 Web Preview</Product>
   </PropertyGroup>
   <ItemGroup>

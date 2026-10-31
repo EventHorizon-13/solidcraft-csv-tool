@@ -11,6 +11,7 @@ on:
       - '模板/**'
       - '.github/workflows/web-preview.yml'
       - 'tests/web_resources_smoke.py'
+      - 'tests/PdfPathChecks/**'
 
 concurrency:
   group: web-preview-${{ github.ref }}
@@ -55,6 +56,12 @@ jobs:
             echo "Unsafe dynamic HTML/code execution API found in Web UI."
             exit 1
           fi
+
+      - name: Check PDF subprocess paths
+        if: matrix.arch == 'amd64'
+        shell: bash
+        run: |
+          PDF_PATH_TEST_NODE="$(command -v node)" dotnet run --project tests/PdfPathChecks/PdfPathChecks.csproj -c Release
 
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -174,7 +181,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.1')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.2')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -196,8 +203,8 @@ jobs:
             printf 'Expected two Web preview packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="web-0.1.1-preview"
-          title="标准辊密封批量生成 Web 0.1.1 Preview"
+          tag="web-0.1.2-preview"
+          title="标准辊密封批量生成 Web 0.1.2 Preview"
           cat > dist/release-notes.md <<'EOF'
           Web UI + Linux 后端测试版，不作为 Windows 正式版替代。
 
@@ -209,6 +216,11 @@ jobs:
           - Linux amd64 / arm64 自包含包。
           - API 输入限制、CSP、安全响应头、路径隔离；未配置访问令牌时 API 仅允许本机访问。
           - CI 已实际启动 amd64 Web 服务并提交一行参数，验证生成 .solidcraft、DXF 和 CSV。
+
+          修复：
+          - PDF 渲染子进程的清单文件改用绝对路径，避免切换工作目录后出现 ENOENT。
+          - 系统服务没有用户应用数据目录时，工作文件落到系统临时目录；临时路径统一绝对化。
+          - 新增相对/绝对工作目录、空格和中文路径的子进程回归检查。
 
           新增：
           - 输出设置支持上传固定 A4 DXF 图框，以及获授权的 gbenor.shx、gbcbig.shx 字体。
@@ -230,4 +242,5 @@ jobs:
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
           fi
+
 

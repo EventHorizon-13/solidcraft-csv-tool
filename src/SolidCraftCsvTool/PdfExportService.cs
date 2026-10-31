@@ -32,7 +32,9 @@ internal static class PdfExportService
         if (!File.Exists(node)) throw new FileNotFoundException("找不到随软件包附带的开源 Node.js 运行时。", node);
         if (!File.Exists(script)) throw new FileNotFoundException("找不到 MLightCAD PDF 渲染器。请完整解压软件包。", script);
 
-        string manifest = Path.Combine(workDirectory, "pdf-manifest.json");
+        // The renderer starts in PdfExporter, not the caller's working directory.
+        // Resolve before the process boundary, including relative CLI work paths.
+        string manifest = Path.GetFullPath(Path.Combine(workDirectory, "pdf-manifest.json"));
         await File.WriteAllTextAsync(manifest, JsonSerializer.Serialize(new
         {
             inputs = pageDxfFiles.Select(Path.GetFullPath).ToArray(),
@@ -81,4 +83,5 @@ internal static class PdfExportService
             throw new InvalidDataException("PDF 渲染器输出内容无效。");
     }
 }
+
 

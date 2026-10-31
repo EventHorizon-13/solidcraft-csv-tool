@@ -18,7 +18,9 @@ public static class Exporter
         else if(options.ExportPdf)throw new InvalidDataException("导出 PDF 时必须提供加工图设置。");
         if(options.Combined&&options.Rows.Any(row=>(OutputNames.Part(row.Name,stamp)+".step").Equals(combinedName,StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("组合 STEP 名不能与单件 STEP 名相同。");
-        string work = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolidCraft", "csv-tool", "run-" + Guid.NewGuid().ToString("N"));
+        string dataRoot = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(dataRoot)) dataRoot = Path.GetTempPath();
+        string work = Path.GetFullPath(Path.Combine(dataRoot, "SolidCraft", "csv-tool", "run-" + Guid.NewGuid().ToString("N")));
         Directory.CreateDirectory(work);
         bool success = false;
         try
@@ -171,3 +173,4 @@ public static class Exporter
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 }
+
