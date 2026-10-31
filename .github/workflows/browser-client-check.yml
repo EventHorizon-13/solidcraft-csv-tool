@@ -15,6 +15,15 @@ jobs:
           node-version: 22
       - run: npm install --no-save playwright@1.58.2
       - run: npx playwright install --with-deps chromium
+      - name: Prepare standalone browser site
+        run: |
+          mkdir -p browser-site/roller-seal/solidcraft work
+          cp src/SolidCraftWeb/wwwroot/*.js src/SolidCraftWeb/wwwroot/*.css src/SolidCraftWeb/wwwroot/index.html browser-site/roller-seal/
+          cp '模板/标准辊密封.solidcraft' browser-site/roller-seal/client-template.solidcraft
+          curl -fL --retry 3 https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/solidcraft-web-0.28.0.zip -o work/web.zip
+          echo 'b0f28e2839dea7213fbbc622998ed1b17c3504c63cb9e2ea8ddf95e308e0e5de  work/web.zip' | sha256sum -c
+          unzip -q work/web.zip -d work
+          cp -R work/solidcraft-web-0.28.0/. browser-site/roller-seal/solidcraft/
       - run: node tests/browser-client-check.cjs
       - name: Validate ZIP members
         run: |

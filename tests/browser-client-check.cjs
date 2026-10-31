@@ -1,6 +1,10 @@
 const {chromium} = require('playwright');
 const fs = require('fs');
+const {spawn}=require('child_process');
 (async()=>{
+ const server=spawn('python3',['-m','http.server','8765','--bind','127.0.0.1','--directory','browser-site']);
+ process.on('exit',()=>server.kill());
+ await new Promise(r=>setTimeout(r,1000));
  const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage({acceptDownloads:true,viewport:{width:1440,height:1000}});
  page.on('pageerror',e=>console.log('PAGE ERROR',e.message));
@@ -12,7 +16,7 @@ const fs = require('fs');
   const url=new URL(r.request().url());url.searchParams.set('webgl','');
   return r.continue({url:url.href});
  });
- await page.goto('https://iobyte.cn/roller-seal/',{waitUntil:'domcontentloaded'});
+ await page.goto('http://127.0.0.1:8765/roller-seal/',{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>document.querySelector('#connectionState').textContent.includes('已就绪'),{},{timeout:240000});
  console.log('Browser engine ready');
  for(let n=0;n<2;n++){
@@ -26,5 +30,5 @@ const fs = require('fs');
   console.log('Generation',n+1,'downloaded',b.length);
  }
  await page.screenshot({path:'browser-result.png',fullPage:true});
- await browser.close();
+ await browser.close();server.kill();
 })().catch(e=>{console.error(e);process.exit(1)});
