@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   els.stepBtn.addEventListener("click", () => startJob(false));
   els.dxfBtn.addEventListener("click", () => startJob(true));
   els.cancelBtn.addEventListener("click", cancelJob);
+  els.downloadBtn.addEventListener("click", downloadResult);
   els.grid.addEventListener("paste", pasteGrid);
   settingIds.forEach(id => els[id].addEventListener("change", saveSettings));
   connect();
@@ -277,7 +278,7 @@ async function pollJob() {
       els.stepBtn.disabled = false;
       els.dxfBtn.disabled = false;
       if (data.downloadable) {
-        els.downloadBtn.href = "/api/jobs/" + state.currentJob + "/download";
+        els.downloadBtn.dataset.job = state.currentJob;
         els.downloadBtn.classList.remove("disabled");
         els.downloadBtn.setAttribute("aria-disabled", "false");
       }
@@ -310,7 +311,36 @@ function setJobState(status, message) {
   els.jobMessage.textContent = message || "";
 }
 
+async function downloadResult(event) {
+  event.preventDefault();
+  const id = els.downloadBtn.dataset.job;
+  if (!id) return;
+  try {
+    const response = await fetch("/api/jobs/" + id + "/download", { headers: headers() });
+    if (!response.ok) {
+      let message = "下载失败：" + response.status;
+      try {
+        const body = await response.json();
+        if (body.error) message = body.error;
+      } catch (_) {}
+      throw new Error(message);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "辊密封_" + id.slice(0, 8) + ".zip";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    writeLog("下载失败：" + error.message);
+  }
+}
+
 function clearDownload() {
+  delete els.downloadBtn.dataset.job;
   els.downloadBtn.removeAttribute("href");
   els.downloadBtn.classList.add("disabled");
   els.downloadBtn.setAttribute("aria-disabled", "true");
