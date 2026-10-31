@@ -148,6 +148,9 @@ function normalizeRows() {
   const names = new Set();
   return state.rows.map((source, index) => {
     const line = index + 2, row = source.map(value => String(value == null ? "" : value).trim());
+    if (row[10] !== "" && Number(row[10]) === 0 && row[11] !== "" && Number(row[11]) === 0) {
+      for (const c of [12,13]) if (row[c] === "") row[c] = DEFAULT_ROW[c];
+    }
     if (row.slice(0,14).some(value => !value)) throw new Error("第 " + line + " 行有空白参数。");
     let name = row[0].replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/^[ .]+|[ .]+$/g, "");
     if (!name) throw new Error("第 " + line + " 行编号无效。");
