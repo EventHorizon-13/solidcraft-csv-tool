@@ -1,4 +1,4 @@
-name: Build and release 2.4.6
+name: Build and release 2.4.7
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.4.6" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.4.7" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify semicircle and core regression checks
@@ -137,7 +137,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.4.6" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.4.7" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -210,15 +210,16 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.4.6"
-          title="标准辊密封批量生成 2.4.6"
+          tag="win-2.4.7"
+          title="标准辊密封批量生成 2.4.7"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.4.6 正式版。
+          标准辊密封批量生成 2.4.7 正式版。
 
           - Windows 桌面版记住上次正常窗口尺寸；最大化退出时保留最大化前的宽高。
           - 内置官方 SolidCraft CLI 升级至 v0.28.0；旧版 V13 模板继续兼容。
           - 修复上视图右侧半孔尺寸偏差：取消向附近投影边线吸附，以对齐后的实际圆弧切线计算。
           - 例如 Ø90 半孔输出实际 45 尺寸；数值按几何计算，不固定孔径。
+          - 修复右端半孔末端 1 mm 边界线段被过滤导致的尺寸链少 1 mm；600 mm 与 660 mm 尺寸链均按真实端点闭合。
           - 新增 R35、R45、R47.5 半孔及干扰边线、坐标偏移回归检查。
           - 保留真实完整半圆、外鼓半圆误拟合修复及孔位置与子头独立尺寸标注。
           - Windows 桌面版：amd64、arm64；Linux CLI：amd64、arm64。

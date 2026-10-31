@@ -73,7 +73,10 @@ internal static partial class MachiningDxf
     {
         EndGroove? left=FindGroove(map,true),right=FindGroove(map,false);
         var b=map.Projection.Bounds;
-        var topEdges=StraightEdges(map.Projection).Where(e=>Math.Abs(e.A.Y-b.MaxY)<.02&&Math.Abs(e.B.Y-b.MaxY)<.02&&Math.Abs(e.A.X-e.B.X)>1).ToArray();
+        // A real 1 mm end fragment may connect the last half-hole tangent to the
+        // body end. Ignore only degenerate geometry; dropping this fragment shortens
+        // the plan span and makes the final dimension chain 1 mm short.
+        var topEdges=StraightEdges(map.Projection).Where(e=>Math.Abs(e.A.Y-b.MaxY)<.02&&Math.Abs(e.B.Y-b.MaxY)<.02&&Math.Abs(e.A.X-e.B.X)>.05).ToArray();
         double bodyMin=topEdges.Length==0?b.MinX:topEdges.Min(e=>Math.Min(e.A.X,e.B.X));
         double bodyMax=topEdges.Length==0?b.MaxX:topEdges.Max(e=>Math.Max(e.A.X,e.B.X));
         // Front-view circles and plan-view bore edges share the aligned X axis.
