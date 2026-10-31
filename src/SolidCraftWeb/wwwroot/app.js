@@ -1,15 +1,16 @@
 "use strict";
 
 const els = {};
-const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null, resourceId: sessionStorage.getItem("rollerSealResources") || null, resources: null };
-const settingIds = ["combineStep","exportCsv","includeFrame","stepName","hiddenLineScale","viewGap"];
+const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null };
+const settingIds = ["combineStep","exportCsv","stepName","hiddenLineScale","viewGap"];
 
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid","jobPanel","jobActions",
-    "combineStep","exportCsv","includeFrame","stepName","hiddenLineScale","viewGap",
-    "stepBtn","dxfBtn","pdfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log","drawingTemplate","fontFiles","uploadResourcesBtn","resetResourcesBtn","resourceStatus"]) {
+    "combineStep","exportCsv","stepName","hiddenLineScale","viewGap",
+    "stepBtn","dxfBtn","pdfBtn","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log"]) {
     els[id] = document.getElementById(id);
   }
+  sessionStorage.removeItem("rollerSealResources");
   els.apiToken.value = sessionStorage.getItem("rollerSealToken") || "";
   els.connectBtn.addEventListener("click", connect);
   els.importBtn.addEventListener("click", () => els.csvFile.click());
@@ -23,8 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
   els.downloadBtn.addEventListener("click", downloadResult);
   els.grid.addEventListener("paste", pasteGrid);
   settingIds.forEach(id => els[id].addEventListener("change", saveSettings));
-  els.uploadResourcesBtn.addEventListener("click", uploadResources);
-  els.resetResourcesBtn.addEventListener("click", () => { selectResources(null); connect(); });
   connect();
 });
 
@@ -56,17 +55,6 @@ async function connect() {
     loadSettings();
     if (!state.rows.length) state.rows = [data.defaultRow.slice()];
     renderTable();
-    const caps = [];
-
-    caps.push(data.capabilities.drawingTemplate ? "DXF 图框已就绪" : "无图框（附编号）");
-    caps.push("PDF 按页等比例输出");
-    els.capabilities.textContent = caps.join(" · ");
-    state.resources = { pdf: data.capabilities.pdf };
-    els.includeFrame.disabled = !data.capabilities.drawingTemplate;
-    if (state.resourceId) {
-      try { selectResources(await api("/api/resources/" + state.resourceId)); }
-      catch (error) { selectResources(null); els.resourceStatus.textContent = error.message; }
-    }
     setConnection("已连接 · " + data.version);
   } catch (error) {
     setConnection(error.message);
@@ -239,12 +227,10 @@ async function validateRows() {
 
 function jobRequest(format) {
   return {
-    resourceId: state.resourceId,
     rows: state.rows,
     combineStep: els.combineStep.checked,
     exportCsv: els.exportCsv.checked,
     outputFormat: format,
-    includeFrame: els.includeFrame.checked,
     stepName: els.stepName.value.trim(),
     hiddenLineScale: Number(els.hiddenLineScale.value),
     viewGap: Number(els.viewGap.value)
@@ -395,38 +381,4 @@ function writeLog(text) {
   els.log.scrollTop = els.log.scrollHeight;
 }
 
-
-function selectResources(data) {
-  state.resourceId = data?.resourceId || null;
-  state.resources = data;
-  if (data) els.includeFrame.disabled = !data.drawingTemplate;
-  if (state.resourceId) sessionStorage.setItem("rollerSealResources", state.resourceId);
-  else sessionStorage.removeItem("rollerSealResources");
-  const fontLabel = data?.customFonts ? "自定义字体" : "默认思源黑体";
-  els.resourceStatus.textContent = data
-    ? [data.drawingTemplate ? "图框已上传" : "无图框", fontLabel, data.pdf ? "PDF 可用" : "PDF 资源未齐"].join(" · ")
-    : "使用默认资源";
-  if (data) els.capabilities.textContent = [data.drawingTemplate ? "图框已就绪" : "无图框（附编号）", fontLabel, data.pdf ? "PDF 等比例分页" : "PDF 资源未齐"].join(" · ");
-}
-
-async function uploadResources() {
-  const form = new FormData();
-  const frame = els.drawingTemplate.files[0];
-  const fonts = Array.from(els.fontFiles.files);
-  if (!frame && !fonts.length) { els.resourceStatus.textContent = "请先选择 DXF 图框或 SHX 字体。"; return; }
-  if ((frame && frame.size > 8 * 1024 * 1024) || fonts.some(f => f.size > 4 * 1024 * 1024) || fonts.length > 3) {
-    els.resourceStatus.textContent = "DXF 最大 8 MiB，最多三个字体且每个最大 4 MiB。"; return;
-  }
-  if (state.resourceId) form.append("resourceId", state.resourceId);
-  if (frame) form.append("drawingTemplate", frame);
-  fonts.forEach(file => form.append("fonts", file));
-  els.uploadResourcesBtn.disabled = true;
-  els.resourceStatus.textContent = "正在上传…";
-  try {
-    selectResources(await api("/api/resources", { method: "POST", body: form }));
-    els.drawingTemplate.value = "";
-    els.fontFiles.value = "";
-  } catch (error) { els.resourceStatus.textContent = "上传失败：" + error.message; }
-  finally { els.uploadResourcesBtn.disabled = false; }
-}
 

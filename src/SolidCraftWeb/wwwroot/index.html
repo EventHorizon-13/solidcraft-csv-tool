@@ -50,19 +50,7 @@
     <div class="fields">
       <label>隐藏线比例<input id="hiddenLineScale" type="number" min="0.05" max="100" step="0.05" value="2"></label>
       <label>视图间距 mm<input id="viewGap" type="number" min="10" max="5000" step="1"></label>
-    </div>
-    <details class="resource-upload">
-      <summary>图框与字体<span class="optional">可选</span></summary>
-      <div class="resource-fields">
-        <label>图框 DXF<input id="drawingTemplate" type="file" accept=".dxf"></label>
-        <label>授权 SHX 字体<input id="fontFiles" type="file" accept=".shx" multiple></label>
-      </div>
-      <p class="hint">图框 ≤ 8 MiB；gbenor.shx、gbcbig.shx、isocp.shx 各 ≤ 4 MiB。</p>
-      <div class="actions resource-actions"><button id="uploadResourcesBtn" type="button">上传并使用</button><button id="resetResourcesBtn" type="button" class="quiet">重置资源</button></div>
-      <p id="resourceStatus" class="hint" role="status" aria-live="polite">默认使用内置思源黑体</p>
-    </details>
-    <label class="check-option"><input id="includeFrame" type="checkbox">使用上传图框</label>
-    <p id="capabilities" class="resource-note">无图框时附零件编号；PDF 按页等比例输出。</p>
+    </div>    <p class="output-note">导出自动附零件编号；PDF 按页等比例输出。</p>
     <div class="export-actions"><button id="dxfBtn" type="button">生成 DXF <span>↗</span></button><button id="pdfBtn" type="button" class="primary">生成 PDF <span>↗</span></button></div>
     <details class="step-options" open><summary>STEP 输出</summary><div class="fields"><label class="field-wide">组合 STEP 文件名<input id="stepName" type="text" maxlength="180"></label></div><div class="check-row"><label><input id="combineStep" type="checkbox">合并 STEP</label><label><input id="exportCsv" type="checkbox">任务 CSV</label></div><button id="stepBtn" type="button" class="step-button">生成 STEP / ZIP</button></details>
   </aside>
