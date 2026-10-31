@@ -375,6 +375,7 @@ function selectResources(data) {
   els.resourceStatus.textContent = data
     ? [data.drawingTemplate ? "图框已上传" : "缺少图框", data.fonts.gbenor ? "gbenor 已上传" : "缺少 gbenor", data.fonts.gbcbig ? "gbcbig 已上传" : "缺少 gbcbig", data.pdf ? "可导出 PDF" : "PDF 资源未齐"].join(" · ")
     : "使用内置资源";
+  if (data) els.capabilities.textContent = "当前使用上传资源 · " + (data.pdf ? "图框与字体已齐" : "PDF 资源未齐");
 }
 
 async function uploadResources() {
