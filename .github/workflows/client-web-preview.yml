@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dotnet publish src/SolidCraftWeb/SolidCraftWeb.csproj -c Release -r '\${{ matrix.rid }}' \
+          dotnet publish src/SolidCraftWeb/SolidCraftWeb.csproj -c Release -r '${{ matrix.rid }}' \
             --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o dist/publish
 
@@ -92,12 +92,12 @@ jobs:
         run: |
           set -euo pipefail
           cp README.md THIRD_PARTY_NOTICES.md dist/publish/
-          tar -czf "dist/StandardRollerSeal-client-api-linux-\${{ matrix.arch }}.tar.gz" -C dist/publish .
+          tar -czf "dist/StandardRollerSeal-client-api-linux-${{ matrix.arch }}.tar.gz" -C dist/publish .
 
       - uses: actions/upload-artifact@v4
         with:
-          name: StandardRollerSeal-client-api-linux-\${{ matrix.arch }}
-          path: dist/StandardRollerSeal-client-api-linux-\${{ matrix.arch }}.tar.gz
+          name: StandardRollerSeal-client-api-linux-${{ matrix.arch }}
+          path: dist/StandardRollerSeal-client-api-linux-${{ matrix.arch }}.tar.gz
           retention-days: 14
 
       - name: Package iobyte.cn site subdirectory
