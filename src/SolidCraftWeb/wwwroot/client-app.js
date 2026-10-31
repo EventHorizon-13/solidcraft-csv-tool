@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const template = new URL("./client-template.solidcraft", location.href).href;
   const url = new URL("./solidcraft/", location.href);
   url.searchParams.set("open", template);
-  url.searchParams.set("embed", "");
+  // Exporting requires normal mode: embed mode disables files_tick/OPFS flushing.
   el.solidCraftFrame.src = url.toString();
   waitForEngine().catch(error => setConnection("SolidCraft 加载失败：" + error.message));
 });
@@ -204,6 +204,9 @@ async function waitForEngine() {
         const defaults = await readTemplateDefaults(api, 60000);
         state.engine = api;
         state.defaults = defaults;
+        state.templatePath = "/opfs/rs-template-" + crypto.randomUUID() + ".solidcraft";
+        const saved = await api.execute("file.save_as", {path:state.templatePath,format:"container",cache:true});
+        await opfsBytes(state.templatePath.slice("/opfs/".length), saved.bytes);
         setConnection("SolidCraft 已就绪 · 本机计算");
         el.jobMessage.textContent = "建模、校验与 STEP 导出均在此浏览器完成。";
         setBusy(false);
@@ -280,11 +283,33 @@ function requireClearInterference(result, expectedBodies) {
     throw new Error("组合 STEP 未导出：相交 " + Math.max(result.count,result.interferences.length) + " 对，未检查 " + result.unchecked.length + " 项，实体 " + result.checked + "/" + expectedBodies + "。" + detail);
   }
 }
-async function opfsBytes(name) {
-  if (!navigator.storage || typeof navigator.storage.getDirectory !== "function") throw new Error("当前浏览器不支持 OPFS 文件存储。");
-  const root = await navigator.storage.getDirectory();
-  const handle = await root.getFileHandle(name);
-  return new Uint8Array(await (await handle.getFile()).arrayBuffer());
+async function opfsBytes(name, expectedBytes, timeoutMs = 30000) {
+  // Engine commands finish before the Web app flushes its virtual files to OPFS.
+  const frame = el.solidCraftFrame.contentWindow;
+  const storage = frame && frame.navigator.storage;
+  if (!storage || typeof storage.getDirectory !== "function") throw new Error("当前浏览器不支持 OPFS 文件存储。");
+  const until = Date.now() + timeoutMs;
+  let latestError;
+  while (Date.now() < until) {
+    try {
+      const root = await storage.getDirectory();
+      const handle = await root.getFileHandle(name);
+      const file = await handle.getFile();
+      if (file.size > 0 && (!Number.isSafeInteger(expectedBytes) || file.size === expectedBytes)) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        if (bytes.length === file.size) return bytes;
+      }
+    } catch (error) {
+      if (!["NotFoundError", "NotReadableError", "InvalidStateError"].includes(error.name)) throw error;
+      latestError = error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error("等待浏览器写入导出文件超时：" + name + (latestError ? "（" + latestError.message + "）" : ""));
+}
+async function engineExecute(command, params) {
+  try { return await state.engine.execute(command, params); }
+  catch (error) { throw new Error(command + "：" + (error.message || String(error))); }
 }
 function safeDownload(bytes, name, type) {
   const url = URL.createObjectURL(new Blob([bytes], {type:type || "application/octet-stream"}));
@@ -351,12 +376,13 @@ async function startGeneration() {
   el.log.textContent = ""; setJob("running","所有建模和 STEP 导出均在浏览器本地执行。");
   const files = [], pieces = [], prefix = "rs-" + crypto.randomUUID().replace(/-/g,"");
   try {
+    await engineExecute("file.open", {path:state.templatePath});
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i], base = filePart(row[0]), temp = prefix + "-" + (i + 1);
       setJob("running","正在生成 " + (i + 1) + "/" + rows.length + "：" + row[0]);
       const changes = rowChanges(row);
-      await state.engine.execute("parameters.change",{changes});
-      const parameterResult = await state.engine.execute("parameters.list",{filter:"user"});
+      await engineExecute("parameters.change",{changes});
+      const parameterResult = await engineExecute("parameters.list",{filter:"user"});
       const parameterList = parameterResult && Array.isArray(parameterResult.parameters) ? parameterResult.parameters : [];
       const halfChecks = parameterList.filter(parameter => parameter.name === "半孔校验");
       const halfValue = halfChecks.length === 1 ? readNumber(halfChecks[0].value) : NaN;
@@ -370,34 +396,34 @@ async function startGeneration() {
       }
       const nativeName = temp + ".solidcraft", stepName = temp + ".step";
       const nativePath = "/opfs/" + nativeName, stepPath = "/opfs/" + stepName;
-      await state.engine.execute("file.save_as",{path:nativePath,format:"container",cache:true,preview:true});
-      await state.engine.execute("file.export",{path:stepPath,format:"step"});
-      files.push({name:base + ".solidcraft",bytes:await opfsBytes(nativeName)});
-      files.push({name:base + ".step",bytes:await opfsBytes(stepName)});
+      const nativeResult = await engineExecute("file.save_as",{path:nativePath,format:"container",cache:true,preview:true});
+      const stepResult = await engineExecute("file.export",{path:stepPath,format:"step"});
+      files.push({name:base + ".solidcraft",bytes:await opfsBytes(nativeName, nativeResult.bytes)});
+      files.push({name:base + ".step",bytes:await opfsBytes(stepName, stepResult.bytes)});
       pieces.push({row,base,bounds,stepPath});
       el.jobProgress.value = i + 1;
       writeLog("已在本机生成 " + base + "（SolidCraft + STEP）。");
     }
     if (el.combineStep.checked) {
       setJob("running","正在浏览器内排布并检查组合 STEP…");
-      await state.engine.execute("file.new",{name:"辊密封组合"});
+      await engineExecute("file.new",{name:"辊密封组合"});
       let cursor = 0;
       for (const piece of pieces) {
         const offset = cursor - piece.bounds.min[0];
-        const inserted = await state.engine.execute("file.insert_step",{path:piece.stepPath,name:piece.row[0],up:"z"});
+        const inserted = await engineExecute("file.insert_step",{path:piece.stepPath,name:piece.row[0],up:"z"});
         const occurrence = occurrenceId(inserted);
-        await state.engine.execute("occurrence.ground",{occurrence,grounded:false});
-        await state.engine.execute("occurrence.move",{occurrence,space:"world",translate:[offset,0,0]});
+        await engineExecute("occurrence.ground",{occurrence,grounded:false});
+        await engineExecute("occurrence.move",{occurrence,space:"world",translate:[offset,0,0]});
         cursor += piece.bounds.max[0] - piece.bounds.min[0] + gap;
       }
       const assembly = await state.engine.inspect({measure:true}), assemblyBounds = boundsOf(assembly);
       const expectedBodies = pieces.reduce((sum,piece) => sum + piece.bounds.bodies,0);
       if (assemblyBounds.bodies !== expectedBodies) throw new Error("组合中的实体数量与单件不一致，已停止导出。");
-      const interference = await state.engine.execute("inspect.interference",{budget_s:240});
+      const interference = await engineExecute("inspect.interference",{budget_s:240});
       requireClearInterference(interference,expectedBodies);
       const combinedTemp = prefix + "-combined.step", combinedPath = "/opfs/" + combinedTemp;
-      await state.engine.execute("file.export",{path:combinedPath,format:"step"});
-      files.push({name:combinedName,bytes:await opfsBytes(combinedTemp)});
+      const combinedResult = await engineExecute("file.export",{path:combinedPath,format:"step"});
+      files.push({name:combinedName,bytes:await opfsBytes(combinedTemp, combinedResult.bytes)});
       el.jobProgress.value = rows.length + 1;
       writeLog("组合 STEP 已导出，浏览器内实体数量与相交检查通过。");
     }

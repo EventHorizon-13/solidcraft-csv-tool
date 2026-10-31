@@ -1,0 +1,37 @@
+name: Browser client export check
+on:
+  push:
+    branches: [web-client-compute]
+    paths: [src/SolidCraftWeb/wwwroot/client-app.js, tests/browser-client-check.cjs, .github/workflows/browser-client-check.yml]
+  workflow_dispatch:
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/browser-client-check.cjs
+      - name: Validate ZIP members
+        run: |
+          python3 - <<'PY'
+          import zipfile,pathlib
+          for p in pathlib.Path('.').glob('browser-result-*.zip'):
+              with zipfile.ZipFile(p) as z:
+                  assert z.testzip() is None
+                  assert any(n.endswith('.solidcraft') for n in z.namelist())
+                  steps=[n for n in z.namelist() if n.endswith('.step')]
+                  assert len(steps)>=2,z.namelist()
+                  for n in steps: assert b'ISO-10303-21' in z.read(n)[:100]
+                  print(p,z.namelist())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-client-export-check
+          path: browser-result*
+          retention-days: 7
