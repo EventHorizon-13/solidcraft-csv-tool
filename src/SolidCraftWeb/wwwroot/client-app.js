@@ -148,7 +148,7 @@ function normalizeRows() {
   return state.rows.map((source, index) => {
     const line = index + 2, row = source.map(value => String(value == null ? "" : value).trim());
     if (row.slice(0,14).some(value => !value)) throw new Error("第 " + line + " 行有空白参数。");
-    let name = row[0].replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/[ .]+$/g, "");
+    let name = row[0].replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/^[ .]+|[ .]+$/g, "");
     if (!name) throw new Error("第 " + line + " 行编号无效。");
     if (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(name.split(".")[0])) name = "_" + name;
     if (names.has(name.toLowerCase())) throw new Error("第 " + line + " 行编号重复：" + name);
@@ -404,9 +404,9 @@ async function startGeneration() {
     if (el.exportCsv.checked) files.push({name:"辊密封_" + dateStamp() + ".csv",bytes:new TextEncoder().encode(csvText(rows))});
     const zip = makeZip(files);
     const zipName = "辊密封_" + dateStamp() + "_STEP.zip";
+    safeDownload(zip,zipName,"application/zip");
     const generatedAtUtc = new Date().toISOString();
     const recorded = await submitGenerationRecord(rows,generatedAtUtc);
-    safeDownload(zip,zipName,"application/zip");
     setJob("completed",recorded ? "生成完成，结果 ZIP 已下载到当前设备。" : "生成完成，结果 ZIP 已下载；服务器生成记录未能提交。");
     writeLog("浏览器已生成并下载 " + zipName + "（" + files.length + " 个文件）；没有上传模型或导出文件。");
   } catch (error) {
@@ -418,10 +418,15 @@ async function startGeneration() {
 }
 async function submitGenerationRecord(rows,generatedAtUtc) {
   try {
-    const response = await fetch("https://srs.arcsiny.com/api/generation-records",{
-      method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({generatedAtUtc,rows})
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    let response;
+    try {
+      response = await fetch("https://srs.arcsiny.com/api/generation-records",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({generatedAtUtc,rows}),signal:controller.signal
+      });
+    } finally { clearTimeout(timeout); }
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || ("HTTP " + response.status));
