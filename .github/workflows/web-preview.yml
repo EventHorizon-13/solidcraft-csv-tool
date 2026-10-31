@@ -190,9 +190,10 @@ jobs:
           - 暂不提供 3D/图纸预览。
           - PDF 需要有效 A4 DXF 图框和授权 SHX 字体资源。
           EOF
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "${files[@]}" --clobber
-            gh release edit "$tag" --title "$title" --notes-file dist/release-notes.md --prerelease
+          repo="EventHorizon-13/solidcraft-roller-seal"
+          if gh release view "$tag" -R "$repo" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber -R "$repo"
+            gh release edit "$tag" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
           else
-            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease
+            gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
           fi
