@@ -1,0 +1,131 @@
+name: Web Linux preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [web-linux-ui]
+    paths:
+      - 'src/SolidCraftWeb/**'
+      - 'src/SolidCraftCsvTool/**'
+      - 'tools/pdf-export/**'
+      - '模板/**'
+      - '.github/workflows/web-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            rid: linux-x64
+            solidcraft_arch: x86_64
+            node_arch: x64
+          - arch: arm64
+            rid: linux-arm64
+            solidcraft_arch: aarch64
+            node_arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Verify web project and core checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet build src/SolidCraftWeb/SolidCraftWeb.csproj -c Release
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
+          fi
+          if grep -R -nE 'innerHTML|eval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(' src/SolidCraftWeb/wwwroot; then
+            echo "Unsafe dynamic HTML/code execution API found in Web UI."
+            exit 1
+          fi
+
+      - name: Install open-source PDF renderer
+        run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
+
+      - name: Bundle official SolidCraft CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/official dist/app/SolidCraft
+          archive="solidcraft-0.28.0-linux-${{ matrix.solidcraft_arch }}.tar.gz"
+          curl --fail --location "https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/$archive" --output "dist/$archive"
+          tar -xzf "dist/$archive" -C dist/official
+          cli="$(find dist/official -type f -name solidcraft-cli -print -quit)"
+          test -n "$cli"
+          install -m 755 "$cli" dist/app/SolidCraft/solidcraft-cli
+          for notice in LICENSE-MIT LICENSE-APACHE NOTICE THIRD-PARTY-LICENSES.txt; do
+            curl --fail --location "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" --output "dist/app/SolidCraft/$notice"
+          done
+
+      - name: Bundle Node.js runtime and PDF renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          node_version="$(node --version)"
+          archive="node-$node_version-linux-${{ matrix.node_arch }}.tar.xz"
+          curl --fail --location "https://nodejs.org/dist/$node_version/$archive" --output "dist/$archive"
+          mkdir -p dist/node dist/app/PdfExporter
+          tar -xJf "dist/$archive" -C dist/node
+          node_dir="$(find dist/node -mindepth 1 -maxdepth 1 -type d -name 'node-*' -print -quit)"
+          install -m 755 "$node_dir/bin/node" dist/app/PdfExporter/node
+          cp "$node_dir/LICENSE" dist/app/PdfExporter/LICENSE-Node.js
+          node tools/pdf-export/build-bundle.mjs dist/app/PdfExporter
+
+      - name: Publish Web preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish src/SolidCraftWeb/SolidCraftWeb.csproj -c Release -r '${{ matrix.rid }}' \
+            --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o dist/publish
+          cp -R dist/publish/. dist/app/
+          cp README.md THIRD_PARTY_NOTICES.md dist/app/
+          cp -R 模板/. dist/app/模板/
+          cp tools/pdf-export/fonts.json.example dist/app/模板/字体/fonts.json.example
+          cp examples/辊密封参数模板.csv dist/app/辊密封参数模板.csv
+
+      - name: Start Web service smoke test
+        if: matrix.arch == 'amd64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist/app
+          ASPNETCORE_URLS=http://127.0.0.1:5080 ./standard-roller-seal-web >web-smoke.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5080/api/bootstrap >bootstrap.json; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q '"columns"' bootstrap.json
+          grep -q '"solidCraft":true' bootstrap.json
+          curl --fail --silent http://127.0.0.1:5080/ | grep -q 'Web Preview'
+
+      - name: Package preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf "dist/StandardRollerSeal-web-linux-${{ matrix.arch }}.tar.gz" -C dist/app .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StandardRollerSeal-web-linux-${{ matrix.arch }}
+          path: dist/StandardRollerSeal-web-linux-${{ matrix.arch }}.tar.gz
+          retention-days: 14
