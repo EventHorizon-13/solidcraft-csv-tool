@@ -117,6 +117,23 @@ jobs:
           grep -q '"columns"' bootstrap.json
           grep -q '"solidCraft":true' bootstrap.json
           curl --fail --silent http://127.0.0.1:5080/ | grep -q 'Web Preview'
+          cat >job.json <<'JSON'
+          {"rows":[["1","5","90","120","105","200","1","1","0","0","0","0","30","30","","","",""]],"combineStep":false,"exportCsv":true,"exportDxf":true,"exportPdf":false}
+          JSON
+          curl --fail --silent -H 'Content-Type: application/json' --data-binary @job.json http://127.0.0.1:5080/api/jobs >job-created.json
+          job_id="$(python3 -c 'import json; print(json.load(open("job-created.json"))["id"])')"
+          for i in $(seq 1 180); do
+            curl --fail --silent "http://127.0.0.1:5080/api/jobs/$job_id" >job-state.json
+            status="$(python3 -c 'import json; print(json.load(open("job-state.json"))["status"])')"
+            if [ "$status" = "completed" ]; then break; fi
+            if [ "$status" = "failed" ] || [ "$status" = "cancelled" ]; then cat job-state.json; exit 1; fi
+            sleep 1
+          done
+          test "$status" = "completed"
+          curl --fail --silent "http://127.0.0.1:5080/api/jobs/$job_id/download" --output result.zip
+          unzip -l result.zip | grep -q '\.solidcraft'
+          unzip -l result.zip | grep -q '\.dxf'
+          unzip -l result.zip | grep -q '\.csv'
 
       - name: Package preview
         shell: bash
