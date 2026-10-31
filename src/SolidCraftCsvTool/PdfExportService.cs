@@ -24,7 +24,7 @@ internal static class PdfExportService
 
     public static async Task ExportAsync(IReadOnlyList<string> pageDxfFiles, string outputFile,
         string fontDirectory, string workDirectory, IProgress<ExportProgress> progress,
-        CancellationToken cancellation)
+        CancellationToken cancellation, double? sheetWidth = null, double? sheetHeight = null)
     {
         if (pageDxfFiles.Count == 0) throw new InvalidDataException("没有可导出的 PDF 页面。");
         ValidateFontDirectory(fontDirectory);
@@ -40,6 +40,8 @@ internal static class PdfExportService
         string manifest = Path.GetFullPath(Path.Combine(workDirectory, "pdf-manifest.json"));
         await File.WriteAllTextAsync(manifest, JsonSerializer.Serialize(new
         {
+            fitBox = sheetWidth is > 0 && sheetHeight is > 0
+                ? new { min = new { x = 0d, y = 0d }, max = new { x = sheetWidth.Value, y = sheetHeight.Value } } : null,
             inputs = pageDxfFiles.Select(Path.GetFullPath).ToArray(),
             output = Path.GetFullPath(outputFile),
             fontDirectory = Path.GetFullPath(fontDirectory)

@@ -148,5 +148,6 @@ def boundary(page):
     assert closed, 'missing PDF page boundary'
     return max(closed,key=lambda b:b[0]*b[1])
 a,b = boundary(pdf.pages[0]),boundary(pdf.pages[1])
+assert a[0] > 1000 and a[1] > 800, (a,b)
 assert abs(a[0]-b[0]) < .01 and abs(a[1]-b[1]) < .01 and a[2] == b[2], (a,b)
 print('Direct no-frame DXF/PDF, labels, Source Han Sans rendering, A4 pagination and uniform page-boundary scale passed.')

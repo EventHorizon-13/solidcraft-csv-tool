@@ -41,6 +41,7 @@ for (let index = 0; index < inputs.length; index++) {
     paper: { widthMm: 297, heightMm: 210 },
     marginMm: 0,
     fit: 'extents',
+    fitBox: manifest.fitBox ?? undefined,
     background: 'none',
     showLineWeight: true,
     textMode: 'vector',

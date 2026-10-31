@@ -164,7 +164,10 @@ public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outpu
                 }
                 stagedPdf = Path.Combine(destination, $".{Path.GetFileNameWithoutExtension(outputName)}-{Guid.NewGuid():N}.tmp.pdf");
                 progress.Report(new($"正在渲染 {pages.Count} 页 A4 PDF…", pages.Count - 1));
-                await PdfExportService.ExportAsync(pdfPages, stagedPdf, drawingOptions.FontDirectory, work, progress, cancellation);
+                var pageFrame = DrawingResources.Load(drawingOptions).Frame;
+                await PdfExportService.ExportAsync(pdfPages, stagedPdf, drawingOptions.FontDirectory, work, progress, cancellation,
+                    sheetWidth: (pageFrame?.Boundary.Width ?? 1190) * pdfOptions.MinimumSheetScale,
+                    sheetHeight: (pageFrame?.Boundary.Height ?? 849) * pdfOptions.MinimumSheetScale);
             }
             cancellation.ThrowIfCancellationRequested();
             if (!drawingOptions.OverwriteOutput && File.Exists(outputPath)) throw new IOException("目标文件在出图期间出现，未覆盖原文件：" + outputPath);
