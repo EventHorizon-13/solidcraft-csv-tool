@@ -68,7 +68,7 @@ internal static class Program
                     TemplatePath = options.GetValueOrDefault("--drawing-template") ?? "",
                     FontDirectory = options.GetValueOrDefault("--font-dir") ?? (exportPdf ? Path.Combine(AppContext.BaseDirectory, "模板", "字体") : ""),
                     DimensionStyleName = options.GetValueOrDefault("--dimension-style") ?? "_5",
-                    HiddenLineScale = Number(options, "--hidden-line-scale", 1),
+                    HiddenLineScale = Number(options, "--hidden-line-scale", 2),
                     ViewGap = Number(options, "--view-gap", 60)
                 };
                 drawing.Validate();
@@ -155,7 +155,7 @@ internal static class Program
         Console.WriteLine("  --font-dir PATH            外置 SHX 字体目录，需含 gbenor.shx 和 gbcbig.shx；默认 模板/字体");
         Console.WriteLine("  --dimension-style NAME     标注样式，默认 _5");
         Console.WriteLine("  --dxf-name NAME            汇总 DXF 文件名");
-        Console.WriteLine("  --hidden-line-scale N      隐藏线比例，默认 1");
+        Console.WriteLine("  --hidden-line-scale N      隐藏线比例，默认 2");
         Console.WriteLine("  --view-gap MM              视图间距，默认 60");
         Console.WriteLine("  --stamp TEXT               文件名前缀日期，默认当前 MMDD");
         Console.WriteLine("  --engine PATH              SolidCraft CLI 路径；默认软件包内的 SolidCraft/solidcraft-cli");

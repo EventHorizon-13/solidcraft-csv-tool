@@ -12,7 +12,7 @@ public sealed record DrawingOptions
     public string TemplatePath { get; init; } = "";
     public string FontDirectory { get; init; } = "";
     public string DimensionStyleName { get; init; } = "_5";
-    public double HiddenLineScale { get; init; } = 1;
+    public double HiddenLineScale { get; init; } = 2;
     public double ViewGap { get; init; } = 60;
     public double FrameMargin { get; init; } = 35;
     public double SheetGap { get; init; } = 100;
