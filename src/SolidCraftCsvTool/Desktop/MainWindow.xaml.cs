@@ -27,7 +27,10 @@ public partial class MainWindow : Window
     internal MainWindow(DesktopSettings settings)
     {
         this.settings=settings;drawingOptions=settings.drawing??new();appearance=settings.Appearance;
-        InitializeComponent();Title=AppBuildInfo.WindowTitle;
+        InitializeComponent();
+        Width=RestoreDimension(settings.windowWidth,MinWidth,SystemParameters.WorkArea.Width,1360);
+        Height=RestoreDimension(settings.windowHeight,MinHeight,SystemParameters.WorkArea.Height,860);
+        Title=AppBuildInfo.WindowTitle;
         output.Text=settings.output;dxfBase.Text=settings.dxfBase??OutputNames.DefaultBase();stepBase.Text=settings.stepBase??OutputNames.DefaultBase();
         combined.IsChecked=settings.combined;taskCsv.IsChecked=settings.taskCsv;overwrite.IsChecked=settings.overwrite;
         openDxf.IsChecked=settings.openDxf;exportPdf.IsChecked=settings.exportPdf;
@@ -75,6 +78,11 @@ public partial class MainWindow : Window
         grid.ItemsSource=table.DefaultView;InitializeSpreadsheetInteractions();ResolveLocalTemplates();AddRow(ModelRules.DefaultRow());InitializeUndoRedo();
         Closing+=OnClosing;
     }
+    static double RestoreDimension(double value,double minimum,double available,double fallback)
+    {
+        if(!double.IsFinite(value)||value<=0)value=fallback;
+        return Math.Clamp(value,minimum,Math.Max(minimum,available));
+    }
     void OnClosing(object? sender,CancelEventArgs e)
     {
         if(cancellation!=null){cancellation.Cancel();e.Cancel=true;stop.IsEnabled=false;SetStatus("当前命令完成后停止，随后可以关闭窗口。");return;}
@@ -98,13 +106,18 @@ public partial class MainWindow : Window
         if(dxfBase.Text==OutputNames.DefaultBase(displayedStamp))dxfBase.Text=OutputNames.DefaultBase(now);
         if(stepBase.Text==OutputNames.DefaultBase(displayedStamp))stepBase.Text=OutputNames.DefaultBase(now);displayedStamp=now;
     }
-    void SaveSettings()
+    internal void SaveSettings()
     {
         settings.output=output.Text;settings.combined=combined.IsChecked==true;settings.taskCsv=taskCsv.IsChecked==true;
         settings.overwrite=overwrite.IsChecked==true;settings.openDxf=openDxf.IsChecked==true;settings.exportPdf=exportPdf.IsChecked==true;
         settings.themeMode=appearance.ToString();settings.drawing=drawingOptions;
         settings.dxfBase=dxfBase.Text==OutputNames.DefaultBase(displayedStamp)?null:dxfBase.Text;
-        settings.stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text;settings.Save();
+        settings.stepBase=stepBase.Text==OutputNames.DefaultBase(displayedStamp)?null:stepBase.Text;
+        double savedWidth=WindowState==WindowState.Normal?ActualWidth:RestoreBounds.Width;
+        double savedHeight=WindowState==WindowState.Normal?ActualHeight:RestoreBounds.Height;
+        if(double.IsFinite(savedWidth)&&savedWidth>=MinWidth)settings.windowWidth=savedWidth;
+        if(double.IsFinite(savedHeight)&&savedHeight>=MinHeight)settings.windowHeight=savedHeight;
+        settings.Save();
     }
     void AddRow(string[] cells)=>table.Rows.Add(cells.Select((value,i)=>ModelRules.Flags.Contains(ModelRules.Columns[i])?(object)(value=="1"):value).ToArray());
     void CommitRows(){grid.CommitEdit(DataGridEditingUnit.Cell,true);grid.CommitEdit(DataGridEditingUnit.Row,true);}

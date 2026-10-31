@@ -33,6 +33,6 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## SolidCraft CLI 0.23.0
+## SolidCraft CLI 0.28.0
 
-Windows and Linux release packages bundle the unmodified official SolidCraft CLI from https://github.com/tangency-labs/solidcraft/releases/tag/v0.23.0 . SolidCraft is an independent application by Tangency Labs. Its MIT/Apache-2.0 licenses, NOTICE and THIRD-PARTY-LICENSES.txt accompany the binary under SolidCraft/. Source: https://github.com/tangency-labs/solidcraft/tree/v0.23.0 .
+Windows and Linux release packages bundle the unmodified official SolidCraft CLI from https://github.com/tangency-labs/solidcraft/releases/tag/v0.28.0 . SolidCraft is an independent application by Tangency Labs. Its MIT/Apache-2.0 licenses, NOTICE and THIRD-PARTY-LICENSES.txt accompany the binary under SolidCraft/. Source: https://github.com/tangency-labs/solidcraft/tree/v0.28.0 .

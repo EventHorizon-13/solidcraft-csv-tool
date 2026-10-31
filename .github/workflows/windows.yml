@@ -1,4 +1,4 @@
-name: Build and release 2.4.5
+name: Build and release 2.4.6
 on:
   workflow_dispatch:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Set release identity
         shell: pwsh
         run: |
-          "BUILD_VERSION=2.4.5" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUILD_VERSION=2.4.6" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           $date = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTimeOffset]::UtcNow, 'China Standard Time').ToString('yyyy-MM-dd HH:mm:ss')
           "BUILD_DATE=$date" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Verify semicircle and core regression checks
@@ -52,14 +52,14 @@ jobs:
         run: |
           $archive = "dist/solidcraft-${{ matrix.solidcraft_arch }}.zip"
           New-Item -ItemType Directory -Force dist/official, "${{ matrix.output }}/SolidCraft" | Out-Null
-          Invoke-WebRequest "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/solidcraft-0.23.0-windows-${{ matrix.solidcraft_arch }}-portable.zip" -OutFile $archive
+          Invoke-WebRequest "https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/solidcraft-0.28.0-windows-${{ matrix.solidcraft_arch }}-portable.zip" -OutFile $archive
           Expand-Archive $archive dist/official -Force
           $cli = Get-ChildItem dist/official -Recurse -Filter solidcraft-cli.exe | Select-Object -First 1
           if (-not $cli) { throw 'Official SolidCraft package has no CLI executable' }
           Copy-Item (Join-Path $cli.DirectoryName '*') "${{ matrix.output }}/SolidCraft" -Recurse
           Remove-Item "${{ matrix.output }}/SolidCraft/solidcraft.exe" -ErrorAction SilentlyContinue
           foreach ($notice in @('LICENSE-MIT','LICENSE-APACHE','NOTICE','THIRD-PARTY-LICENSES.txt')) {
-            Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" -OutFile "${{ matrix.output }}/SolidCraft/$notice"
+            Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" -OutFile "${{ matrix.output }}/SolidCraft/$notice"
           }
       - name: Bundle open-source Node.js runtime and PDF renderer
         shell: pwsh
@@ -137,7 +137,7 @@ jobs:
       - name: Set release identity
         shell: bash
         run: |
-          echo "BUILD_VERSION=2.4.5" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=2.4.6" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_ENV"
       - name: Install open-source PDF renderer
         run: npm install --prefix tools/pdf-export --ignore-scripts --no-audit --no-fund
@@ -146,14 +146,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/official dist/app/SolidCraft
-          archive="solidcraft-0.23.0-linux-${{ matrix.solidcraft_arch }}.tar.gz"
-          curl --fail --location "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/$archive" --output "dist/$archive"
+          archive="solidcraft-0.28.0-linux-${{ matrix.solidcraft_arch }}.tar.gz"
+          curl --fail --location "https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/$archive" --output "dist/$archive"
           tar -xzf "dist/$archive" -C dist/official
           cli="$(find dist/official -type f -name solidcraft-cli -print -quit)"
           test -n "$cli"
           install -m 755 "$cli" dist/app/SolidCraft/solidcraft-cli
           for notice in LICENSE-MIT LICENSE-APACHE NOTICE THIRD-PARTY-LICENSES.txt; do
-            curl --fail --location "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" --output "dist/app/SolidCraft/$notice"
+            curl --fail --location "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" --output "dist/app/SolidCraft/$notice"
           done
       - name: Bundle open-source Node.js runtime and PDF renderer
         shell: bash
@@ -210,11 +210,13 @@ jobs:
             printf 'Expected four architecture packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="win-2.4.5"
-          title="标准辊密封批量生成 2.4.5"
+          tag="win-2.4.6"
+          title="标准辊密封批量生成 2.4.6"
           cat > dist/release-notes.md <<EOF
-          标准辊密封批量生成 2.4.5 正式版。
+          标准辊密封批量生成 2.4.6 正式版。
 
+          - Windows 桌面版记住上次正常窗口尺寸；最大化退出时保留最大化前的宽高。
+          - 内置官方 SolidCraft CLI 升级至 v0.28.0；旧版 V13 模板继续兼容。
           - 修复上视图右侧半孔尺寸偏差：取消向附近投影边线吸附，以对齐后的实际圆弧切线计算。
           - 例如 Ø90 半孔输出实际 45 尺寸；数值按几何计算，不固定孔径。
           - 新增 R35、R45、R47.5 半孔及干扰边线、坐标偏移回归检查。

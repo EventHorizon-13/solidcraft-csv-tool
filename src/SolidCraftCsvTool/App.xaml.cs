@@ -98,6 +98,8 @@ public partial class DesktopApp : Application
 internal sealed class DesktopSettings
 {
     public string output {get;set;}=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"SolidCraft输出");
+    public double windowWidth {get;set;}=1360;
+    public double windowHeight {get;set;}=860;
     public bool combined {get;set;}=true;
     public bool taskCsv {get;set;}=true;
     public bool overwrite {get;set;}

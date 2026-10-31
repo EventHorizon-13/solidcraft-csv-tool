@@ -2,11 +2,17 @@
 
 面向标准辊密封零件的参数化建模与工程出图工具。通过参数表或 CSV 批量管理尺寸，自动调用随包提供的 SolidCraft CLI，生成三维模型和加工图文件。
 
-**版本：2.4.5**
+**版本：2.4.6**
 
 **支持平台：** Windows 10/11（x64、ARM64 桌面版）；Linux（amd64、ARM64 命令行版）。目前没有 macOS 桌面版。
 
 [下载最新正式版](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases/latest) · [查看所有版本](https://github.com/EventHorizon-13/solidcraft-roller-seal/releases) · [查看构建与 UI 测试](https://github.com/EventHorizon-13/solidcraft-roller-seal/actions)
+
+## 2.4.6 更新说明
+
+- Windows 桌面版记住上次正常窗口的宽度和高度；最大化退出时保存最大化前的尺寸，下次启动恢复。
+- 内置官方 SolidCraft CLI 升级至 **0.28.0**，Windows x64/ARM64 与 Linux amd64/ARM64 构建统一使用该版本。
+- 旧版 V13 标准模板可继续打开；注意 SolidCraft 0.28.0 保存的新设计使用文件格式 45，不能再由 0.27.x 或更早版本打开。
 
 ## 2.4.5 修复说明
 
@@ -23,7 +29,8 @@
 - **撤销与重做：** 支持 Ctrl+Z、Ctrl+Y 和 Ctrl+Shift+Z，填充、单元格编辑、整列修改、勾选切换及行操作均纳入历史记录。
 - **高效表格操作：** 单击即可切换勾选框；双击勾选列列头可全选/取消全选，双击其他列头可批量修改整列。
 - **深浅色主题：** 支持自动跟随系统、深色和浅色模式；当前单元格有明确外框，选中状态和设置选项卡均有高亮提示。
-- **独立运行环境：** Windows 桌面版自包含 .NET；安装包附带对应架构的官方 SolidCraft 0.23 CLI。PDF 导出所需 Node.js 运行时和渲染器也随包提供。
+- **独立运行环境：** Windows 桌面版自包含 .NET；安装包附带对应架构的官方 SolidCraft 0.28.0 CLI。PDF 导出所需 Node.js 运行时和渲染器也随包提供。
+- **窗口尺寸记忆：** 自动保存主窗口上次正常状态下的宽高；最大化关闭时保留最大化前尺寸。
 
 ## 界面截图
 
@@ -100,7 +107,7 @@
 | `辊密封_MMDD.pdf` | 多页 A4 横向加工图 PDF |
 | `辊密封_MMDD.csv` | 当前任务参数快照（可关闭） |
 
-`MMDD` 是生成当天的月日。默认名称会自动更新日期；合并 STEP、CSV 导出和自定义名称等选项会记住上次设置。
+`MMDD` 是生成当天的月日。默认名称会自动更新日期；合并 STEP、CSV 导出、自定义名称、窗口宽高等设置会自动记住。
 
 ## CSV 参数说明
 
@@ -122,7 +129,7 @@
 ## 运行环境与实现
 
 - Windows 桌面程序：WPF、.NET 10，自包含发布。
-- 三维建模：安装包附带官方 [SolidCraft 0.23 CLI](https://github.com/tangency-labs/solidcraft/releases/tag/v0.23.0)，后台运行，不需要手动打开 SolidCraft 窗口。
+- 三维建模：安装包附带官方 [SolidCraft 0.28.0 CLI](https://github.com/tangency-labs/solidcraft/releases/tag/v0.28.0)，后台运行，不需要手动打开 SolidCraft 窗口。
 - Linux：自包含 .NET CLI，支持 amd64 和 arm64。
 - PDF：使用开源 DXF 数据模型与矢量渲染器，并随安装包提供 Node.js 运行时；不包含 ODA 或专有 SDK。
 - 默认组合间距固定为 10 mm，后台控制端口固定为 7878。桌面版使用内置标准辊密封模型；CLI 可通过 `--template` 指定其他 V13 `.solidcraft` 模板。
@@ -157,7 +164,7 @@
 本地构建桌面项目需要 .NET 10 SDK：
 
 ```powershell
-dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.4.5
+dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Version=2.4.6
 ```
 
 第三方组件及许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。项目主页：[GitHub](https://github.com/EventHorizon-13/solidcraft-roller-seal)。

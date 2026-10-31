@@ -46,14 +46,14 @@ jobs:
         run: |
           $archive = "dist/solidcraft-${{ matrix.solidcraft_arch }}.zip"
           New-Item -ItemType Directory -Force dist/official, "${{ matrix.output }}/SolidCraft" | Out-Null
-          Invoke-WebRequest "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/solidcraft-0.23.0-windows-${{ matrix.solidcraft_arch }}-portable.zip" -OutFile $archive
+          Invoke-WebRequest "https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/solidcraft-0.28.0-windows-${{ matrix.solidcraft_arch }}-portable.zip" -OutFile $archive
           Expand-Archive $archive dist/official -Force
           $cli = Get-ChildItem dist/official -Recurse -Filter solidcraft-cli.exe | Select-Object -First 1
           if (-not $cli) { throw 'Official SolidCraft package has no CLI executable' }
           Copy-Item (Join-Path $cli.DirectoryName '*') "${{ matrix.output }}/SolidCraft" -Recurse
           Remove-Item "${{ matrix.output }}/SolidCraft/solidcraft.exe" -ErrorAction SilentlyContinue
           foreach ($notice in @('LICENSE-MIT','LICENSE-APACHE','NOTICE','THIRD-PARTY-LICENSES.txt')) {
-            Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" -OutFile "${{ matrix.output }}/SolidCraft/$notice"
+            Invoke-WebRequest "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" -OutFile "${{ matrix.output }}/SolidCraft/$notice"
           }
       - name: Bundle open-source Node.js runtime and PDF renderer
         shell: pwsh
@@ -123,14 +123,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/official dist/app/SolidCraft
-          archive="solidcraft-0.23.0-linux-${{ matrix.solidcraft_arch }}.tar.gz"
-          curl --fail --location "https://github.com/tangency-labs/solidcraft/releases/download/v0.23.0/$archive" --output "dist/$archive"
+          archive="solidcraft-0.28.0-linux-${{ matrix.solidcraft_arch }}.tar.gz"
+          curl --fail --location "https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/$archive" --output "dist/$archive"
           tar -xzf "dist/$archive" -C dist/official
           cli="$(find dist/official -type f -name solidcraft-cli -print -quit)"
           test -n "$cli"
           install -m 755 "$cli" dist/app/SolidCraft/solidcraft-cli
           for notice in LICENSE-MIT LICENSE-APACHE NOTICE THIRD-PARTY-LICENSES.txt; do
-            curl --fail --location "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.23.0/$notice" --output "dist/app/SolidCraft/$notice"
+            curl --fail --location "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" --output "dist/app/SolidCraft/$notice"
           done
       - name: Bundle open-source Node.js runtime and PDF renderer
         shell: bash

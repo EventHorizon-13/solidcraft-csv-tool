@@ -138,6 +138,7 @@ internal static class DesktopSmoke
     }
     internal static async Task Run(MainWindow window,string[] args)
     {
+        double originalWidth=window.Width,originalHeight=window.Height;
         string? Arg(string name){int i=Array.IndexOf(args,name);return i>=0&&i+1<args.Length?args[i+1]:null;}
         window.LoadSmokeRows();
         window.VerifySpreadsheetInteractions();
@@ -196,7 +197,17 @@ internal static class DesktopSmoke
         {
             window.Width=window.MinWidth;window.Height=window.MinHeight;DesktopApp.SetAppearance(AppearanceMode.Light);await Settle(window);window.VerifyUi();VerifyContrast(window);Capture(window,minimum);
         }
-        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; WPS-style fill series/copy; bulk column editing; checkbox-header select-all; theme contrast; selected-cell outline and fill handle; selected settings-tab background and indicator; themed update prompt; aligned About dialog; adjustable log; main/settings/about/update prompt and minimum size.");
+        double testWidth=Math.Clamp(window.MinWidth+80,window.MinWidth,Math.Max(window.MinWidth,SystemParameters.WorkArea.Width));
+        double testHeight=Math.Clamp(window.MinHeight+60,window.MinHeight,Math.Max(window.MinHeight,SystemParameters.WorkArea.Height));
+        window.Width=testWidth;window.Height=testHeight;await Settle(window);window.SaveSettings();
+        var persisted=DesktopSettings.Load();
+        if(Math.Abs(persisted.windowWidth-window.ActualWidth)>1||Math.Abs(persisted.windowHeight-window.ActualHeight)>1)
+            throw new InvalidOperationException("主窗口尺寸未正确保存。");
+        var reopened=new MainWindow(persisted);
+        if(Math.Abs(reopened.Width-testWidth)>1||Math.Abs(reopened.Height-testHeight)>1)
+            throw new InvalidOperationException("主窗口未恢复上次尺寸。");
+        window.Width=originalWidth;window.Height=originalHeight;await Settle(window);window.SaveSettings();
+        File.WriteAllText(Path.Combine(AppContext.BaseDirectory,"smoke-success.txt"),"PASS: six-row data; WPS-style fill series/copy; bulk column editing; checkbox-header select-all; theme contrast; selected-cell outline and fill handle; selected settings-tab background and indicator; themed update prompt; aligned About dialog; adjustable log; main/settings/about/update prompt and minimum size; window size save/restore.");
         window.Close();
     }
 }
