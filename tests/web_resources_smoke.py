@@ -130,24 +130,19 @@ assert len(pdf.pages) == 2
 for page in pdf.pages:
     assert abs(float(page.mediabox.width) - 841.89) < 1
     assert abs(float(page.mediabox.height) - 595.28) < 1
-# The longest straight closed rectangle is the shared page boundary. Its model
-# size and transform must match across pages, despite different part dimensions.
-def boundary(page):
-    points, closed = [], []
+# Compare the effective geometry CTM emitted into each actual PDF page.
+# PDF polylines may be emitted as separate stroke segments, so a closed-path
+# detector would incorrectly measure a glyph or a semicircle instead of a box.
+from collections import Counter
+def geometry_transform(page):
+    transforms = Counter()
     def visit(operator, operands, cm, tm):
-        nonlocal points
-        if operator == b'm': points = [(float(operands[0]), float(operands[1]))]
-        elif operator == b'l': points.append((float(operands[0]), float(operands[1])))
-        elif operator in (b'h',b'S',b's') and len(points) >= 4:
-            xs, ys = zip(*points)
-            if max(xs) > min(xs) and max(ys) > min(ys):
-                closed.append((max(xs)-min(xs),max(ys)-min(ys),tuple(round(float(v),5) for v in cm)))
-        elif operator in (b'S', b's', b'f', b'f*', b'n'): points=[]
+        if operator in (b'm', b'l'):
+            transforms[tuple(round(float(v),5) for v in cm)] += 1
     page.extract_text(visitor_operand_before=visit)
-    print('Largest PDF closed paths:', sorted(closed,key=lambda b:b[0]*b[1])[-5:])
-    assert closed, 'missing PDF page boundary'
-    return max(closed,key=lambda b:b[0]*b[1])
-a,b = boundary(pdf.pages[0]),boundary(pdf.pages[1])
-assert a[0] > 1000 and a[1] > 800, (a,b)
-assert abs(a[0]-b[0]) < .01 and abs(a[1]-b[1]) < .01 and a[2] == b[2], (a,b)
-print('Direct no-frame DXF/PDF, labels, Source Han Sans rendering, A4 pagination and uniform page-boundary scale passed.')
+    assert transforms, 'no vector geometry in PDF'
+    return transforms.most_common(1)[0][0]
+a,b = geometry_transform(pdf.pages[0]), geometry_transform(pdf.pages[1])
+assert a == b and a[0] > 0 and a[3] > 0, (a,b)
+assert pdf.pages[0].get_contents().get_data() != pdf.pages[1].get_contents().get_data()
+print('Direct no-frame DXF/PDF, labels, Source Han Sans rendering, A4 pagination and identical geometry transforms passed:',a)
