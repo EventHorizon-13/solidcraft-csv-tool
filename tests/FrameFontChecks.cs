@@ -9,7 +9,7 @@ internal static class FrameFontChecks
     public static void Run(string directory)
     {
         var sourceHan = DrawingResources.Load(new DrawingOptions { UseBundledFont = true, UseDefaultSourceHan = true });
-        if (sourceHan.Style.LengthPrecision != 2 || sourceHan.Style.TextStyle.FontFile != "SourceHanSansSC-Regular.ttf")
+        if (sourceHan.Style.LengthPrecision != 2 || !sourceHan.Style.SuppressLinearTrailingZeros || sourceHan.Style.TextStyle.FontFile != "SourceHanSansSC-Regular.ttf")
             throw new Exception("Web default Source Han must use two optional decimal places.");
         foreach (var sample in new[] { (60d, "60"), (60.1, "60.1"), (60.126, "60.13"), (-60.126, "-60.13") })
             if (DrawingResources.FormatDimension(sample.Item1, sourceHan.Style) != sample.Item2)
@@ -20,7 +20,7 @@ internal static class FrameFontChecks
         File.WriteAllText(Path.Combine(customFontDirectory, "isocp.shx"), "fixture");
         var customFont = DrawingResources.Load(new DrawingOptions { UseBundledFont = true, FontDirectory = customFontDirectory });
         customFont.Style.DimRoundoff = 0;
-        if (customFont.Style.LengthPrecision != 3 || customFont.Style.TextStyle.FontFile != "isocp.shx" ||
+        if (customFont.Style.LengthPrecision != 3 || customFont.Style.SuppressLinearTrailingZeros || customFont.Style.TextStyle.FontFile != "isocp.shx" ||
             DrawingResources.FormatDimension(60.126, customFont.Style) != "60.126")
             throw new Exception("Custom SHX fonts must retain the original dimension precision.");
 

@@ -69,7 +69,11 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         {
             var defaults = DefaultStyle();
             if (options.UseBundledFont) defaults.TextStyle = PreferredTextStyle(options, false);
-            if (options.UseDefaultSourceHan) defaults.LengthPrecision = 2;
+            if (options.UseDefaultSourceHan)
+            {
+                defaults.LengthPrecision = 2;
+                defaults.SuppressLinearTrailingZeros = true;
+            }
             return new(defaults, null);
         }
         DxfDocument template = DxfDocument.Load(options.TemplatePath) ?? throw new InvalidDataException("无法读取 DXF 模板。");
@@ -85,7 +89,11 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         }
         var style = (DimensionStyle)template.DimensionStyles[options.DimensionStyleName].Clone();
         if (options.UseBundledFont) style.TextStyle = PreferredTextStyle(options, false);
-        if (options.UseDefaultSourceHan) style.LengthPrecision = 2;
+        if (options.UseDefaultSourceHan)
+        {
+            style.LengthPrecision = 2;
+            style.SuppressLinearTrailingZeros = true;
+        }
         FrameSource? frame = options.IncludeFrame ? FindFrame(template) : null;
         if (options.IncludeFrame && frame == null) throw new InvalidDataException("模板中没有找到独立的矩形图框块；请关闭图框或使用含图框块的 DXF。");
         return new(style, frame);

@@ -44,7 +44,9 @@ def upload(files, resource_id=None, **options):
 # Genuine structural DXF fixture with a distinct dimension style demonstrates that
 # a job uses the selected resource set instead of the package's/default template.
 doc = ezdxf.new('R2010')
-doc.dimstyles.new('upload-test')
+upload_style = doc.dimstyles.new('upload-test')
+upload_style.dxf.dimdec = 4
+upload_style.dxf.dimzin = 0
 block = doc.blocks.new('A4_FRAME')
 block.add_lwpolyline([(0, 0), (297, 0), (297, 210), (0, 210)], close=True)
 doc.modelspace().add_blockref('A4_FRAME', (0, 0))
@@ -94,9 +96,14 @@ for _ in range(180):
     time.sleep(1)
 assert result['status'] == 'completed', result
 archive = call('/api/jobs/' + job['id'] + '/download')
-names = zipfile.ZipFile(io.BytesIO(archive)).namelist()
-assert any(name.endswith('.dxf') for name in names), names
-print('Targeted uploads, authentication, invalid files, size/path limits, immutable sets and selected-frame DXF job passed.')
+archive_file = zipfile.ZipFile(io.BytesIO(archive))
+names = archive_file.namelist()
+dxf_name = next((name for name in names if name.endswith('.dxf')), None)
+assert dxf_name, names
+selected_drawing = ezdxf.read(io.StringIO(archive_file.read(dxf_name).decode('utf-8-sig')))
+selected_style = selected_drawing.dimstyles.get('upload-test')
+assert selected_style.dxf.dimdec == 2 and selected_style.dxf.dimzin & 8, (selected_style.dxf.dimdec, selected_style.dxf.dimzin)
+print('Targeted uploads, auth, resource immutability, default Source Han 2-decimal/trailing-zero suppression and selected-frame DXF job passed.')
 
 
 # New Web downloads: no ZIP for DXF/PDF; no-frame DXF contains a part label and
@@ -113,6 +120,13 @@ def run_job(payload):
     assert result['status'] == 'completed', result
     return result, call('/api/jobs/' + job['id'] + '/download')
 
+custom_result, custom_archive = run_job(dict(payload, resourceId=second['resourceId']))
+custom_zip = zipfile.ZipFile(io.BytesIO(custom_archive))
+custom_dxf_name = next(name for name in custom_zip.namelist() if name.endswith('.dxf'))
+custom_drawing = ezdxf.read(io.StringIO(custom_zip.read(custom_dxf_name).decode('utf-8-sig')))
+custom_style = custom_drawing.dimstyles.get('upload-test')
+assert custom_style.dxf.dimdec == 4 and custom_style.dxf.dimzin == 0, (custom_style.dxf.dimdec, custom_style.dxf.dimzin)
+
 row = boot['defaultRow'].copy()
 row[0] = '2'
 row[5] = str(float(row[5]) * 10)
@@ -125,6 +139,8 @@ assert not list(drawing.modelspace().query('*[layer=="FRAME"]'))
 labels = [entity.dxf.text for entity in drawing.modelspace().query('TEXT') if '编号' in entity.dxf.text]
 assert len(labels) == 2 and labels[0] != labels[1], labels
 assert any('SourceHanSansSC-Regular.ttf' in style.dxf.font for style in drawing.styles)
+default_style = drawing.dimstyles.get('_5')
+assert default_style.dxf.dimdec == 2 and default_style.dxf.dimzin & 8, (default_style.dxf.dimdec, default_style.dxf.dimzin)
 result, raw = run_job({'rows': rows, 'outputFormat': 'pdf', 'includeFrame': False})
 assert result['contentType'] == 'application/pdf' and result['downloadName'].endswith('.pdf')
 assert raw.startswith(b'%PDF-') and not raw.startswith(b'PK')
