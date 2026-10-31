@@ -1,6 +1,13 @@
 name: Browser-compute Web preview
 on:
   workflow_dispatch:
+  push:
+    branches: [web-client-compute]
+    paths:
+      - 'src/SolidCraftWeb/**'
+      - '模板/标准辊密封.solidcraft'
+      - 'CLIENT_COMPUTE_EXPERIMENT.md'
+      - '.github/workflows/client-web-preview.yml'
 
 permissions:
   contents: read
