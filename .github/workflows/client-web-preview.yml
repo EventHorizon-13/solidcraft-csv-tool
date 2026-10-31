@@ -53,17 +53,14 @@ jobs:
             https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/solidcraft-web-0.28.0.zip \
             --output "$archive"
           printf '%s  %s\n' b0f28e2839dea7213fbbc622998ed1b17c3504c63cb9e2ea8ddf95e308e0e5de "$archive" | sha256sum --check
-          unzip -q "$archive" -d dist/publish/wwwroot/solidcraft
-          unzip -q "$archive" -d dist/site-root/roller-seal/solidcraft
-          test -f dist/publish/wwwroot/solidcraft/index.html
+          mkdir -p work/solidcraft-web-unpacked
+          unzip -q "$archive" -d work/solidcraft-web-unpacked
+          web_root=work/solidcraft-web-unpacked/solidcraft-web-0.28.0
+          test -f "$web_root/index.html"
+          cp -R "$web_root/." dist/publish/wwwroot/solidcraft/
+          cp -R "$web_root/." dist/site-root/roller-seal/solidcraft/
           cp '模板/标准辊密封.solidcraft' dist/publish/wwwroot/client-template.solidcraft
           cp '模板/标准辊密封.solidcraft' dist/site-root/roller-seal/client-template.solidcraft
-          for notice in LICENSE-MIT LICENSE-APACHE; do
-            curl --fail --location --retry 3 \
-              "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" \
-              --output "dist/publish/wwwroot/solidcraft/$notice"
-            cp "dist/publish/wwwroot/solidcraft/$notice" "dist/site-root/roller-seal/solidcraft/$notice"
-          done
           printf '%s\n' 'SolidCraft Web v0.28.0, same-origin browser build.' \
             'Upstream source: https://github.com/tangency-labs/solidcraft' \
             'See the adjacent license files for license terms.' \
