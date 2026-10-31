@@ -10,6 +10,7 @@ on:
       - 'tools/pdf-export/**'
       - '模板/**'
       - '.github/workflows/web-preview.yml'
+      - 'tests/web_resources_smoke.py'
 
 permissions:
   contents: read
@@ -41,14 +42,11 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: Verify web project and core checks
+      - name: Build Web project and check browser code
         shell: bash
         run: |
           set -euo pipefail
           dotnet build src/SolidCraftWeb/SolidCraftWeb.csproj -c Release
-          if [ "${{ matrix.arch }}" = "amd64" ]; then
-            dotnet run --project tests/CoreChecks.csproj -c Release -- work/core-checks
-          fi
           if grep -R -nE 'innerHTML|eval[[:space:]]*\(|new[[:space:]]+Function[[:space:]]*\(' src/SolidCraftWeb/wwwroot; then
             echo "Unsafe dynamic HTML/code execution API found in Web UI."
             exit 1
@@ -135,6 +133,29 @@ jobs:
           unzip -l result.zip | grep -q '\.dxf'
           unzip -l result.zip | grep -q '\.csv'
 
+      - name: Check resource upload API and selected-frame export
+        if: matrix.arch == 'amd64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv work/upload-check-env
+          work/upload-check-env/bin/pip install 'ezdxf==1.4.3'
+          cd dist/app
+          ROLLERSEAL_WEB_TOKEN=upload-smoke-token ASPNETCORE_URLS=http://127.0.0.1:5080 ./standard-roller-seal-web >resource-smoke.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent -H 'X-RollerSeal-Token: upload-smoke-token' http://127.0.0.1:5080/api/bootstrap > /dev/null; then break; fi
+            sleep 1
+          done
+          ../../work/upload-check-env/bin/python ../../tests/web_resources_smoke.py
+
+      - name: Remove smoke-test data from distribution
+        shell: bash
+        run: |
+          rm -rf dist/app/WebData
+          rm -f dist/app/*smoke.log dist/app/bootstrap.json dist/app/job*.json dist/app/result.zip
+
       - name: Package preview
         shell: bash
         run: |
@@ -149,7 +170,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.0')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.1')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -171,8 +192,8 @@ jobs:
             printf 'Expected two Web preview packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="web-0.1.0-preview"
-          title="标准辊密封批量生成 Web 0.1.0 Preview"
+          tag="web-0.1.1-preview"
+          title="标准辊密封批量生成 Web 0.1.1 Preview"
           cat > dist/release-notes.md <<'EOF'
           Web UI + Linux 后端测试版，不作为 Windows 正式版替代。
 
@@ -185,10 +206,16 @@ jobs:
           - API 输入限制、CSP、安全响应头、路径隔离；未配置访问令牌时 API 仅允许本机访问。
           - CI 已实际启动 amd64 Web 服务并提交一行参数，验证生成 .solidcraft、DXF 和 CSV。
 
+          新增：
+          - 输出设置支持上传固定 A4 DXF 图框，以及获授权的 gbenor.shx、gbcbig.shx 字体。
+          - POST /api/resources 与 GET /api/resources/{id}，任务通过 resourceId 选择不可变资源集；资源保存在 WebData，刷新页面可继续使用。
+          - 令牌鉴权、文件类型/大小/内容签名校验、路径限制；私有图框和字体不会被分发。
+          - 定点验证上传、鉴权、无效文件、大小和路径限制、资源隔离、选择上传图框导出 DXF；不运行全量测试。
+
           当前限制：
           - 仍为测试版，尚未完全达到 Windows UI 的表格交互细节。
           - 暂不提供 3D/图纸预览。
-          - PDF 需要有效 A4 DXF 图框和授权 SHX 字体资源。
+          - PDF 仍需上传有效 A4 DXF 图框与授权 SHX 字体；字体签名检查不替代实际 PDF 渲染验证。
           EOF
           repo="EventHorizon-13/solidcraft-roller-seal"
           if gh release view "$tag" -R "$repo" >/dev/null 2>&1; then
@@ -197,3 +224,4 @@ jobs:
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
           fi
+

@@ -13,13 +13,14 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 1024 * 1024;
+    options.MultipartBodyLengthLimit = WebResources.MaxBodyBytes;
     options.ValueLengthLimit = 128 * 1024;
 });
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 2 * 1024 * 1024);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = WebResources.MaxBodyBytes);
 
 var app = builder.Build();
-var jobs = new JobStore(AppContext.BaseDirectory);
+var resources = new WebResources(AppContext.BaseDirectory);
+var jobs = new JobStore(AppContext.BaseDirectory, resources);
 var apiToken = Environment.GetEnvironmentVariable("ROLLERSEAL_WEB_TOKEN");
 
 app.Use(async (context, next) =>
@@ -55,7 +56,7 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
     var local = LocalTemplates.Find(AppContext.BaseDirectory, AppContext.BaseDirectory);
     return Results.Json(new
     {
-        version = "0.1.0-preview",
+        version = "0.1.1-preview",
         columns = ModelRules.Columns,
         flags = ModelRules.Flags.OrderBy(x => x).ToArray(),
         defaultRow = ModelRules.DefaultRow(),
@@ -74,9 +75,32 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
         {
             solidCraft = File.Exists(JobStore.EnginePath(AppContext.BaseDirectory)),
             drawingTemplate = local.Dxf != null,
-            pdf = local.Dxf != null && Directory.Exists(Path.Combine(AppContext.BaseDirectory, "模板", "字体"))
+            pdf = resources.Resolve(null).Dxf != null && resources.Resolve(null).FontsReady
         }
     });
+});
+
+app.MapGet("/api/resources/{id}", (HttpRequest request, string id) =>
+{
+    if (!Authorized(request)) return Denied();
+    try { return Results.Json(resources.Resolve(id).Snapshot()); }
+    catch (Exception ex) when (ex is InvalidDataException or FileNotFoundException)
+    { return Results.NotFound(new { error = ex.Message }); }
+});
+
+app.MapPost("/api/resources", async (HttpRequest request, CancellationToken cancellation) =>
+{
+    if (!Authorized(request)) return Denied();
+    if (!request.HasFormContentType) return Results.BadRequest(new { error = "请使用 multipart/form-data 上传图框和字体。" });
+    try
+    {
+        var form = await request.ReadFormAsync(cancellation);
+        return Results.Json((await resources.UploadAsync(form, cancellation)).Snapshot());
+    }
+    catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
+    { return Results.Json(new { error = "上传请求不能超过 20 MiB。" }, statusCode: 413); }
+    catch (Exception ex) when (ex is InvalidDataException or FileNotFoundException or ArgumentException)
+    { return Results.BadRequest(new { error = ex.Message }); }
 });
 
 app.MapPost("/api/csv/parse", async (HttpRequest request, CancellationToken cancellation) =>
@@ -175,16 +199,19 @@ public sealed record JobRequest(
     string? Stamp = null,
     double HiddenLineScale = 1,
     double ViewGap = 60,
-    string DimensionStyle = "_5");
+    string DimensionStyle = "_5",
+    string? ResourceId = null);
 
 public sealed class JobStore
 {
     readonly ConcurrentDictionary<string, JobState> jobs = new(StringComparer.Ordinal);
     readonly string root;
+    readonly WebResources resources;
     readonly SemaphoreSlim gate = new(1, 1);
 
-    public JobStore(string applicationRoot)
+    public JobStore(string applicationRoot, WebResources resources)
     {
+        this.resources = resources;
         root = Path.Combine(applicationRoot, "WebData", "jobs");
         Directory.CreateDirectory(root);
     }
@@ -221,32 +248,34 @@ public sealed class JobStore
         string id = Guid.NewGuid().ToString("N");
         string directory = Path.Combine(root, id);
         string output = Path.Combine(directory, "output");
-        Directory.CreateDirectory(output);
 
         DrawingOptions? drawing = null;
         if (request.ExportDxf || request.ExportPdf)
         {
-            if (request.ExportPdf && local.Dxf == null)
-                throw new FileNotFoundException("PDF 导出需要安装包中的固定 A4 DXF 图框模板。");
-            string fontDirectory = Path.Combine(AppContext.BaseDirectory, "模板", "字体");
+            var selected = resources.Resolve(request.ResourceId);
+            if (request.ExportPdf && selected.Dxf == null)
+                throw new FileNotFoundException("PDF 导出需要固定 A4 DXF 图框，请先在输出设置中上传。");
+            string fontDirectory = selected.FontDirectory;
             drawing = new DrawingOptions
             {
                 OverwriteOutput = true,
                 OutputFileName = request.DxfName,
-                TemplatePath = local.Dxf ?? "",
+                TemplatePath = selected.Dxf ?? "",
                 FontDirectory = request.ExportPdf ? fontDirectory : "",
                 DimensionStyleName = string.IsNullOrWhiteSpace(request.DimensionStyle) ? "_5" : request.DimensionStyle.Trim(),
                 HiddenLineScale = request.HiddenLineScale,
                 ViewGap = request.ViewGap,
-                IncludeFrame = local.Dxf != null
+                IncludeFrame = selected.Dxf != null
             };
             drawing.Validate();
+            if (selected.Dxf != null) _ = DrawingResources.Load(drawing);
             if (request.ExportPdf) PdfExportService.ValidateFontDirectory(fontDirectory);
         }
 
         string? stepName = string.IsNullOrWhiteSpace(request.StepName) ? null : OutputNames.FileName(request.StepName, ".step", stamp)[..^5];
         if (!string.IsNullOrWhiteSpace(request.DxfName)) _ = OutputNames.FileName(request.DxfName, ".dxf", stamp);
 
+        Directory.CreateDirectory(output);
         var state = new JobState(id);
         if (!jobs.TryAdd(id, state)) throw new IOException("无法创建任务。");
 
@@ -376,3 +405,4 @@ public sealed class JobState
         }
     }
 }
+

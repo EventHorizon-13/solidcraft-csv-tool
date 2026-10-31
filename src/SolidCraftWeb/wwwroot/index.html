@@ -53,6 +53,19 @@
         <label>隐藏线比例<input id="hiddenLineScale" type="number" min="0.05" max="100" step="0.05"></label>
         <label>视图间距 mm<input id="viewGap" type="number" min="10" max="5000" step="1"></label>
       </div>
+      <details class="resource-upload" open>
+        <summary>图框与字体</summary>
+        <div class="resource-fields">
+          <label>固定 A4 图框 · DXF<input id="drawingTemplate" type="file" accept=".dxf"></label>
+          <label>授权字体 · SHX<input id="fontFiles" type="file" accept=".shx" multiple></label>
+        </div>
+        <p class="hint">图框最大 8 MiB；字体需 gbenor.shx 和 gbcbig.shx，每个最大 4 MiB。</p>
+        <div class="actions">
+          <button id="uploadResourcesBtn" type="button">上传并使用</button>
+          <button id="resetResourcesBtn" type="button">使用内置资源</button>
+        </div>
+        <p id="resourceStatus" class="hint" role="status" aria-live="polite">未选择上传资源</p>
+      </details>
       <div class="actions">
         <button id="stepBtn" type="button" class="primary">生成 STEP</button>
         <button id="dxfBtn" type="button" class="primary">生成 DXF / PDF</button>
@@ -79,3 +92,4 @@
 <script src="/app.js" defer></script>
 </body>
 </html>
+

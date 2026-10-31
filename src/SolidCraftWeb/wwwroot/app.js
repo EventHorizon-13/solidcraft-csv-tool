@@ -1,13 +1,13 @@
 "use strict";
 
 const els = {};
-const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null };
+const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null, resourceId: sessionStorage.getItem("rollerSealResources") || null, resources: null };
 const settingIds = ["combineStep","exportCsv","exportPdf","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap"];
 
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid",
     "combineStep","exportCsv","exportPdf","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap",
-    "stepBtn","dxfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log"]) {
+    "stepBtn","dxfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log","drawingTemplate","fontFiles","uploadResourcesBtn","resetResourcesBtn","resourceStatus"]) {
     els[id] = document.getElementById(id);
   }
   els.apiToken.value = sessionStorage.getItem("rollerSealToken") || "";
@@ -22,6 +22,8 @@ document.addEventListener("DOMContentLoaded", () => {
   els.downloadBtn.addEventListener("click", downloadResult);
   els.grid.addEventListener("paste", pasteGrid);
   settingIds.forEach(id => els[id].addEventListener("change", saveSettings));
+  els.uploadResourcesBtn.addEventListener("click", uploadResources);
+  els.resetResourcesBtn.addEventListener("click", () => { selectResources(null); connect(); });
   connect();
 });
 
@@ -58,6 +60,11 @@ async function connect() {
     caps.push(data.capabilities.drawingTemplate ? "DXF 图框已就绪" : "未发现 DXF 图框");
     caps.push(data.capabilities.pdf ? "PDF 资源已发现" : "PDF 资源可能不完整");
     els.capabilities.textContent = caps.join(" · ");
+    state.resources = { pdf: data.capabilities.pdf };
+    if (state.resourceId) {
+      try { selectResources(await api("/api/resources/" + state.resourceId)); }
+      catch (error) { selectResources(null); els.resourceStatus.textContent = error.message; }
+    }
     setConnection("已连接 · " + data.version);
   } catch (error) {
     setConnection(error.message);
@@ -225,6 +232,7 @@ async function validateRows() {
 
 function jobRequest(exportDxf) {
   return {
+    resourceId: state.resourceId,
     rows: state.rows,
     combineStep: els.combineStep.checked,
     exportCsv: els.exportCsv.checked,
@@ -240,6 +248,10 @@ function jobRequest(exportDxf) {
 
 async function startJob(exportDxf) {
   if (state.currentJob) return;
+  if (exportDxf && els.exportPdf.checked && !state.resources?.pdf) {
+    setJobState("failed", "请先上传固定 A4 DXF 图框及 gbenor.shx、gbcbig.shx 字体。");
+    return;
+  }
   saveSettings();
   clearDownload();
   try {
@@ -352,4 +364,36 @@ function writeLog(text) {
   if (els.log.textContent) els.log.textContent += "\n";
   els.log.textContent += text;
   els.log.scrollTop = els.log.scrollHeight;
+}
+
+
+function selectResources(data) {
+  state.resourceId = data?.resourceId || null;
+  state.resources = data;
+  if (state.resourceId) sessionStorage.setItem("rollerSealResources", state.resourceId);
+  else sessionStorage.removeItem("rollerSealResources");
+  els.resourceStatus.textContent = data
+    ? [data.drawingTemplate ? "图框已上传" : "缺少图框", data.fonts.gbenor ? "gbenor 已上传" : "缺少 gbenor", data.fonts.gbcbig ? "gbcbig 已上传" : "缺少 gbcbig", data.pdf ? "可导出 PDF" : "PDF 资源未齐"].join(" · ")
+    : "使用内置资源";
+}
+
+async function uploadResources() {
+  const form = new FormData();
+  const frame = els.drawingTemplate.files[0];
+  const fonts = Array.from(els.fontFiles.files);
+  if (!frame && !fonts.length) { els.resourceStatus.textContent = "请先选择 DXF 图框或 SHX 字体。"; return; }
+  if ((frame && frame.size > 8 * 1024 * 1024) || fonts.some(f => f.size > 4 * 1024 * 1024) || fonts.length > 2) {
+    els.resourceStatus.textContent = "DXF 最大 8 MiB，最多两个字体且每个最大 4 MiB。"; return;
+  }
+  if (state.resourceId) form.append("resourceId", state.resourceId);
+  if (frame) form.append("drawingTemplate", frame);
+  fonts.forEach(file => form.append("fonts", file));
+  els.uploadResourcesBtn.disabled = true;
+  els.resourceStatus.textContent = "正在上传…";
+  try {
+    selectResources(await api("/api/resources", { method: "POST", body: form }));
+    els.drawingTemplate.value = "";
+    els.fontFiles.value = "";
+  } catch (error) { els.resourceStatus.textContent = "上传失败：" + error.message; }
+  finally { els.uploadResourcesBtn.disabled = false; }
 }

@@ -168,3 +168,14 @@ dotnet build src/SolidCraftCsvTool/SolidCraftCsvTool.csproj -c Release -p:Versio
 ```
 
 第三方组件及许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。项目主页：[GitHub](https://github.com/EventHorizon-13/solidcraft-roller-seal)。
+
+## Web Preview：上传图框和字体（0.1.1）
+
+Web 版本的“输出设置 → 图框与字体”支持选择固定 A4 DXF 图框以及您有权使用的 `gbenor.shx`、`gbcbig.shx`，点击“上传并使用”。可以先传图框、再补传字体；补传保留当前资源的其他文件。刷新同一浏览器标签后继续使用所选资源。“使用内置资源”切回安装包默认值。上传资源存放在服务端 `WebData/resources/`，不在公开静态目录中；升级时应保留 WebData，字体和私人图框不会发布到 GitHub。
+
+- `POST /api/resources`：multipart/form-data，文件字段 `drawingTemplate`（单个 .dxf，最大 8 MiB）、`fonts`（最多两个，文件名仅允许 gbenor.shx 和 gbcbig.shx，各最大 4 MiB）。可选字符串字段 `resourceId` 指向之前上传的资源集。合计文件最大 16 MiB，请求体最大 20 MiB。
+- 返回 `resourceId`、`drawingTemplate`、`fonts.gbenor`、`fonts.gbcbig` 和 `pdf`。GET `/api/resources/{id}` 可查询资源就绪状态。
+- POST `/api/jobs` 的 JSON 增加可选 `resourceId`。不提供时使用内置资源；提供时使用相应不可变资源集，后续上传不会改写旧资源集或影响正在执行的任务。
+- 所有资源 API 沿用 `X-RollerSeal-Token` 鉴权。未配置令牌时仅允许回环调用。公网反代必须配置令牌，且不能在反代中为匿名请求注入令牌。
+- 反向代理的上传请求上限需要设置为至少 20 MiB（Nginx `client_max_body_size 20m;`），API 应禁缓存。
+- DXF 会做解析检查，所选标注样式和图框结构在提交出图任务时验证。字体做编译 SHX 签名检查；该检查不替代实际 PDF 渲染验证。只上传所需原始文件，不接受 ZIP、路径或任意服务器文件名。PDF 需要完整图框和两个字体；未齐时前端会提示。
