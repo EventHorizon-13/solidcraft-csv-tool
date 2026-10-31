@@ -1,0 +1,127 @@
+name: Browser-compute Web preview
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            rid: linux-x64
+          - arch: arm64
+            rid: linux-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Publish Web server shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish src/SolidCraftWeb/SolidCraftWeb.csproj -c Release -r '\${{ matrix.rid }}' \
+            --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=false -o dist/publish
+
+      - name: Bundle same-origin SolidCraft WebAssembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=work/solidcraft-web-0.28.0.zip
+          mkdir -p work dist/publish/wwwroot/solidcraft dist/site-root/roller-seal/solidcraft
+          curl --fail --location --retry 3 \
+            https://github.com/tangency-labs/solidcraft/releases/download/v0.28.0/solidcraft-web-0.28.0.zip \
+            --output "$archive"
+          printf '%s  %s\n' b0f28e2839dea7213fbbc622998ed1b17c3504c63cb9e2ea8ddf95e308e0e5de "$archive" | sha256sum --check
+          unzip -q "$archive" -d dist/publish/wwwroot/solidcraft
+          unzip -q "$archive" -d dist/site-root/roller-seal/solidcraft
+          test -f dist/publish/wwwroot/solidcraft/index.html
+          cp '模板/标准辊密封.solidcraft' dist/publish/wwwroot/client-template.solidcraft
+          cp '模板/标准辊密封.solidcraft' dist/site-root/roller-seal/client-template.solidcraft
+          for notice in LICENSE-MIT LICENSE-APACHE; do
+            curl --fail --location --retry 3 \
+              "https://raw.githubusercontent.com/tangency-labs/solidcraft/v0.28.0/$notice" \
+              --output "dist/publish/wwwroot/solidcraft/$notice"
+            cp "dist/publish/wwwroot/solidcraft/$notice" "dist/site-root/roller-seal/solidcraft/$notice"
+          done
+          printf '%s\n' 'SolidCraft Web v0.28.0, same-origin browser build.' \
+            'Upstream source: https://github.com/tangency-labs/solidcraft' \
+            'See the adjacent license files for license terms.' \
+            > dist/publish/wwwroot/solidcraft/THIRD-PARTY-NOTICE.txt
+          cp dist/publish/wwwroot/solidcraft/THIRD-PARTY-NOTICE.txt dist/site-root/roller-seal/solidcraft/
+
+      - name: Bundle Source Han Sans SC for the site directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/font-tools dist/publish/wwwroot/fonts dist/site-root/roller-seal/fonts
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/Variable/TTF/SourceHanSansSC-VF.ttf \
+            --output work/SourceHanSansSC-VF.ttf
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/LICENSE.txt \
+            --output work/LICENSE-SourceHanSans.txt
+          python3 -m venv work/font-tools/venv
+          work/font-tools/venv/bin/pip install 'fonttools[woff]==4.60.1'
+          work/font-tools/venv/bin/fonttools varLib.instancer work/SourceHanSansSC-VF.ttf wght=400 \
+            --output work/SourceHanSansSC-Regular.ttf
+          cat src/SolidCraftWeb/wwwroot/index.html src/SolidCraftWeb/wwwroot/client-app.js \
+            src/SolidCraftWeb/wwwroot/client.css > work/ui-font-text.txt
+          work/font-tools/venv/bin/pyftsubset work/SourceHanSansSC-Regular.ttf \
+            --text-file=work/ui-font-text.txt --unicodes=U+0020-00FF --flavor=woff2 \
+            --output-file=dist/publish/wwwroot/fonts/SourceHanSansSC-UI.woff2
+          cp dist/publish/wwwroot/fonts/SourceHanSansSC-UI.woff2 dist/site-root/roller-seal/fonts/
+          cp work/LICENSE-SourceHanSans.txt dist/publish/wwwroot/fonts/LICENSE.txt
+          cp work/LICENSE-SourceHanSans.txt dist/site-root/roller-seal/fonts/LICENSE.txt
+
+      - name: Package API server
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp README.md THIRD_PARTY_NOTICES.md dist/publish/
+          tar -czf "dist/StandardRollerSeal-client-api-linux-\${{ matrix.arch }}.tar.gz" -C dist/publish .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StandardRollerSeal-client-api-linux-\${{ matrix.arch }}
+          path: dist/StandardRollerSeal-client-api-linux-\${{ matrix.arch }}.tar.gz
+          retention-days: 14
+
+      - name: Package iobyte.cn site subdirectory
+        if: matrix.arch == 'amd64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp src/SolidCraftWeb/wwwroot/index.html dist/site-root/roller-seal/
+          cp src/SolidCraftWeb/wwwroot/styles.css dist/site-root/roller-seal/
+          cp src/SolidCraftWeb/wwwroot/client.css dist/site-root/roller-seal/
+          cp src/SolidCraftWeb/wwwroot/client-app.js dist/site-root/roller-seal/
+          cp README.md THIRD_PARTY_NOTICES.md CLIENT_COMPUTE_EXPERIMENT.md dist/site-root/
+          cat > dist/site-root/DEPLOY-ROLLER-SEAL.txt <<'EOF'
+          Extract roller-seal/ into the existing iobyte.cn website document root.
+          It creates /roller-seal/ and leaves the site's existing homepage files untouched.
+          The page sends only generated parameters and timestamp to https://srs.arcsiny.com;
+          that server records the request IP. The API server package must be deployed separately.
+          EOF
+          cd dist/site-root
+          zip -qr ../iobyte-cn-roller-seal-subdirectory.zip roller-seal DEPLOY-ROLLER-SEAL.txt CLIENT_COMPUTE_EXPERIMENT.md
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.arch == 'amd64'
+        with:
+          name: iobyte-cn-roller-seal-subdirectory
+          path: dist/iobyte-cn-roller-seal-subdirectory.zip
+          retention-days: 14
