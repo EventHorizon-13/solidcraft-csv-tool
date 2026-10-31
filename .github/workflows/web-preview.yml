@@ -11,6 +11,7 @@ on:
       - '模板/**'
       - '.github/workflows/web-preview.yml'
       - 'tests/web_resources_smoke.py'
+      - 'tests/web_ui_check.py'
       - 'tests/PdfPathChecks/**'
 
 concurrency:
@@ -95,6 +96,21 @@ jobs:
           cp "$node_dir/LICENSE" dist/app/PdfExporter/LICENSE-Node.js
           node tools/pdf-export/build-bundle.mjs dist/app/PdfExporter
 
+      - name: Bundle Source Han Sans SC (SIL OFL)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/app/PdfExporter/fonts
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/Variable/TTF/SourceHanSansSC-VF.ttf --output dist/SourceHanSansSC-VF.ttf
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/LICENSE.txt --output dist/app/PdfExporter/fonts/LICENSE-SourceHanSans.txt
+          python3 -m venv work/font-tools
+          work/font-tools/bin/pip install 'fonttools[woff]==4.60.1'
+          work/font-tools/bin/fonttools varLib.instancer dist/SourceHanSansSC-VF.ttf wght=400 --output dist/app/PdfExporter/fonts/SourceHanSansSC-Regular.ttf
+          cat src/SolidCraftWeb/wwwroot/index.html src/SolidCraftWeb/wwwroot/app.js src/SolidCraftCsvTool/*.cs > work/ui-font-text.txt
+          mkdir -p dist/app/wwwroot/fonts
+          work/font-tools/bin/pyftsubset dist/app/PdfExporter/fonts/SourceHanSansSC-Regular.ttf --text-file=work/ui-font-text.txt --unicodes=U+0020-00FF --flavor=woff2 --output-file=dist/app/wwwroot/fonts/SourceHanSansSC-UI.woff2
+          cp dist/app/PdfExporter/fonts/LICENSE-SourceHanSans.txt dist/app/wwwroot/fonts/LICENSE.txt
+
       - name: Publish Web preview
         shell: bash
         run: |
@@ -150,7 +166,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv work/upload-check-env
-          work/upload-check-env/bin/pip install 'ezdxf==1.4.3'
+          work/upload-check-env/bin/pip install 'ezdxf==1.4.3' 'pypdf==6.1.3' 'playwright==1.56.0'
+          work/upload-check-env/bin/python -m playwright install --with-deps chromium
           cd dist/app
           ROLLERSEAL_WEB_TOKEN=upload-smoke-token ASPNETCORE_URLS=http://127.0.0.1:5080 ./standard-roller-seal-web >resource-smoke.log 2>&1 &
           pid=$!
@@ -160,6 +177,15 @@ jobs:
             sleep 1
           done
           ../../work/upload-check-env/bin/python ../../tests/web_resources_smoke.py
+          ../../work/upload-check-env/bin/python ../../tests/web_ui_check.py
+
+      - name: Save Web UI previews
+        if: always() && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebUI-previews
+          path: work/ui-*.png
+          retention-days: 7
 
       - name: Remove smoke-test data from distribution
         shell: bash
@@ -181,7 +207,7 @@ jobs:
 
   release:
     needs: build
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.2')
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'Release Web preview 0.1.3')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -191,6 +217,21 @@ jobs:
           pattern: StandardRollerSeal-web-linux-*
           path: dist/release-assets
           merge-multiple: true
+
+      - name: Bundle Source Han Sans SC (SIL OFL)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/app/PdfExporter/fonts
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/Variable/TTF/SourceHanSansSC-VF.ttf --output dist/SourceHanSansSC-VF.ttf
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/adobe-fonts/source-han-sans/2.005R/LICENSE.txt --output dist/app/PdfExporter/fonts/LICENSE-SourceHanSans.txt
+          python3 -m venv work/font-tools
+          work/font-tools/bin/pip install 'fonttools[woff]==4.60.1'
+          work/font-tools/bin/fonttools varLib.instancer dist/SourceHanSansSC-VF.ttf wght=400 --output dist/app/PdfExporter/fonts/SourceHanSansSC-Regular.ttf
+          cat src/SolidCraftWeb/wwwroot/index.html src/SolidCraftWeb/wwwroot/app.js src/SolidCraftCsvTool/*.cs > work/ui-font-text.txt
+          mkdir -p dist/app/wwwroot/fonts
+          work/font-tools/bin/pyftsubset dist/app/PdfExporter/fonts/SourceHanSansSC-Regular.ttf --text-file=work/ui-font-text.txt --unicodes=U+0020-00FF --flavor=woff2 --output-file=dist/app/wwwroot/fonts/SourceHanSansSC-UI.woff2
+          cp dist/app/PdfExporter/fonts/LICENSE-SourceHanSans.txt dist/app/wwwroot/fonts/LICENSE.txt
 
       - name: Publish Web preview pre-release
         shell: bash
@@ -203,8 +244,8 @@ jobs:
             printf 'Expected two Web preview packages, found %s\n' "${#files[@]}"
             exit 1
           fi
-          tag="web-0.1.2-preview"
-          title="标准辊密封批量生成 Web 0.1.2 Preview"
+          tag="web-0.1.3-preview"
+          title="标准辊密封批量生成 Web 0.1.3 Preview"
           cat > dist/release-notes.md <<'EOF'
           Web UI + Linux 后端测试版，不作为 Windows 正式版替代。
 
@@ -216,6 +257,12 @@ jobs:
           - Linux amd64 / arm64 自包含包。
           - API 输入限制、CSP、安全响应头、路径隔离；未配置访问令牌时 API 仅允许本机访问。
           - CI 已实际启动 amd64 Web 服务并提交一行参数，验证生成 .solidcraft、DXF 和 CSV。
+
+          本次更新：
+          - 重排参数工作台与侧栏，优化窄屏、深浅色和键盘焦点；UI提供思源黑体子集。隐藏线默认比例改为2。
+          - DXF、PDF 独立按钮；直接下载所选文件，PDF 不再打包 ZIP。
+          - 默认内置开源思源黑体 Source Han Sans SC；可选上传 gbenor.shx、gbcbig.shx、isocp.shx。
+          - 无图框导出自动补编号；PDF 单独生成分页边界，整批各页使用相同比例，下载的无图框 DXF 不加边框。
 
           修复：
           - PDF 渲染子进程的清单文件改用绝对路径，避免切换工作目录后出现 ENOENT。
@@ -231,7 +278,7 @@ jobs:
           当前限制：
           - 仍为测试版，尚未完全达到 Windows UI 的表格交互细节。
           - 暂不提供 3D/图纸预览。
-          - PDF 仍需上传有效 A4 DXF 图框与授权 SHX 字体；字体签名检查不替代实际 PDF 渲染验证。
+          - 私有 SHX 字体仅由用户自行上传，字体签名检查不替代实际 PDF 渲染验证。
           EOF
           repo="EventHorizon-13/solidcraft-roller-seal"
           if gh release view "$tag" -R "$repo" >/dev/null 2>&1; then
@@ -242,5 +289,6 @@ jobs:
           else
             gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "$title" --notes-file dist/release-notes.md --prerelease -R "$repo"
           fi
+
 
 

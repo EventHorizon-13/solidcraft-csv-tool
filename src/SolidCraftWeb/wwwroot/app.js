@@ -2,12 +2,12 @@
 
 const els = {};
 const state = { columns: [], flags: new Set(), rows: [], defaults: {}, currentJob: null, poll: null, resourceId: sessionStorage.getItem("rollerSealResources") || null, resources: null };
-const settingIds = ["combineStep","exportCsv","exportPdf","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap"];
+const settingIds = ["combineStep","exportCsv","includeFrame","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap"];
 
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["apiToken","connectBtn","connectionState","csvFile","importBtn","addBtn","validateBtn","rowCount","grid",
-    "combineStep","exportCsv","exportPdf","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap",
-    "stepBtn","dxfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log","drawingTemplate","fontFiles","uploadResourcesBtn","resetResourcesBtn","resourceStatus"]) {
+    "combineStep","exportCsv","includeFrame","dxfName","stepName","dimensionStyle","hiddenLineScale","viewGap",
+    "stepBtn","dxfBtn","pdfBtn","capabilities","jobState","jobMessage","jobProgress","cancelBtn","downloadBtn","log","drawingTemplate","fontFiles","uploadResourcesBtn","resetResourcesBtn","resourceStatus"]) {
     els[id] = document.getElementById(id);
   }
   els.apiToken.value = sessionStorage.getItem("rollerSealToken") || "";
@@ -16,8 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
   els.csvFile.addEventListener("change", importCsv);
   els.addBtn.addEventListener("click", addRow);
   els.validateBtn.addEventListener("click", validateRows);
-  els.stepBtn.addEventListener("click", () => startJob(false));
-  els.dxfBtn.addEventListener("click", () => startJob(true));
+  els.stepBtn.addEventListener("click", () => startJob("step"));
+  els.dxfBtn.addEventListener("click", () => startJob("dxf"));
+  els.pdfBtn.addEventListener("click", () => startJob("pdf"));
   els.cancelBtn.addEventListener("click", cancelJob);
   els.downloadBtn.addEventListener("click", downloadResult);
   els.grid.addEventListener("paste", pasteGrid);
@@ -57,10 +58,11 @@ async function connect() {
     renderTable();
     const caps = [];
     caps.push(data.capabilities.solidCraft ? "SolidCraft CLI 已就绪" : "缺少 SolidCraft CLI");
-    caps.push(data.capabilities.drawingTemplate ? "DXF 图框已就绪" : "未发现 DXF 图框");
-    caps.push(data.capabilities.pdf ? "PDF 资源已发现" : "PDF 资源可能不完整");
+    caps.push(data.capabilities.drawingTemplate ? "DXF 图框已就绪" : "无图框（附编号）");
+    caps.push(data.capabilities.pdf ? "PDF 已就绪" : "默认思源黑体");
     els.capabilities.textContent = caps.join(" · ");
     state.resources = { pdf: data.capabilities.pdf };
+    els.includeFrame.disabled = !data.capabilities.drawingTemplate;
     if (state.resourceId) {
       try { selectResources(await api("/api/resources/" + state.resourceId)); }
       catch (error) { selectResources(null); els.resourceStatus.textContent = error.message; }
@@ -78,6 +80,11 @@ function setConnection(text) {
 function loadSettings() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem("rollerSealWebSettings.v1") || "{}"); } catch (_) {}
+  if (!localStorage.getItem("rollerSealHiddenScaleDefault.v2")) {
+    if (Number(saved.hiddenLineScale) === 1) delete saved.hiddenLineScale;
+    localStorage.setItem("rollerSealHiddenScaleDefault.v2", "1");
+    localStorage.setItem("rollerSealWebSettings.v1", JSON.stringify(saved));
+  }
   for (const id of settingIds) {
     const fallback = state.defaults[id];
     const value = Object.prototype.hasOwnProperty.call(saved, id) ? saved[id] : fallback;
@@ -230,14 +237,14 @@ async function validateRows() {
   }
 }
 
-function jobRequest(exportDxf) {
+function jobRequest(format) {
   return {
     resourceId: state.resourceId,
     rows: state.rows,
     combineStep: els.combineStep.checked,
     exportCsv: els.exportCsv.checked,
-    exportDxf: exportDxf,
-    exportPdf: exportDxf && els.exportPdf.checked,
+    outputFormat: format,
+    includeFrame: els.includeFrame.checked,
     dxfName: els.dxfName.value.trim(),
     stepName: els.stepName.value.trim(),
     hiddenLineScale: Number(els.hiddenLineScale.value),
@@ -246,24 +253,22 @@ function jobRequest(exportDxf) {
   };
 }
 
-async function startJob(exportDxf) {
+async function startJob(format) {
   if (state.currentJob) return;
-  if (exportDxf && els.exportPdf.checked && !state.resources?.pdf) {
-    setJobState("failed", "请先上传固定 A4 DXF 图框及 gbenor.shx、gbcbig.shx 字体。");
-    return;
-  }
   saveSettings();
   clearDownload();
   try {
     const data = await api("/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(jobRequest(exportDxf))
+      body: JSON.stringify(jobRequest(format))
     });
     state.currentJob = data.id;
+    document.querySelector(".log-details").open = true;
     els.cancelBtn.disabled = false;
     els.stepBtn.disabled = true;
     els.dxfBtn.disabled = true;
+    els.pdfBtn.disabled = true;
     setJobState("queued", "等待执行");
     await pollJob();
     state.poll = setInterval(pollJob, 800);
@@ -289,8 +294,11 @@ async function pollJob() {
       els.cancelBtn.disabled = true;
       els.stepBtn.disabled = false;
       els.dxfBtn.disabled = false;
+      els.pdfBtn.disabled = false;
       if (data.downloadable) {
         els.downloadBtn.dataset.job = state.currentJob;
+        els.downloadBtn.dataset.filename = data.downloadName || "结果.zip";
+        els.downloadBtn.textContent = data.contentType === "application/pdf" ? "下载 PDF" : data.contentType === "application/dxf" ? "下载 DXF" : "下载结果 ZIP";
         els.downloadBtn.classList.remove("disabled");
         els.downloadBtn.setAttribute("aria-disabled", "false");
       }
@@ -303,6 +311,7 @@ async function pollJob() {
     els.cancelBtn.disabled = true;
     els.stepBtn.disabled = false;
     els.dxfBtn.disabled = false;
+      els.pdfBtn.disabled = false;
     setJobState("failed", error.message);
   }
 }
@@ -341,7 +350,7 @@ async function downloadResult(event) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "辊密封_" + id.slice(0, 8) + ".zip";
+    link.download = els.downloadBtn.dataset.filename || "结果.zip";
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -370,12 +379,13 @@ function writeLog(text) {
 function selectResources(data) {
   state.resourceId = data?.resourceId || null;
   state.resources = data;
+  if (data) els.includeFrame.disabled = !data.drawingTemplate;
   if (state.resourceId) sessionStorage.setItem("rollerSealResources", state.resourceId);
   else sessionStorage.removeItem("rollerSealResources");
   els.resourceStatus.textContent = data
-    ? [data.drawingTemplate ? "图框已上传" : "缺少图框", data.fonts.gbenor ? "gbenor 已上传" : "缺少 gbenor", data.fonts.gbcbig ? "gbcbig 已上传" : "缺少 gbcbig", data.pdf ? "可导出 PDF" : "PDF 资源未齐"].join(" · ")
+    ? [data.drawingTemplate ? "图框已上传" : "无图框（附编号）", data.fonts.gbenor ? "gbenor 已上传" : "内置思源黑体", data.fonts.gbcbig ? "gbcbig 已上传" : "内置中文字体", data.fonts.isocp ? "isocp 已上传" : "内置标注字体", data.pdf ? "可导出 PDF" : "PDF 资源未齐"].join(" · ")
     : "使用内置资源";
-  if (data) els.capabilities.textContent = "当前使用上传资源 · " + (data.pdf ? "图框与字体已齐" : "PDF 资源未齐");
+  if (data) els.capabilities.textContent = "当前使用上传资源 · " + (data.pdf ? "PDF 已就绪" : "PDF 资源未齐");
 }
 
 async function uploadResources() {
@@ -383,8 +393,8 @@ async function uploadResources() {
   const frame = els.drawingTemplate.files[0];
   const fonts = Array.from(els.fontFiles.files);
   if (!frame && !fonts.length) { els.resourceStatus.textContent = "请先选择 DXF 图框或 SHX 字体。"; return; }
-  if ((frame && frame.size > 8 * 1024 * 1024) || fonts.some(f => f.size > 4 * 1024 * 1024) || fonts.length > 2) {
-    els.resourceStatus.textContent = "DXF 最大 8 MiB，最多两个字体且每个最大 4 MiB。"; return;
+  if ((frame && frame.size > 8 * 1024 * 1024) || fonts.some(f => f.size > 4 * 1024 * 1024) || fonts.length > 3) {
+    els.resourceStatus.textContent = "DXF 最大 8 MiB，最多三个字体且每个最大 4 MiB。"; return;
   }
   if (state.resourceId) form.append("resourceId", state.resourceId);
   if (frame) form.append("drawingTemplate", frame);
@@ -398,3 +408,4 @@ async function uploadResources() {
   } catch (error) { els.resourceStatus.textContent = "上传失败：" + error.message; }
   finally { els.uploadResourcesBtn.disabled = false; }
 }
+

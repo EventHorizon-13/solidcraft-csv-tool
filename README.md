@@ -179,3 +179,14 @@ Web 版本的“输出设置 → 图框与字体”支持选择固定 A4 DXF 图
 - 所有资源 API 沿用 `X-RollerSeal-Token` 鉴权。未配置令牌时仅允许回环调用。公网反代必须配置令牌，且不能在反代中为匿名请求注入令牌。
 - 反向代理的上传请求上限需要设置为至少 20 MiB（Nginx `client_max_body_size 20m;`），API 应禁缓存。
 - DXF 会做解析检查，所选标注样式和图框结构在提交出图任务时验证。字体做编译 SHX 签名检查；该检查不替代实际 PDF 渲染验证。只上传所需原始文件，不接受 ZIP、路径或任意服务器文件名。PDF 需要完整图框和两个字体；未齐时前端会提示。
+
+
+## Web 0.1.3：直接下载与无图框出图
+
+- “生成 DXF”和“生成 PDF”分别生成并直接下载 DXF、PDF，移除“同时导出 PDF”。PDF 下载不包含 DXF/模型/CSV，不生成 ZIP；STEP 仍可下载完整 ZIP。
+- POST /api/jobs 新增 outputFormat（step/dxf/pdf）与 includeFrame；旧 exportDxf/exportPdf 组合保持兼容。任务快照提供 contentType、downloadName，下载接口返回对应 MIME 与文件名。
+- 不上传图框也可生成 PDF/DXF；无图框时为每个零件补编号。PDF 使用独立分页用 DXF 中间文件，统一批次最大出图比例，并加分页方框锁定各页范围；下载的无图框 DXF 没有该框。
+- 默认字体为 Adobe Source Han Sans SC 2.005R，SIL Open Font License 1.1；构建从官方 TTF 可变字体取 wght=400 实例，随包提供字体和许可。没有上传私有 SHX 也能生成中文 PDF。
+- 可选 fonts 文件扩大为 gbenor.shx、gbcbig.shx、isocp.shx，各最大4MiB；DXF图框最大8MiB，总文件20MiB，请求24MiB。反代需 client_max_body_size 24m。授权字体只保存本机，不随软件分发。
+
+隐藏线比例默认2；网页版桌面/手机布局已重排，并随包提供思源黑体UI子集。正式版默认比例的main提交单独包含 [skip ci]，不构建正式安装包。

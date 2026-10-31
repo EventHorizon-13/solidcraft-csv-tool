@@ -67,10 +67,12 @@ upload([frame], resource_id='../escape', status=400)
 call('/api/resources/' + 'a' * 32, status=404)
 
 first = upload([frame])
-assert first['drawingTemplate'] and not first['pdf']
-second = upload([font, bigfont], first['resourceId'])
+assert first['drawingTemplate'] and first['pdf']
+isocp = ('fonts', 'isocp.shx', font[2])
+second = upload([font, bigfont, isocp], first['resourceId'])
+assert second['fonts']['isocp']
 assert second['pdf'] and second['resourceId'] != first['resourceId']
-assert not call('/api/resources/' + first['resourceId'])['pdf'], 'previous set mutated'
+assert not call('/api/resources/' + first['resourceId'])['fonts']['gbenor'], 'previous set mutated'
 assert call('/api/resources/' + second['resourceId'])['pdf']
 call('/WebData/resources/' + second['resourceId'] + '/frame.dxf', status=404)
 boot = call('/api/bootstrap')
@@ -78,7 +80,7 @@ payload = {'rows': [boot['defaultRow']], 'combineStep': False, 'exportCsv': True
            'exportDxf': True, 'resourceId': first['resourceId'], 'dimensionStyle': 'upload-test'}
 missing = dict(payload, resourceId='b' * 32)
 call('/api/jobs', json.dumps(missing).encode(), 'application/json', status=400)
-call('/api/jobs', json.dumps(dict(payload, exportPdf=True)).encode(), 'application/json', status=400)
+call('/api/jobs', json.dumps(dict(payload, outputFormat='exe')).encode(), 'application/json', status=400)
 job = call('/api/jobs', json.dumps(payload).encode(), 'application/json')
 for _ in range(180):
     result = call('/api/jobs/' + job['id'])
@@ -90,3 +92,58 @@ archive = call('/api/jobs/' + job['id'] + '/download')
 names = zipfile.ZipFile(io.BytesIO(archive)).namelist()
 assert any(name.endswith('.dxf') for name in names), names
 print('Targeted uploads, authentication, invalid files, size/path limits, immutable sets and selected-frame DXF job passed.')
+
+
+# New Web downloads: no ZIP for DXF/PDF; no-frame DXF contains a part label and
+# no FRAME entities. Two differently sized parts share the same PDF scale.
+from pypdf import PdfReader
+
+def run_job(payload):
+    job = call('/api/jobs', json.dumps(payload).encode(), 'application/json')
+    for _ in range(180):
+        result = call('/api/jobs/' + job['id'])
+        if result['status'] in ('completed', 'failed', 'cancelled'):
+            break
+        time.sleep(1)
+    assert result['status'] == 'completed', result
+    return result, call('/api/jobs/' + job['id'] + '/download')
+
+row = boot['defaultRow'].copy()
+row[0] = '2'
+row[5] = str(float(row[5]) * 10)
+rows = [boot['defaultRow'], row]
+result, raw = run_job({'rows': rows, 'outputFormat': 'dxf', 'includeFrame': False})
+assert result['contentType'] == 'application/dxf' and result['downloadName'].endswith('.dxf')
+assert not raw.startswith(b'PK')
+drawing = ezdxf.read(io.StringIO(raw.decode('utf-8-sig')))
+assert not list(drawing.modelspace().query('*[layer=="FRAME"]'))
+labels = [entity.dxf.text for entity in drawing.modelspace().query('TEXT') if '编号' in entity.dxf.text]
+assert len(labels) == 2 and labels[0] != labels[1], labels
+assert any('SourceHanSansSC-Regular.ttf' in style.dxf.font for style in drawing.styles)
+result, raw = run_job({'rows': rows, 'outputFormat': 'pdf', 'includeFrame': False})
+assert result['contentType'] == 'application/pdf' and result['downloadName'].endswith('.pdf')
+assert raw.startswith(b'%PDF-') and not raw.startswith(b'PK')
+pdf = PdfReader(io.BytesIO(raw))
+assert len(pdf.pages) == 2
+for page in pdf.pages:
+    assert abs(float(page.mediabox.width) - 841.89) < 1
+    assert abs(float(page.mediabox.height) - 595.28) < 1
+# The longest straight closed rectangle is the shared page boundary. Its model
+# size and transform must match across pages, despite different part dimensions.
+def boundary(page):
+    points, closed = [], []
+    def visit(operator, operands, cm, tm):
+        nonlocal points
+        if operator == b'm': points = [(float(operands[0]), float(operands[1]))]
+        elif operator == b'l': points.append((float(operands[0]), float(operands[1])))
+        elif operator == b'h' and len(points) >= 4:
+            xs, ys = zip(*points)
+            if max(xs) > min(xs) and max(ys) > min(ys):
+                closed.append((max(xs)-min(xs),max(ys)-min(ys),tuple(round(float(v),5) for v in cm)))
+        elif operator in (b'S', b's', b'f', b'f*', b'n'): points=[]
+    page.extract_text(visitor_operand_before=visit)
+    assert closed, 'missing PDF page boundary'
+    return max(closed,key=lambda b:b[0]*b[1])
+a,b = boundary(pdf.pages[0]),boundary(pdf.pages[1])
+assert abs(a[0]-b[0]) < .01 and abs(a[1]-b[1]) < .01 and a[2] == b[2], (a,b)
+print('Direct no-frame DXF/PDF, labels, Source Han Sans rendering, A4 pagination and uniform page-boundary scale passed.')

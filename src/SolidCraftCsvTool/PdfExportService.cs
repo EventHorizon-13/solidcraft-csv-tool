@@ -6,8 +6,11 @@ namespace SolidCraftCsvTool;
 
 internal static class PdfExportService
 {
+    public static string BundledFontPath => Path.Combine(AppContext.BaseDirectory, "PdfExporter", "fonts", "SourceHanSansSC-Regular.ttf");
+
     public static void ValidateFontDirectory(string fontDirectory)
     {
+        if (File.Exists(BundledFontPath)) return;
         if (string.IsNullOrWhiteSpace(fontDirectory) || !Directory.Exists(fontDirectory))
             throw new DirectoryNotFoundException("PDF 导出需要外置 SHX 字体目录，请在“出图设置”中选择包含 gbenor.shx 和 gbcbig.shx 的文件夹。");
         string fontRoot = Directory.Exists(Path.Combine(fontDirectory, "fonts")) &&
@@ -83,5 +86,6 @@ internal static class PdfExportService
             throw new InvalidDataException("PDF 渲染器输出内容无效。");
     }
 }
+
 
 

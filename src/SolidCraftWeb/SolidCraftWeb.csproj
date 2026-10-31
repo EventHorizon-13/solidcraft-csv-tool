@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>standard-roller-seal-web</AssemblyName>
     <RootNamespace>SolidCraftCsvTool</RootNamespace>
-    <Version>0.1.2-preview</Version>
+    <Version>0.1.3-preview</Version>
     <Product>标准辊密封批量生成 Web Preview</Product>
   </PropertyGroup>
   <ItemGroup>
@@ -26,4 +26,5 @@
     <PackageReference Include="netDxf" Version="2023.11.10" />
   </ItemGroup>
 </Project>
+
 

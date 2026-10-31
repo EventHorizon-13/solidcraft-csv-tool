@@ -12,11 +12,14 @@ public sealed record DrawingOptions
     public string TemplatePath { get; init; } = "";
     public string FontDirectory { get; init; } = "";
     public string DimensionStyleName { get; init; } = "_5";
-    public double HiddenLineScale { get; init; } = 1;
+    public double HiddenLineScale { get; init; } = 2;
     public double ViewGap { get; init; } = 60;
     public double FrameMargin { get; init; } = 35;
     public double SheetGap { get; init; } = 100;
     public bool IncludeFrame { get; init; } = true;
+    public bool UseBundledFont { get; init; }
+    public bool PdfPageBoundary { get; init; }
+    public double MinimumSheetScale { get; init; } = 1;
     // Empty values keep the template's text; absent/empty TITLE keeps the per-part automatic name.
     public Dictionary<string, string> TitleBlockAttributes { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public void Validate()
@@ -60,7 +63,12 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
     public static DrawingResources Load(DrawingOptions options)
     {
         options.Validate();
-        if (string.IsNullOrWhiteSpace(options.TemplatePath)) return new(DefaultStyle(), null);
+        if (string.IsNullOrWhiteSpace(options.TemplatePath))
+        {
+            var defaults = DefaultStyle();
+            if (options.UseBundledFont) defaults.TextStyle = PreferredTextStyle(options, false);
+            return new(defaults, null);
+        }
         DxfDocument template = DxfDocument.Load(options.TemplatePath) ?? throw new InvalidDataException("无法读取 DXF 模板。");
         if (!template.DimensionStyles.Contains(options.DimensionStyleName))
             throw new InvalidDataException($"模板不含标注样式“{options.DimensionStyleName}”，请在出图设置中选择。");
@@ -73,9 +81,17 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
             block.Name=name;
         }
         var style = (DimensionStyle)template.DimensionStyles[options.DimensionStyleName].Clone();
+        if (options.UseBundledFont) style.TextStyle = PreferredTextStyle(options, false);
         FrameSource? frame = options.IncludeFrame ? FindFrame(template) : null;
         if (options.IncludeFrame && frame == null) throw new InvalidDataException("模板中没有找到独立的矩形图框块；请关闭图框或使用含图框块的 DXF。");
         return new(style, frame);
+    }
+    public static TextStyle PreferredTextStyle(DrawingOptions options, bool title)
+    {
+        bool Has(string name) => File.Exists(Path.Combine(options.FontDirectory, name));
+        if (!title && Has("isocp.shx")) return new TextStyle("SC_ISO", "isocp.shx") { BigFont = Has("gbcbig.shx") ? "gbcbig.shx" : "" };
+        if (Has("gbenor.shx") && Has("gbcbig.shx")) return new TextStyle("SC_GB", "gbenor.shx") { BigFont = "gbcbig.shx" };
+        return new TextStyle("SC_SOURCE_HAN", "SourceHanSansSC-Regular.ttf");
     }
     public static DimensionStyle DefaultStyle() => new("_5")
     {
@@ -150,3 +166,4 @@ internal sealed record DrawingResources(DimensionStyle Style, FrameSource? Frame
         return all.Length == 0 ? null : BoundsOf(all);
     }
 }
+

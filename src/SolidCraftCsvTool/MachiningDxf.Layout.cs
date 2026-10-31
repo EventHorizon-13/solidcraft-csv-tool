@@ -52,6 +52,23 @@ internal static partial class MachiningDxf
         return "辊密封"+id;
     }
 
+    internal static double MeasureSheetScale(IReadOnlyList<StepDrawingPage> pages, DrawingOptions options)
+    {
+        // Writer owns managed DXF objects only; measuring must not save a file.
+        var writer = new Writer("", options);
+        writer.Initialize();
+        var scenes = pages.Select((p,i) => PlanPage(writer,p,i+1)).ToArray();
+        return RequiredSheetScale(writer, scenes);
+    }
+    static double RequiredSheetScale(Writer writer, Scene[] scenes)
+    {
+        var frame = writer.Resources.Frame;
+        double margin = writer.Options.FrameMargin;
+        double width = (frame?.Boundary.Width ?? 1190) - 2*margin;
+        double height = (frame?.Boundary.Height ?? 849) - (frame == null ? 155 : frame.TitleTop-frame.Boundary.MinY) - 2*margin;
+        if (width <= 0 || height <= 0) throw new InvalidDataException("图框内容区不足。");
+        return Math.Max(writer.Options.MinimumSheetScale, scenes.Max(s=>Math.Max(s.Bounds.Width/width,s.Bounds.Height/height)));
+    }
     static void RenderSheets(Writer writer,IReadOnlyList<StepDrawingPage> pages)
     {
         var scenes=pages.Select((p,i)=>PlanPage(writer,p,i+1)).ToArray();
@@ -61,7 +78,7 @@ internal static partial class MachiningDxf
         double bottom=(frame==null ? 155 : frame.TitleTop-frame.Boundary.MinY)+margin;
         double availableWidth=baseWidth-2*margin,availableHeight=baseHeight-bottom-margin;
         if(availableWidth<=0 || availableHeight<=0)throw new InvalidDataException("图框内容区不足，请减小图框边距。");
-        double factor=Math.Max(1,scenes.Max(s=>Math.Max(s.Bounds.Width/availableWidth,s.Bounds.Height/availableHeight)));
+        double factor=RequiredSheetScale(writer,scenes);
         double sheetWidth=baseWidth*factor,sheetHeight=baseHeight*factor;
         for(int i=0;i<scenes.Length;i++)
         {
@@ -71,6 +88,13 @@ internal static partial class MachiningDxf
             double x=margin*factor+(availableWidth*factor-b.Width)/2-b.MinX;
             double y=sheetY+bottom*factor+(availableHeight*factor-b.Height)/2-b.MinY;
             scene.Render(x,y);
+            if (!writer.Options.IncludeFrame)
+            {
+                writer.SetOffset(0,sheetY);
+                writer.Text("编号：" + DrawingName(pages[i].Name,i+1), new(sheetWidth*.5,margin*factor), writer.DimensionTextHeight,"TITLE");
+                if (writer.Options.PdfPageBoundary)
+                    writer.Polyline([new(0,0),new(sheetWidth,0),new(sheetWidth,sheetHeight),new(0,sheetHeight)],true,"FRAME");
+            }
         }
     }
 
@@ -90,3 +114,4 @@ internal static partial class MachiningDxf
         return lanes;
     }
 }
+

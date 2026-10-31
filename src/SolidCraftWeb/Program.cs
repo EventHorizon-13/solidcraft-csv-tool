@@ -56,7 +56,7 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
     var local = LocalTemplates.Find(AppContext.BaseDirectory, AppContext.BaseDirectory);
     return Results.Json(new
     {
-        version = "0.1.2-preview",
+        version = "0.1.3-preview",
         columns = ModelRules.Columns,
         flags = ModelRules.Flags.OrderBy(x => x).ToArray(),
         defaultRow = ModelRules.DefaultRow(),
@@ -67,7 +67,7 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
             exportPdf = false,
             dxfName = OutputNames.DefaultBase(),
             stepName = OutputNames.DefaultBase(),
-            hiddenLineScale = 1,
+            hiddenLineScale = 2,
             viewGap = 60,
             dimensionStyle = "_5"
         },
@@ -75,7 +75,7 @@ app.MapGet("/api/bootstrap", (HttpRequest request) =>
         {
             solidCraft = File.Exists(JobStore.EnginePath(AppContext.BaseDirectory)),
             drawingTemplate = local.Dxf != null,
-            pdf = resources.Resolve(null).Dxf != null && resources.Resolve(null).FontsReady
+            pdf = File.Exists(PdfExportService.BundledFontPath) || resources.Resolve(null).FontsReady
         }
     });
 });
@@ -98,7 +98,7 @@ app.MapPost("/api/resources", async (HttpRequest request, CancellationToken canc
         return Results.Json((await resources.UploadAsync(form, cancellation)).Snapshot());
     }
     catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
-    { return Results.Json(new { error = "上传请求不能超过 20 MiB。" }, statusCode: 413); }
+    { return Results.Json(new { error = "上传请求不能超过 24 MiB。" }, statusCode: 413); }
     catch (Exception ex) when (ex is InvalidDataException or FileNotFoundException or ArgumentException)
     { return Results.BadRequest(new { error = ex.Message }); }
 });
@@ -182,7 +182,7 @@ app.MapGet("/api/jobs/{id}/download", (HttpRequest request, string id) =>
     if (!Authorized(request)) return Denied();
     if (!jobs.TryGet(id, out var state) || state.Status != "completed" || state.DownloadPath == null || !File.Exists(state.DownloadPath))
         return Results.NotFound(new { error = "任务结果尚不可下载。" });
-    return Results.File(state.DownloadPath, "application/zip", "辊密封_" + id[..8] + ".zip", enableRangeProcessing: true);
+    return Results.File(state.DownloadPath, state.ContentType, state.DownloadName, enableRangeProcessing: true);
 });
 
 app.MapFallbackToFile("index.html");
@@ -197,10 +197,12 @@ public sealed record JobRequest(
     string? DxfName = null,
     string? StepName = null,
     string? Stamp = null,
-    double HiddenLineScale = 1,
+    double HiddenLineScale = 2,
     double ViewGap = 60,
     string DimensionStyle = "_5",
-    string? ResourceId = null);
+    string? ResourceId = null,
+    string? OutputFormat = null,
+    bool IncludeFrame = true);
 
 public sealed class JobStore
 {
@@ -234,6 +236,11 @@ public sealed class JobStore
 
     public JobState Create(JobRequest request)
     {
+        string? format = request.OutputFormat?.ToLowerInvariant();
+        if (format != null && format is not ("step" or "dxf" or "pdf")) throw new InvalidDataException("输出格式仅支持 step、dxf、pdf。");
+        if (format != null) request = request with {
+            ExportDxf = format is "dxf" or "pdf", ExportPdf = format == "pdf",
+            CombineStep = format == "step" && request.CombineStep, ExportCsv = format == "step" && request.ExportCsv };
         List<PreparedRow> prepared = NormalizeAndValidate(request.Rows);
         string stamp = string.IsNullOrWhiteSpace(request.Stamp) ? OutputNames.Stamp : request.Stamp.Trim();
         if (!Regex.IsMatch(stamp, "^[A-Za-z0-9-]{1,16}$")) throw new ArgumentException("日期/前缀只允许 1 至 16 位英文字母、数字或连字符。");
@@ -253,19 +260,18 @@ public sealed class JobStore
         if (request.ExportDxf || request.ExportPdf)
         {
             var selected = resources.Resolve(request.ResourceId);
-            if (request.ExportPdf && selected.Dxf == null)
-                throw new FileNotFoundException("PDF 导出需要固定 A4 DXF 图框，请先在输出设置中上传。");
             string fontDirectory = selected.FontDirectory;
             drawing = new DrawingOptions
             {
                 OverwriteOutput = true,
-                OutputFileName = request.DxfName,
+                OutputFileName = request.DxfName ?? "",
                 TemplatePath = selected.Dxf ?? "",
-                FontDirectory = request.ExportPdf ? fontDirectory : "",
+                FontDirectory = fontDirectory,
+                UseBundledFont = true,
                 DimensionStyleName = string.IsNullOrWhiteSpace(request.DimensionStyle) ? "_5" : request.DimensionStyle.Trim(),
                 HiddenLineScale = request.HiddenLineScale,
                 ViewGap = request.ViewGap,
-                IncludeFrame = selected.Dxf != null
+                IncludeFrame = request.IncludeFrame && selected.Dxf != null
             };
             drawing.Validate();
             if (selected.Dxf != null) _ = DrawingResources.Load(drawing);
@@ -295,11 +301,11 @@ public sealed class JobStore
             Drawing: drawing,
             ExportPdf: request.ExportPdf);
 
-        _ = Task.Run(() => RunAsync(state, options, engine, directory, output));
+        _ = Task.Run(() => RunAsync(state, options, engine, directory, output, format));
         return state;
     }
 
-    async Task RunAsync(JobState state, ExportOptions options, string engine, string directory, string output)
+    async Task RunAsync(JobState state, ExportOptions options, string engine, string directory, string output, string? format)
     {
         bool entered = false;
         try
@@ -311,6 +317,14 @@ public sealed class JobStore
             var progress = new Progress<ExportProgress>(entry => state.Report(entry.Message, entry.Completed, entry.Log));
             await Exporter.RunAsync(options, progress, state.Token);
 
+            if (format is "pdf" or "dxf")
+            {
+                string name = Path.ChangeExtension(options.Drawing!.ResolvedFileName, "." + format);
+                string file = Path.Combine(output, name);
+                if (!File.Exists(file)) throw new FileNotFoundException("未生成所选格式文件。");
+                state.Complete(file, format == "pdf" ? "application/pdf" : "application/dxf", name);
+                return;
+            }
             string zip = Path.Combine(directory, "result.zip");
             if (File.Exists(zip)) File.Delete(zip);
             ZipFile.CreateFromDirectory(output, zip, CompressionLevel.Fastest, false);
@@ -349,6 +363,8 @@ public sealed class JobState
     public string Message { get; private set; } = "等待执行";
     public int Completed { get; private set; }
     public string? DownloadPath { get; private set; }
+    public string ContentType { get; private set; } = "application/zip";
+    public string DownloadName { get; private set; } = "result.zip";
     public CancellationToken Token => cancellation.Token;
 
     public JobState(string id) => Id = id;
@@ -372,9 +388,9 @@ public sealed class JobState
         }
     }
 
-    public void Complete(string path)
+    public void Complete(string path, string contentType = "application/zip", string? name = null)
     {
-        lock (sync) { DownloadPath = path; Status = "completed"; Message = "生成完成"; }
+        lock (sync) { DownloadPath = path; ContentType = contentType; DownloadName = name ?? "辊密封_" + Id[..8] + ".zip"; Status = "completed"; Message = "生成完成"; }
     }
 
     public void Fail(string message)
@@ -400,10 +416,13 @@ public sealed class JobState
                 message = Message,
                 completed = Completed,
                 logs = logs.ToArray(),
+                downloadName = DownloadName,
+                contentType = ContentType,
                 downloadable = Status == "completed" && DownloadPath != null
             };
         }
     }
 }
+
 
 

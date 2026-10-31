@@ -101,8 +101,6 @@ public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outpu
             throw new IOException("汇总 DXF 已存在，未覆盖原文件：" + outputPath);
         if (exportPdf)
         {
-            if (string.IsNullOrWhiteSpace(drawingOptions.TemplatePath))
-                throw new InvalidDataException("PDF 导出需要选择包含固定 A4 图框的 DXF 模板。");
             _ = DrawingResources.Load(drawingOptions);
             string pdfOutputPath = Path.Combine(destination, Path.ChangeExtension(drawingOptions.ResolvedFileName, ".pdf"));
             if (!drawingOptions.OverwriteOutput && File.Exists(pdfOutputPath))
@@ -155,15 +153,17 @@ public static async Task RunAsync(IReadOnlyList<string> inputFiles, string outpu
             if (exportPdf)
             {
                 cancellation.ThrowIfCancellationRequested();
+                var pdfOptions = drawingOptions with { PdfPageBoundary = !drawingOptions.IncludeFrame,
+                    MinimumSheetScale = MachiningDxf.MeasureSheetScale(pages, drawingOptions) };
                 string[] pdfPages = new string[pages.Count];
                 for (int i = 0; i < pages.Count; i++)
                 {
                     cancellation.ThrowIfCancellationRequested();
                     pdfPages[i] = Path.Combine(work, $"pdf-page-{i + 1:D4}.dxf");
-                    MachiningDxf.Write(pdfPages[i], pages[i], drawingOptions);
+                    MachiningDxf.Write(pdfPages[i], pages[i], pdfOptions);
                 }
                 stagedPdf = Path.Combine(destination, $".{Path.GetFileNameWithoutExtension(outputName)}-{Guid.NewGuid():N}.tmp.pdf");
-                progress.Report(new($"正在用外置 SHX 字体渲染 {pages.Count} 页 A4 PDF…", pages.Count - 1));
+                progress.Report(new($"正在渲染 {pages.Count} 页 A4 PDF…", pages.Count - 1));
                 await PdfExportService.ExportAsync(pdfPages, stagedPdf, drawingOptions.FontDirectory, work, progress, cancellation);
             }
             cancellation.ThrowIfCancellationRequested();
@@ -554,7 +554,7 @@ internal static partial class MachiningDxf
         }
         public void Initialize()
         {
-            titleStyle=new netDxf.Tables.TextStyle("SC_TITLE","gbenor.shx"){BigFont="gbcbig.shx"};
+            titleStyle=Options.UseBundledFont ? DrawingResources.PreferredTextStyle(Options,true) : new netDxf.Tables.TextStyle("SC_TITLE","gbenor.shx"){BigFont="gbcbig.shx"};
             document.DrawingVariables.InsUnits=netDxf.Units.DrawingUnits.Millimeters;
             var hiddenType=new netDxf.Tables.Linetype("SC_HIDDEN",new netDxf.Tables.LinetypeSegment[]{new netDxf.Tables.LinetypeSimpleSegment(6),new netDxf.Tables.LinetypeSimpleSegment(-3)});
             foreach(var(name,color)in new[]{("VISIBLE",(short)7),("HIDDEN",(short)7),("DIM",(short)4),("TEXT",(short)3),("TITLE",(short)7),("FRAME",(short)7)})
@@ -1167,3 +1167,4 @@ internal static partial class MachiningDxf
         return Encoding.GetEncoding(936, EncoderFallback.ReplacementFallback, DecoderFallback.ReplacementFallback);
     }
 }
+

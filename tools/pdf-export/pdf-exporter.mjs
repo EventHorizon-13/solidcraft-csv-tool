@@ -9,6 +9,7 @@ import { FontManager } from '@mlightcad/mtext-renderer'
 import { AcTrMTextRenderer } from '@mlightcad/three-renderer'
 import { exportDatabaseToPdf } from '@mlightcad/pdf-renderer'
 import { PDFDocument } from 'pdf-lib'
+import { fileURLToPath } from 'node:url'
 import { createPdfGlyphProvider } from './pdf-glyph-provider.mjs'
 
 const args = parseArgs(process.argv.slice(2))
@@ -19,7 +20,6 @@ const inputs = manifest.inputs
 const fontDirectory = resolve(manifest.fontDirectory ?? '')
 const output = resolve(manifest.output ?? '')
 if (!Array.isArray(inputs) || inputs.length === 0) throw new Error('没有待转换的单页 DXF。')
-if (!manifest.fontDirectory) throw new Error('请在“出图设置”中选择包含 gbenor.shx 和 gbcbig.shx 的外置字体文件夹。')
 await setupTextFonts(fontDirectory)
 
 const combined = await PDFDocument.create()
@@ -77,61 +77,40 @@ function fontStem(value) {
 }
 
 async function setupTextFonts(directory) {
-  const roots = [directory, join(directory, 'fonts')]
-  let root = directory
-  let catalog
-  for (const candidate of roots) {
-    try {
-      const parsed = JSON.parse(await readFile(join(candidate, 'fonts.json'), 'utf8'))
-      if (Array.isArray(parsed)) { root = candidate; catalog = parsed; break }
-    } catch { }
+  const builtIn = join(dirname(fileURLToPath(import.meta.url)), 'fonts', 'SourceHanSansSC-Regular.ttf')
+  const entries = new Map()
+  const add = (entry) => {
+    for (const name of [entry.file, ...entry.name]) entries.set(fontStem(name), entry)
   }
-  if (!catalog) {
-    for (const candidate of roots) {
-      try {
-        const files = await readdir(candidate)
-        if (files.some(file => /^gbenor\.shx$/i.test(file)) && files.some(file => /^gbcbig\.shx$/i.test(file))) {
-          root = candidate
-          break
-        }
-      } catch { }
+  add({ name: ['sourcehansanssc-regular', 'Source Han Sans SC', 'SourceHanSansSC'], file: 'SourceHanSansSC-Regular.ttf', path: builtIn, type: 'mesh' })
+  for (const root of [directory, join(directory, 'fonts')]) {
+    let files
+    try { files = await readdir(root) } catch { continue }
+    for (const file of files) {
+      if (!/^(gbenor|gbcbig|isocp)\.shx$/i.test(file)) continue
+      add({ name: [fontStem(file)], file, path: join(root, file), type: 'shx', encoding: /^gbcbig\.shx$/i.test(file) ? 'gbk' : undefined })
     }
   }
-  const entries = new Map()
-  const add = (info) => {
-    if (!info?.file) return
-    const names = Array.isArray(info.name) ? info.name : [info.name ?? fontStem(info.file)]
-    const entry = { ...info, name: names, type: info.type ?? (extname(info.file).toLowerCase() === '.shx' ? 'shx' : 'mesh') }
-    for (const alias of [info.file, ...names]) entries.set(fontStem(alias), entry)
-  }
-  for (const item of catalog ?? []) add(item)
-  for (const file of await readdir(root)) {
-    if (!['.shx', '.ttf', '.otf', '.woff', '.woff2'].includes(extname(file).toLowerCase())) continue
-    if (!entries.has(fontStem(file))) add({ name: [fontStem(file)], file, type: extname(file).toLowerCase() === '.shx' ? 'shx' : 'mesh', encoding: /^gbcbig\.shx$/i.test(file) ? 'gbk' : undefined })
-  }
-  for (const required of ['gbenor.shx', 'gbcbig.shx']) {
-    if (!entries.has(fontStem(required))) throw new Error(`外置字体文件夹缺少 ${required}。可参照 tools/pdf-export/fonts.json.example 配置 fonts.json。`)
-  }
-
+  const defaults = ['sourcehansanssc-regular']
   const manager = FontManager.instance
   manager.enableFontCache = false
-  manager.setDefaultFonts('modern')
+  manager.setDefaultFonts(defaults)
+  manager.setSymbolFonts(defaults)
   manager.lazyFontLoading = true
   manager.awaitFontsBeforeDraw = true
   const renderer = AcTrMTextRenderer.getInstance()
   renderer.setRenderMode('main')
   renderer.initialize()
   renderer.setMeshGlyphInstancing(false)
-  await renderer.setDefaultFonts('modern')
+  await renderer.setDefaultFonts(defaults)
+  manager.setSymbolFonts(defaults)
   await renderer.setLazyFontLoading(true)
   await renderer.setAwaitFontsBeforeDraw(true)
   manager.setFontLoader({
-    get baseUrl() { return root },
+    get baseUrl() { return directory },
     set baseUrl(_value) { },
     async getAvailableFonts() {
-      return [...new Map([...entries.values()].map(entry => [entry.file, {
-        name: entry.name, file: entry.file, type: entry.type, url: '', source: 'cache', encoding: entry.encoding
-      }])).values()]
+      return [...new Set(entries.values())].map(entry => ({ name: entry.name, file: entry.file, type: entry.type, url: '', source: 'cache', encoding: entry.encoding }))
     },
     async load(names) {
       const statuses = []
@@ -139,9 +118,8 @@ async function setupTextFonts(directory) {
         const entry = entries.get(fontStem(name))
         if (!entry) { statuses.push({ fontName: fontStem(name), url: '', status: 'NotFound' }); continue }
         try {
-          const file = await readFile(join(root, entry.file))
-          const arrayBuffer = new ArrayBuffer(file.byteLength)
-          new Uint8Array(arrayBuffer).set(file)
+          const file = await readFile(entry.path)
+          const arrayBuffer = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength)
           statuses.push(await manager.cacheFont(arrayBuffer, entry.file, entry.name, entry.encoding))
         } catch (error) {
           statuses.push({ fontName: fontStem(name), url: '', status: 'FailedToLoad', error: String(error) })
@@ -150,9 +128,6 @@ async function setupTextFonts(directory) {
       return statuses
     }
   })
-  const required = ['gbenor.shx', 'gbcbig.shx']
-  const statuses = await manager.loadFontsByNames(required)
-  const missing = statuses.filter(status => status.status !== 'Success')
-  if (missing.length) throw new Error(`无法加载外置 SHX 字体：${missing.map(item => item.fontName).join('、')}`)
+  const statuses = await manager.loadFontsByNames(defaults)
+  if (statuses.some(status => status.status !== 'Success')) throw new Error('无法加载内置思源黑体 Source Han Sans SC。')
 }
-

@@ -7,7 +7,7 @@ public sealed class WebResources
 {
     readonly string root;
     readonly string applicationRoot;
-    public const long MaxBodyBytes = 20 * 1024 * 1024;
+    public const long MaxBodyBytes = 24 * 1024 * 1024;
     public WebResources(string applicationRoot)
     {
         this.applicationRoot = applicationRoot;
@@ -31,8 +31,8 @@ public sealed class WebResources
 
     public async Task<ResourcePaths> UploadAsync(IFormCollection form, CancellationToken cancellation)
     {
-        if (form.Files.Count is < 1 or > 3) throw new InvalidDataException("请选择一个 DXF 图框及最多两个 SHX 字体文件。");
-        if (form.Files.Sum(f => f.Length) > 16 * 1024 * 1024) throw new InvalidDataException("上传文件合计不能超过 16 MiB。");
+        if (form.Files.Count is < 1 or > 4) throw new InvalidDataException("请选择一个 DXF 图框及最多三个 SHX 字体文件。");
+        if (form.Files.Sum(f => f.Length) > 20 * 1024 * 1024) throw new InvalidDataException("上传文件合计不能超过 20 MiB。");
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in form.Files)
         {
@@ -42,9 +42,9 @@ public sealed class WebResources
             long limit;
             if (file.Name == "drawingTemplate" && Path.GetExtension(name).Equals(".dxf", StringComparison.OrdinalIgnoreCase))
             { target = "frame.dxf"; limit = 8 * 1024 * 1024; }
-            else if (file.Name == "fonts" && (name.Equals("gbenor.shx", StringComparison.OrdinalIgnoreCase) || name.Equals("gbcbig.shx", StringComparison.OrdinalIgnoreCase)))
+            else if (file.Name == "fonts" && (name.Equals("gbenor.shx", StringComparison.OrdinalIgnoreCase) || name.Equals("gbcbig.shx", StringComparison.OrdinalIgnoreCase) || name.Equals("isocp.shx", StringComparison.OrdinalIgnoreCase)))
             { target = name.ToLowerInvariant(); limit = 4 * 1024 * 1024; }
-            else throw new InvalidDataException("仅接受 drawingTemplate 字段的 .dxf 和 fonts 字段的 gbenor.shx、gbcbig.shx。");
+            else throw new InvalidDataException("仅接受 drawingTemplate 字段的 .dxf 和 fonts 字段的 gbenor.shx、gbcbig.shx、isocp.shx。");
             if (!names.Add(target)) throw new InvalidDataException("同名资源只能上传一次。");
             if (file.Length <= 0 || file.Length > limit) throw new InvalidDataException("DXF 最大 8 MiB，每个字体最大 4 MiB，文件不能为空。");
         }
@@ -56,7 +56,7 @@ public sealed class WebResources
         try
         {
             if (previous.Dxf != null) File.Copy(previous.Dxf, Path.Combine(directory, "frame.dxf"));
-            foreach (string font in new[] { "gbenor.shx", "gbcbig.shx" })
+            foreach (string font in new[] { "gbenor.shx", "gbcbig.shx", "isocp.shx" })
             {
                 string source = Path.Combine(previous.FontDirectory, font);
                 if (!File.Exists(source)) source = Path.Combine(previous.FontDirectory, "fonts", font);
@@ -100,9 +100,11 @@ public sealed class WebResources
 
 public sealed record ResourcePaths(string? Id, string? Dxf, string FontDirectory)
 {
-    public bool FontsReady => new[] { "gbenor.shx", "gbcbig.shx" }.All(font =>
+    public bool FontsReady => new[] { "gbenor.shx", "gbcbig.shx", "isocp.shx" }.All(font =>
         File.Exists(Path.Combine(FontDirectory, font)) || File.Exists(Path.Combine(FontDirectory, "fonts", font)));
     public object Snapshot() => new { resourceId = Id, drawingTemplate = Dxf != null, fonts = new {
         gbenor = File.Exists(Path.Combine(FontDirectory, "gbenor.shx")) || File.Exists(Path.Combine(FontDirectory, "fonts", "gbenor.shx")),
-        gbcbig = File.Exists(Path.Combine(FontDirectory, "gbcbig.shx")) || File.Exists(Path.Combine(FontDirectory, "fonts", "gbcbig.shx")) }, pdf = Dxf != null && FontsReady };
+        isocp = File.Exists(Path.Combine(FontDirectory, "isocp.shx")),
+        gbcbig = File.Exists(Path.Combine(FontDirectory, "gbcbig.shx")) || File.Exists(Path.Combine(FontDirectory, "fonts", "gbcbig.shx")) }, pdf = File.Exists(SolidCraftCsvTool.PdfExportService.BundledFontPath) || FontsReady };
 }
+
